@@ -118,6 +118,10 @@ def _persist_capture(
     )
 
 
+def _log_event(log_path: Path, payload: dict[str, Any]) -> None:
+    dpl.append_jsonl(log_path, {"ts_utc": dpl.utc_now_iso(), **payload})
+
+
 def _apply_retention(conn: Any, raw_dir: Path, *, retention_days: int, max_store_mb: int) -> dict[str, int]:
     now = datetime.now(timezone.utc)
     ttl_cutoff = now - timedelta(days=max(0, retention_days))
@@ -179,6 +183,7 @@ def run_capture(args: argparse.Namespace) -> dict[str, Any]:
         "duplicates": 0,
         "skipped_fresh": 0,
     }
+    log_path = Path(args.log_path)
 
     source_dir.mkdir(parents=True, exist_ok=True)
     candidates = _iter_candidates(source_dir)
@@ -206,6 +211,17 @@ def run_capture(args: argparse.Namespace) -> dict[str, Any]:
             fingerprint=fingerprint,
         ):
             counters["duplicates"] += 1
+            _log_event(
+                log_path,
+                {
+                    "event": "duplicate",
+                    "source": args.source,
+                    "symbol": c.symbol,
+                    "page_type": c.page_type,
+                    "fingerprint": fingerprint,
+                    "candidate_path": c.path.as_posix(),
+                },
+            )
             continue
 
         latest_ts = _latest_capture_ts(conn, source=args.source, symbol=c.symbol, page_type=c.page_type)
@@ -213,6 +229,19 @@ def run_capture(args: argparse.Namespace) -> dict[str, Any]:
             age = datetime.now(timezone.utc) - latest_ts
             if age < timedelta(minutes=args.freshness_minutes):
                 counters["skipped_fresh"] += 1
+                _log_event(
+                    log_path,
+                    {
+                        "event": "skipped_fresh",
+                        "source": args.source,
+                        "symbol": c.symbol,
+                        "page_type": c.page_type,
+                        "fingerprint": fingerprint,
+                        "candidate_path": c.path.as_posix(),
+                        "latest_capture_ts_utc": latest_ts.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                        "freshness_minutes": int(args.freshness_minutes),
+                    },
+                )
                 continue
 
         ts = datetime.now(timezone.utc)
@@ -235,10 +264,9 @@ def run_capture(args: argparse.Namespace) -> dict[str, Any]:
             )
 
         counters["captured"] += 1
-        dpl.append_jsonl(
-            Path(args.log_path),
+        _log_event(
+            log_path,
             {
-                "ts_utc": dpl.utc_now_iso(),
                 "event": "captured",
                 "source": args.source,
                 "symbol": c.symbol,
@@ -254,6 +282,19 @@ def run_capture(args: argparse.Namespace) -> dict[str, Any]:
         retention_days=args.retention_days,
         max_store_mb=args.max_store_mb,
     )
+    if retention["pruned_ttl"] or retention["pruned_cap"]:
+        _log_event(
+            log_path,
+            {
+                "event": "pruned",
+                "source": args.source,
+                "pruned_ttl": retention["pruned_ttl"],
+                "pruned_cap": retention["pruned_cap"],
+                "pruned_bytes": retention["pruned_bytes"],
+            },
+        )
+
+    bytes_on_disk = sum(p.stat().st_size for p in raw_dir.rglob('*') if p.is_file()) if raw_dir.exists() else 0
 
     summary = {
         **counters,
@@ -261,6 +302,7 @@ def run_capture(args: argparse.Namespace) -> dict[str, Any]:
         "source": args.source,
         "db": db_path.as_posix(),
         "raw_dir": raw_dir.as_posix(),
+        "bytes_on_disk": int(bytes_on_disk),
     }
     conn.close()
     return summary

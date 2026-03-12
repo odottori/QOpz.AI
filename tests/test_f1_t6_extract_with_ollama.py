@@ -69,7 +69,14 @@ class TestF1T6ExtractWithOllama(unittest.TestCase):
         s = extract_with_ollama.run_extract(args)
         self.assertEqual(s["valid"], 1)
         self.assertEqual(s["needs_review"], 0)
-        self.assertTrue((out_dir / "1.json").exists())
+        out_file = out_dir / "1.json"
+        self.assertTrue(out_file.exists())
+        payload = dpl.parse_json(out_file)
+        self.assertEqual(payload["validator_version"], "v1")
+        self.assertEqual(payload["prompt_version"], extract_with_ollama.PROMPT_VERSION)
+        log_lines = [line for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertEqual(len(log_lines), 1)
+        self.assertIn('"event": "validated"', log_lines[0])
 
     def test_needs_review_when_no_numeric(self):
         root = _case_root()
@@ -102,6 +109,10 @@ class TestF1T6ExtractWithOllama(unittest.TestCase):
         s = extract_with_ollama.run_extract(args)
         self.assertEqual(s["valid"], 0)
         self.assertEqual(s["needs_review"], 1)
+        log_lines = [line for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertEqual(len(log_lines), 2)
+        self.assertIn('"event": "invalid_json"', log_lines[0])
+        self.assertIn('"event": "needs_review"', log_lines[1])
 
         con = dpl.connect_db(db)
         row = con.execute("SELECT status FROM extractions LIMIT 1").fetchone()

@@ -13,6 +13,7 @@ except ModuleNotFoundError:  # support direct execution: py scripts\extract_with
     import demo_pipeline_lib as dpl
 
 PROMPT_VERSION = "v1"
+VALIDATOR_VERSION = "v1"
 
 
 def _try_float(v: Any) -> float | None:
@@ -134,6 +135,10 @@ def _validate(rec: dict[str, Any], *, symbol: str, page_type: str) -> tuple[bool
     return True, "ok"
 
 
+def _log_event(log_path: Path, payload: dict[str, Any]) -> None:
+    dpl.append_jsonl(log_path, {"ts_utc": dpl.utc_now_iso(), **payload})
+
+
 def _pending_captures(conn: Any, *, model: str, prompt_version: str, limit: int) -> list[dict[str, Any]]:
     rows = dpl.fetchall_dicts(
         conn,
@@ -218,8 +223,28 @@ def run_extract(args: argparse.Namespace) -> dict[str, Any]:
                     final_error = ""
                     break
                 final_error = why
+                _log_event(
+                    Path(args.log_path),
+                    {
+                        "event": "invalid_json",
+                        "capture_id": capture_id,
+                        "attempt": attempts,
+                        "backend": args.backend,
+                        "error": final_error,
+                    },
+                )
             except Exception as exc:
                 final_error = str(exc)
+                _log_event(
+                    Path(args.log_path),
+                    {
+                        "event": "invalid_json",
+                        "capture_id": capture_id,
+                        "attempt": attempts,
+                        "backend": args.backend,
+                        "error": final_error,
+                    },
+                )
 
         if final_rec is not None:
             out_path = Path(args.out_dir) / f"{capture_id}.json"
@@ -230,6 +255,7 @@ def run_extract(args: argparse.Namespace) -> dict[str, Any]:
                     "model": args.model,
                     "prompt_version": args.prompt_version,
                     "backend": args.backend,
+                    "validator_version": VALIDATOR_VERSION,
                     "record": final_rec,
                     "source_raw_path": raw_path.as_posix(),
                     "fingerprint_sha256": str(row["fingerprint_sha256"]),
@@ -253,14 +279,17 @@ def run_extract(args: argparse.Namespace) -> dict[str, Any]:
                 ),
             )
             valid += 1
-            dpl.append_jsonl(
+            _log_event(
                 Path(args.log_path),
                 {
-                    "ts_utc": dpl.utc_now_iso(),
                     "event": "validated",
                     "capture_id": capture_id,
                     "status": "VALID",
                     "output_path": out_path.as_posix(),
+                    "backend": args.backend,
+                    "model": args.model,
+                    "prompt_version": args.prompt_version,
+                    "validator_version": VALIDATOR_VERSION,
                 },
             )
             continue
@@ -283,14 +312,17 @@ def run_extract(args: argparse.Namespace) -> dict[str, Any]:
             ),
         )
         needs_review += 1
-        dpl.append_jsonl(
+        _log_event(
             Path(args.log_path),
             {
-                "ts_utc": dpl.utc_now_iso(),
                 "event": "needs_review",
                 "capture_id": capture_id,
                 "status": "NEEDS_REVIEW",
                 "error": final_error,
+                "backend": args.backend,
+                "model": args.model,
+                "prompt_version": args.prompt_version,
+                "validator_version": VALIDATOR_VERSION,
             },
         )
 
