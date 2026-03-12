@@ -122,7 +122,43 @@ def _log_event(log_path: Path, payload: dict[str, Any]) -> None:
     dpl.append_jsonl(log_path, {"ts_utc": dpl.utc_now_iso(), **payload})
 
 
-def _apply_retention(conn: Any, raw_dir: Path, *, retention_days: int, max_store_mb: int) -> dict[str, int]:
+def _capture_row_by_raw_path(conn: Any, raw_path: Path) -> dict[str, Any] | None:
+    return dpl.fetchone_dict(
+        conn,
+        """
+        SELECT id, source, symbol, page_type, fingerprint_sha256, payload_bytes, status
+        FROM captures
+        WHERE raw_path = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (raw_path.as_posix(),),
+    )
+
+
+def _prune_raw_file(conn: Any, raw_path: Path, *, reason: str, log_path: Path) -> int:
+    row = _capture_row_by_raw_path(conn, raw_path)
+    size = raw_path.stat().st_size if raw_path.exists() else 0
+    raw_path.unlink(missing_ok=True)
+    conn.execute("UPDATE captures SET status='PRUNED' WHERE raw_path=?", (raw_path.as_posix(),))
+    _log_event(
+        log_path,
+        {
+            "event": "pruned_file",
+            "reason": reason,
+            "raw_path": raw_path.as_posix(),
+            "bytes": int(size),
+            "capture_id": int(row["id"]) if row and row.get("id") is not None else None,
+            "source": str(row["source"]) if row and row.get("source") is not None else None,
+            "symbol": str(row["symbol"]) if row and row.get("symbol") is not None else None,
+            "page_type": str(row["page_type"]) if row and row.get("page_type") is not None else None,
+            "fingerprint": str(row["fingerprint_sha256"]) if row and row.get("fingerprint_sha256") is not None else None,
+        },
+    )
+    return int(size)
+
+
+def _apply_retention(conn: Any, raw_dir: Path, *, retention_days: int, max_store_mb: int, log_path: Path) -> dict[str, int]:
     now = datetime.now(timezone.utc)
     ttl_cutoff = now - timedelta(days=max(0, retention_days))
 
@@ -136,9 +172,7 @@ def _apply_retention(conn: Any, raw_dir: Path, *, retention_days: int, max_store
         for p in files:
             mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
             if mtime < ttl_cutoff:
-                size = p.stat().st_size
-                p.unlink(missing_ok=True)
-                conn.execute("UPDATE captures SET status='PRUNED' WHERE raw_path=?", (p.as_posix(),))
+                size = _prune_raw_file(conn, p, reason="ttl", log_path=log_path)
                 pruned_ttl += 1
                 pruned_bytes += int(size)
 
@@ -151,9 +185,7 @@ def _apply_retention(conn: Any, raw_dir: Path, *, retention_days: int, max_store
             for p in oldest:
                 if total <= max_bytes:
                     break
-                size = p.stat().st_size
-                p.unlink(missing_ok=True)
-                conn.execute("UPDATE captures SET status='PRUNED' WHERE raw_path=?", (p.as_posix(),))
+                size = _prune_raw_file(conn, p, reason="disk_cap", log_path=log_path)
                 pruned_cap += 1
                 pruned_bytes += int(size)
                 total -= size
@@ -281,6 +313,7 @@ def run_capture(args: argparse.Namespace) -> dict[str, Any]:
         raw_dir,
         retention_days=args.retention_days,
         max_store_mb=args.max_store_mb,
+        log_path=log_path,
     )
     if retention["pruned_ttl"] or retention["pruned_cap"]:
         _log_event(
