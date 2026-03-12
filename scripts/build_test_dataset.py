@@ -30,6 +30,7 @@ FIELDS = [
     "model",
     "prompt_version",
     "backend",
+    "validator_version",
     "raw_path",
     "output_path",
 ]
@@ -139,6 +140,7 @@ def _collect_rows(
                 "model": str(row["model"]),
                 "prompt_version": str(row["prompt_version"]),
                 "backend": str(row["backend"]),
+                "validator_version": str(payload.get("validator_version") or "unknown"),
                 "raw_path": str(row["raw_path"]),
                 "output_path": output_path.as_posix(),
             }
@@ -214,6 +216,25 @@ def run_build(args: argparse.Namespace) -> dict[str, Any]:
         "model_filter": args.model or None,
         "prompt_version_filter": args.prompt_version or None,
         "parquet_status": parquet_note,
+        "symbols": sorted({str(row["symbol"]) for row in rows}),
+        "page_types": sorted({str(row["page_type"]) for row in rows}),
+        "models": sorted({str(row["model"]) for row in rows}),
+        "prompt_versions": sorted({str(row["prompt_version"]) for row in rows}),
+        "validator_versions": sorted({str(row["validator_version"]) for row in rows}),
+        "records": [
+            {
+                "capture_id": int(row["capture_id"]),
+                "symbol": str(row["symbol"]),
+                "page_type": str(row["page_type"]),
+                "fingerprint_sha256": str(row["fingerprint_sha256"]),
+                "model": str(row["model"]),
+                "prompt_version": str(row["prompt_version"]),
+                "validator_version": str(row["validator_version"]),
+                "raw_path": str(row["raw_path"]),
+                "output_path": str(row["output_path"]),
+            }
+            for row in rows
+        ],
     }
     dpl.write_json(prov_path, provenance)
 
@@ -226,6 +247,8 @@ def run_build(args: argparse.Namespace) -> dict[str, Any]:
             "records": len(rows),
             "dedup_skipped": skipped_duplicates,
             "csv_path": csv_path.as_posix(),
+            "provenance_path": prov_path.as_posix(),
+            "dataset_csv_sha256": csv_hash,
             "parquet_written": parquet_written,
         },
     )

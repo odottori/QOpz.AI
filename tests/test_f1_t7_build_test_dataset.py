@@ -24,6 +24,7 @@ class TestF1T7BuildTestDataset(unittest.TestCase):
                 "model": "qwen2.5",
                 "prompt_version": "v1",
                 "backend": "json-pass",
+                "validator_version": "v1",
                 "record": {
                     "symbol": "IWM",
                     "page_type": "quote",
@@ -103,6 +104,18 @@ class TestF1T7BuildTestDataset(unittest.TestCase):
             rows = list(csv.DictReader(f))
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["symbol"], "IWM")
+        self.assertEqual(rows[0]["validator_version"], "v1")
+
+        prov = dpl.parse_json(prov_path)
+        self.assertEqual(prov["record_count"], 1)
+        self.assertEqual(prov["symbols"], ["IWM"])
+        self.assertEqual(prov["validator_versions"], ["v1"])
+        self.assertEqual(len(prov["records"]), 1)
+        self.assertEqual(prov["records"][0]["output_path"], payload.as_posix())
+
+        log_lines = [line for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertEqual(len(log_lines), 1)
+        self.assertIn('"event": "dataset_built"', log_lines[0])
 
 
 if __name__ == "__main__":

@@ -32,8 +32,85 @@ def _first_key(d: dict[str, Any], keys: list[str]) -> Any:
     return None
 
 
+def _normalize_ocr_numeric_token(token: str) -> float | None:
+    cleaned = token.strip().replace(",", ".")
+    if not cleaned:
+        return None
+    if re.fullmatch(r"\d{5}", cleaned):
+        try:
+            return float(f"{cleaned[:-2]}.{cleaned[-2:]}")
+        except ValueError:
+            return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _extract_ocr_numbers(raw_line: str) -> list[float]:
+    values: list[float] = []
+    for match in re.finditer(r"[-+]?\d+(?:[.,]\d+)?", raw_line):
+        token = match.group(0)
+        tail = raw_line[match.end() : match.end() + 2]
+        if "%" in tail:
+            continue
+        value = _normalize_ocr_numeric_token(token)
+        if value is None:
+            continue
+        values.append(value)
+    return values
+
+
+def _extract_from_ocr_row(raw: dict[str, Any], *, symbol: str, page_type: str) -> dict[str, Any]:
+    raw_line = str(raw.get("raw_line") or "")
+    # Parse conservative numeric clusters from OCR rows produced by real IBKR screenshots.
+    nums = _extract_ocr_numbers(raw_line)
+
+    quote_cluster: list[float] = []
+    for idx in range(max(0, len(nums) - 2)):
+        chunk = nums[idx : idx + 3]
+        positive = [x for x in chunk if x > 0]
+        if len(positive) < 2:
+            continue
+        lo = min(positive)
+        hi = max(positive)
+        if lo >= 1.0 and hi / max(lo, 1e-9) <= 1.01:
+            quote_cluster = positive
+            break
+    if not quote_cluster:
+        for idx in range(max(0, len(nums) - 1)):
+            pair = [x for x in nums[idx : idx + 2] if x > 0]
+            if len(pair) != 2:
+                continue
+            lo = min(pair)
+            hi = max(pair)
+            if lo >= 1.0 and hi / max(lo, 1e-9) <= 1.02:
+                quote_cluster = pair
+                break
+
+    last = quote_cluster[0] if len(quote_cluster) >= 1 else None
+    bid = quote_cluster[1] if len(quote_cluster) >= 2 else None
+    ask = quote_cluster[2] if len(quote_cluster) >= 3 else None
+    if bid is not None and ask is not None and ask < bid:
+        bid, ask = ask, bid
+
+    return {
+        "symbol": symbol,
+        "page_type": page_type,
+        "observed_ts_utc": _first_key(raw, ["observed_ts_utc", "generated_at_utc", "ts", "timestamp"]),
+        "bid": bid,
+        "ask": ask,
+        "last": last,
+        "iv": None,
+        "delta": None,
+        "underlying_price": None,
+    }
+
+
 def _extract_from_dict(raw: dict[str, Any], *, symbol: str, page_type: str) -> dict[str, Any]:
     nested = raw.get("data") if isinstance(raw.get("data"), dict) else raw
+    if isinstance(nested, dict) and nested.get("raw_line"):
+        return _extract_from_ocr_row(nested, symbol=symbol, page_type=page_type)
 
     rec = {
         "symbol": symbol,
@@ -139,6 +216,16 @@ def _log_event(log_path: Path, payload: dict[str, Any]) -> None:
     dpl.append_jsonl(log_path, {"ts_utc": dpl.utc_now_iso(), **payload})
 
 
+def _capture_log_context(row: dict[str, Any], *, capture_id: int, symbol: str, page_type: str, raw_path: Path) -> dict[str, Any]:
+    return {
+        "capture_id": capture_id,
+        "symbol": symbol,
+        "page_type": page_type,
+        "raw_path": raw_path.as_posix(),
+        "fingerprint_sha256": str(row["fingerprint_sha256"]),
+    }
+
+
 def _pending_captures(conn: Any, *, model: str, prompt_version: str, limit: int) -> list[dict[str, Any]]:
     rows = dpl.fetchall_dicts(
         conn,
@@ -227,7 +314,7 @@ def run_extract(args: argparse.Namespace) -> dict[str, Any]:
                     Path(args.log_path),
                     {
                         "event": "invalid_json",
-                        "capture_id": capture_id,
+                        **_capture_log_context(row, capture_id=capture_id, symbol=symbol, page_type=page_type, raw_path=raw_path),
                         "attempt": attempts,
                         "backend": args.backend,
                         "error": final_error,
@@ -239,7 +326,7 @@ def run_extract(args: argparse.Namespace) -> dict[str, Any]:
                     Path(args.log_path),
                     {
                         "event": "invalid_json",
-                        "capture_id": capture_id,
+                        **_capture_log_context(row, capture_id=capture_id, symbol=symbol, page_type=page_type, raw_path=raw_path),
                         "attempt": attempts,
                         "backend": args.backend,
                         "error": final_error,
@@ -283,7 +370,7 @@ def run_extract(args: argparse.Namespace) -> dict[str, Any]:
                 Path(args.log_path),
                 {
                     "event": "validated",
-                    "capture_id": capture_id,
+                    **_capture_log_context(row, capture_id=capture_id, symbol=symbol, page_type=page_type, raw_path=raw_path),
                     "status": "VALID",
                     "output_path": out_path.as_posix(),
                     "backend": args.backend,
@@ -316,7 +403,7 @@ def run_extract(args: argparse.Namespace) -> dict[str, Any]:
             Path(args.log_path),
             {
                 "event": "needs_review",
-                "capture_id": capture_id,
+                **_capture_log_context(row, capture_id=capture_id, symbol=symbol, page_type=page_type, raw_path=raw_path),
                 "status": "NEEDS_REVIEW",
                 "error": final_error,
                 "backend": args.backend,
