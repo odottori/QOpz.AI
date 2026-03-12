@@ -14,7 +14,12 @@ Build a deterministic, low-footprint data pipeline for testing/tuning before rea
 - `F1-T6` Extract fields with Ollama and strict validator+retry.
 - `F1-T7` Build clean test dataset and provenance index.
 - `F1-T8` Enforce retention (TTL + disk cap) and produce audit report.
-- `F2-T5` Run backtest using the generated dataset.
+- `F2-T5` Run the classical dataset-driven backtest using the generated dataset.
+
+## Boundary
+This pipeline is for the classical offline backtest path.
+It does not by itself implement the full operator-grade replay that simulates day-by-day decisions from a shifted historical "today".
+That replay-oriented path lives mainly in the paper/operator execution area and should be treated as a distinct validation mode.
 
 ## Anti-bloat controls
 - Content fingerprint (`sha256`) for every raw artifact.

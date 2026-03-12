@@ -202,7 +202,7 @@
     {
       "id": "R1B_DEMO_DATA_PIPELINE",
       "name": "Data pipeline demo differita + estrazione LLM deterministica",
-      "goal": "Acquisire snapshot demo differiti con dedup/freshness/retention, estrarre JSON con Ollama+qwen2.5, validare e produrre dataset pulito per backtest.",
+      "goal": "Acquisire snapshot demo differiti con dedup/freshness/retention, estrarre JSON con Ollama+qwen2.5, validare e produrre dataset pulito per backtest classico dataset-driven.",
       "required_steps": [
         "F1-T5",
         "F1-T6",
