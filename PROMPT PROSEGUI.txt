@@ -1,0 +1,212 @@
+# PROMPT MASTER (GO/NO-GO) — VERSIONE FINALE OPZ (ESTESA, ZIP=UNICA FONTE DI VERITÀ, AVANZAMENTO ESPLICITO, NAMING OPZ+QUANT)
+
+**CONTESTO**  
+In questa chat allegherò **uno ZIP della repo**: **lo ZIP allegato è l’unica fonte di verità**. Devi basarti **esclusivamente** sui file contenuti nello ZIP (e sugli output di comandi che io incollerò), ignorando memoria di chat precedenti, assunzioni esterne e qualsiasi fonte non inclusa nello ZIP (**niente web, niente “ricordi”, niente deduzioni non verificabili in repo**).
+
+---
+
+## 1) OBIETTIVO FINALE E ARCHITETTURA
+**Obiettivo**: arrivare al rilascio **GO/NO-GO** (passaggio da paper trading a decisione live) seguendo architettura a 5 moduli:
+
+1. Regime  
+2. Strategy  
+3. Risk Engine  
+4. Hedge  
+5. Execution **Human-confirmed** (**mai autopilota**)
+
+**Vincoli non negoziabili**
+- UI: **Operator Console definitiva in React + FastAPI** (Windows-first). **No Linux, no alternative stack.**
+- Execution: sempre “human-confirmed”.
+- Nessun “autopilota” live.
+
+---
+
+## 2) GATE CRITICI LIVE (HARD RULES)
+Applicare i gate **come definiti dalle sorgenti macchina in repo** (canonici + json + tools). Soglie target:
+
+- Sharpe Paper: **≥ 0.8** su almeno **10 trade**
+- Max DD Paper: **< 8%** in qualunque periodo
+- Compliance: **zero violazioni** su sizing e stop-loss
+
+**Regola di coerenza**: se c’è mismatch tra testi/JSON/tools, segnala il mismatch e proponi una **patch tool-based** che riallinei la sorgente corretta (mai editing manuale).
+
+---
+
+## 3) REGOLE D’INGAGGIO (“NO MANUAL WORK”)
+- **Step-by-step incrementale**: piccoli step, verificabili, con patch chirurgiche.
+- **Idempotenza**: nessun editing manuale a file canonici/registri. Ogni aggiornamento passa da tool Python idempotenti in `tools/`.
+- **Windows-First (CRLF)**: preserva CRLF; vietate conversioni LF che creano drift su MANIFEST/registri. Se serve, aggiungi/aggiorna un tool di verifica/enforcement (mai fix manuali).
+- **PowerShell-only**: ambiente Windows PowerShell, Python invocato sempre via `py` (niente bash/heredoc).
+- **No noise**: non ripetere comandi già eseguiti con successo; se un gate fallisce, rilascia solo fix mirati.
+- **No refactor cosmetico**: evitare refactor non funzionali prima del GO/NO-GO (salvo necessario per sbloccare un gate o una milestone).
+
+---
+
+## 4) PROTOCOLLO DI CONSEGNA (OBBLIGATORIO)
+**Ogni tua risposta deve includere SEMPRE 4 blocchi:**
+1) **Stato sintetico** (branch, `next_step`, milestone, gate attesi, avanzamento)  
+2) **Decisione operativa**: prossimo step implementativo proposto (motivazione breve)  
+3) **PATCH ZIP**: un file applicabile per **sovrascrittura** nella root  
+4) **Comandi PowerShell** copy-paste per: sync → apply patch → verify → gates → status avanzamento → git commit/push
+
+---
+
+## 5) NAMING OBBLIGATORIO DEGLI ZIP (OPZ + QUANT)
+Per evitare ambiguità tra chat/progetti:
+
+- **Tutti gli ZIP prodotti devono includere SEMPRE `OPZ`.**
+- **Tutti gli ZIP prodotti devono includere SEMPRE anche `QUANT`** (namespace dominio/progetto).
+- Formato consigliato:
+  - Patch: `PATCH_OPZ_QUANT_####_<descrizione>.zip`
+  - Snapshot repo (se richiesto): `REPO_OPZ_QUANT_<yyyymmdd_hhmm>.zip`
+
+---
+
+## 6) PATCH: REQUISITI MINIMI
+**Ogni PATCH deve includere o garantire la presenza di:**
+- `tools\apply_patch.py`
+- `tools\verify_manifest.py`
+- `tools\certify_steps.py`
+
+**Scope patch**: patch **minima** (solo file necessari + eventuali aggiornamenti coerenti di MANIFEST/REGISTRO/step-index/sorgenti di stato se cambiano i tracciati o l’avanzamento).
+
+---
+
+## 7) AUTOMAZIONE PYTHON (IN `tools/`)
+Insieme alla patch, fornisci/aggiorna script per:
+- Applicare e validare la patch in modo robusto.
+- Eseguire i gate minimi con output **esplicito PASS/FAIL** e motivazione sintetica.
+- Rigenerare/verificare il MANIFEST (necessario se i file tracciati cambiano).
+- **Aggiornare in modo coerente le sorgenti di stato/avanzamento** quando uno step/milestone cambia stato (sempre tool-based, mai manuale).
+
+---
+
+## 8) STATO AVANZAMENTO (MISURAZIONE) — `py tools\release_status.py --format md`
+`py tools\release_status.py --format md` è lo **strumento ufficiale di misurazione** dell’avanzamento (milestone Done/Missing) e va usato per:
+
+- **Baseline**: fotografare lo stato prima di proporre/modificare uno step.
+- **Verifica**: controllare che la PATCH abbia effettivamente mosso l’avanzamento come previsto.
+- **Pubblicazione**: includere nella risposta un estratto/riassunto coerente con l’output.
+
+**Quando lanciarlo (regola operativa):**
+- **Sempre** dopo aver letto lo ZIP (prima analisi).
+- **Sempre** dopo `apply_patch + verify_manifest + certify_steps + unittest`, per confermare l’avanzamento aggiornato.
+- Se un gate fallisce: rilancialo **solo** se hai modificato sorgenti/step che impattano l’avanzamento.
+
+**Chi aggiorna “le info che pubblica”:**
+- `release_status.py` è un **report derivato**, non la fonte.
+- Le info devono provenire **solo** dalle sorgenti macchina in repo (vedi Sez. 11).
+- Se l’output non riflette l’avanzamento atteso, la PATCH deve includere l’aggiornamento **tool-based** delle sorgenti corrette (mai “aggiustamenti manuali” su markdown/canonici).
+
+---
+
+## 9) WORKFLOW POWERSHELL (SEMPRE COMPLETO, COPIA-INCOLLA)
+In ogni risposta, includi i comandi PS in questo ordine:
+
+**Sync & Status**
+- `git rev-parse --abbrev-ref HEAD`
+- `git fetch --prune`
+- `git status -sb`
+- `py scripts\repo_sync_status.py --format line --no-fetch`
+
+**Apply & Verify (gate minimi)**
+- `py tools\apply_patch.py ...`
+- `py tools\verify_manifest.py`
+- `py tools\certify_steps.py`
+- `py -m unittest -q`
+
+**Stato Avanzamento (misurazione)**
+- `py tools\release_status.py --format md`
+
+**Ciclo Git (se tutto OK)**
+- `git status --short` (pulito)
+- `git commit -m "Descrizione STEP"`
+- `git push`
+- `git status --short`
+
+---
+
+## 10) GATE DI INTEGRITÀ (PRIMA DI OGNI CONSEGNA)
+Prima di consegnare una patch, il codice deve superare internamente:
+- `py -m unittest -q` → OK
+- `py tools\verify_manifest.py` → OK
+- `py tools\certify_steps.py` → OK
+
+Se c’è drift o modifiche a MANIFEST/step-index:
+- `py tools\reconcile_step_index.py`
+- `py tools\rebuild_manifest.py`
+- `py tools\verify_manifest.py`
+
+---
+
+## 11) ROADMAP, STATO E SORGENTI AUTORITATIVE (PRESENTI NELLO ZIP)
+Usa **solo** le sorgenti macchina **presenti nello ZIP**; qualsiasi documento/indicazione fuori dallo ZIP è **non autoritativa**:
+
+- Piano/Roadmap: `.canonici/04_APPENDICI.md` (sezione Roadmap GO/NO-GO)
+- Dati di piano/stato: `config/release_plan_go_nogo.json`
+- Stato avanzamento (report): `py tools\release_status.py --format md`
+- Next step operativo: `.qoaistate.json` (e/o ciò che i tool dichiarano come “next_step”)
+
+**Regola**: se per completare uno step cambiano milestone/next_step, la PATCH deve aggiornare le sorgenti di stato **in modo tool-based** (non manuale).
+
+---
+
+## 12) ESECUZIONE IMMEDIATA (PRIMO PASSO)
+1) **Analisi**: leggi la repo dallo ZIP allegato.  
+2) **Stato sintetico obbligatorio** (in risposta):
+   - branch corrente
+   - `next_step` (da `.qoaistate.json`)
+   - Stato milestone: includi e/o riassumi l’output di `py tools\release_status.py --format md`
+   - Esito atteso dei gate attuali
+3) **Azione**: proponi il **prossimo step implementativo** e rilascia la **prima `PATCH_OPZ_QUANT_####_*.zip`** rispettando tutti i protocolli sopra.
+
+---
+
+-------------------------------------
+
+
+Da questo momento, il file ZIP allegato è l’unica fonte di verità. Lavora esclusivamente sul suo contenuto.
+1. Obiettivo Operativo
+Riprendere e completare l’attività di implementazione in modalità incrementale. Per ogni interazione, devi rilasciare:
+Patch ZIP: Un archivio .zip applicabile in sovrascrittura (overwrite) sulla root della repo.
+Stato di Avanzamento: Un report sintetico, puntuale e verificabile del lavoro svolto.
+Gate di Qualità: Garanzia che i test e i controlli di integrità siano superati (Green) prima della consegna.
+2. Regole Tecniche e "No Noise"
+Niente Manualità: Non richiedere modifiche manuali a file di registro o canonici. Ogni aggiornamento deve essere gestito da tool Python idempotenti presenti in tools/.
+Minimalismo: Le patch devono essere chirurgiche (minime). Non introdurre file ridondanti o "rumore" (ripetizioni di comandi già eseguiti con successo).
+Correzioni: In caso di errore, produci immediatamente una patch correttiva (zip + tool .py).
+3. Specifica CRLF (Windows-First - Non Negoziabile)
+La repo deve accettare e preservare rigorosamente i terminatori di riga CRLF.
+Configurazione Git: Imponi e garantisci core.safecrlf=false e core.eol=crlf.
+Nessun Drift: Correggi eventuali .gitattributes o settaggi che forzano LF. Qualsiasi allineamento deve avvenire tramite patch e tool Python, senza intervento manuale dell'utente.
+Staging: Configura la repo per non bloccare staging/commit a causa di conversioni automatiche.
+4. Protocollo di Consegna (Obbligatorio)
+Ogni risposta che include codice deve contenere un file PATCH_*.zip e le relative istruzioni.
+A. Contenuto della Patch e Automazione Python
+Insieme ai file di progetto, la patch deve includere/aggiornare script in tools/ per:
+Validare e applicare i file della patch in modo robusto.
+Eseguire i gate di controllo e produrre un output chiaro (Pass/Fail).
+Rigenerare/verificare il MANIFEST (idempotente).
+B. Workflow PowerShell (Standardizzato)
+Fornisci sempre il blocco di comandi PowerShell pronti all'uso per:
+Estrarre la patch.
+Eseguire i gate di verifica.
+Eseguire il ciclo Git:
+Verifica branch e sync con upstream.
+git commit -m "Descrizione coerente con lo STEP"
+git push
+git status --short (deve risultare pulito).
+5. Gate di Integrità e "Step-System"
+Prima della consegna, verifica internamente che:
+py -m unittest -q -> OK
+py tools\verify_manifest.py -> OK
+py tools\certify_steps.py -> Generato senza errori
+Se certify_steps segnala drift o se la patch tocca file tracciati nel MANIFEST, esegui/fornisci la sequenza di riconciliazione:
+py tools\reconcile_step_index.py -> py tools\rebuild_manifest.py -> py tools\verify_manifest.py.
+Primo Passo Richiesto
+Analisi: Leggi la repo dallo ZIP allegato.
+Report Stato Attuale:
+Branch previsto.
+next_step (rilevato da .qoaistate.json).
+Esito atteso dei gate (in base ai file presenti).
+Azione: Proponi il prossimo step implementativo e rilascia la prima PATCH_*.zip seguendo i protocolli sopra descritti.

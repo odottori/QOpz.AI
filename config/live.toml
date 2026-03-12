@@ -1,0 +1,33 @@
+[phase0]
+requirements_lock = "requirements.lock"
+ibkr_timeout_sec = 10
+md_timeout_sec = 10
+md_symbol = "SPY"
+md_exchange = "SMART"
+md_currency = "USD"
+md_right = "P"          # P or C
+md_dte_min = 30
+md_dte_max = 60
+
+[storage]
+duckdb_path = "db/quantoptionai.duckdb"
+parquet_convention = "asof_ts=YYYY-MM-DDTHH:MM:SSZ"
+
+[dataset]
+seed = 42
+mode = "live"
+
+[broker]
+host = "127.0.0.1"
+port = 7497
+client_id = 7
+
+[ops]
+log_dir = "logs"
+log_rotation_days = 7
+
+[ops.kill_switch]
+manual_trigger_file = "ops/kill_switch.trigger"
+
+[secrets]
+required_env = []

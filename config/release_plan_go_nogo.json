@@ -1,0 +1,256 @@
+{
+  "version": "v1",
+  "generated_ts_utc": "2026-03-03T13:05:42Z",
+  "principles": {
+    "execution_mode": "HUMAN_CONFIRMED",
+    "windows_first": true,
+    "no_linux_required": true,
+    "go_nogo": {
+      "paper_sharpe_min": 0.8,
+      "paper_min_trades": 10,
+      "paper_maxdd_max": 0.08,
+      "zero_rule_violations": true
+    },
+    "tier_upgrade": {
+      "oos_sharpe_min": 0.8,
+      "oos_maxdd_max": 0.08,
+      "zero_rule_violations": true
+    }
+  },
+  "capital_tiers": {
+    "MICRO": {
+      "capital_range_eur": [
+        1000,
+        2000
+      ],
+      "strategies": [
+        "Vertical Spread",
+        "Bull Put (IWM)"
+      ],
+      "target_monthly_return_pct": [
+        0.8,
+        1.5
+      ],
+      "max_positions": [
+        1,
+        2
+      ]
+    },
+    "SMALL": {
+      "capital_range_eur": [
+        2000,
+        5000
+      ],
+      "strategies": [
+        "Iron Condor",
+        "Bull Put",
+        "Wheel"
+      ],
+      "target_monthly_return_pct": [
+        1.2,
+        2.5
+      ],
+      "max_positions": [
+        2,
+        3
+      ]
+    },
+    "MEDIUM": {
+      "capital_range_eur": [
+        5000,
+        15000
+      ],
+      "strategies": [
+        "Iron Condor (SPY/QQQ)",
+        "PMCC",
+        "Calendar"
+      ],
+      "target_monthly_return_pct": [
+        1.5,
+        3.0
+      ],
+      "max_positions": [
+        3,
+        5
+      ]
+    },
+    "ADVANCED": {
+      "capital_range_eur": [
+        15000,
+        null
+      ],
+      "strategies": [
+        "Multi-sottostante",
+        "Ratio Spread"
+      ],
+      "target_monthly_return_pct": [
+        2.0,
+        4.0
+      ],
+      "max_positions": [
+        4,
+        8
+      ]
+    }
+  },
+  "modules": [
+    {
+      "id": "M1_DATA",
+      "name": "Data & Provenance (F1)",
+      "required_steps": [
+        "F1-T1",
+        "F1-T2",
+        "F1-T3",
+        "F1-T4",
+        "F1-T5",
+        "F1-T6",
+        "F1-T7",
+        "F1-T8"
+      ]
+    },
+    {
+      "id": "M1B_DEMO_DATA",
+      "name": "Demo Deferred Data Pipeline (Capture + LLM Extract + Dataset)",
+      "required_steps": [
+        "F1-T5",
+        "F1-T6",
+        "F1-T7",
+        "F1-T8",
+        "F2-T5"
+      ]
+    },
+    {
+      "id": "M2_REGIME_RISK",
+      "name": "Regime + Risk Overlay (F2)",
+      "required_steps": [
+        "F2-T1",
+        "F2-T2",
+        "F2-T3",
+        "F2-T4",
+        "F2-T5"
+      ]
+    },
+    {
+      "id": "M3_EXECUTION",
+      "name": "Execution (F3)",
+      "required_steps": [
+        "F3-T1",
+        "F3-T2",
+        "F3-T3",
+        "F3-T4"
+      ]
+    },
+    {
+      "id": "M4_SCORING_SIZING",
+      "name": "Scoring/Sizing (F4)",
+      "required_steps": [
+        "F4-T1",
+        "F4-T2",
+        "F4-T3"
+      ]
+    },
+    {
+      "id": "M5_HEDGE",
+      "name": "Tactical Hedge (F5)",
+      "required_steps": [
+        "F5-T1",
+        "F5-T2",
+        "F5-T3"
+      ]
+    },
+    {
+      "id": "M6_UI_OPS",
+      "name": "UI Operator Console + Ops (F6)",
+      "required_steps": [
+        "F6-T1",
+        "F6-T2",
+        "F6-T3"
+      ]
+    }
+  ],
+  "milestones": [
+    {
+      "id": "R0_BASELINE",
+      "name": "Baseline operativa e integrità",
+      "goal": "Repo stabile, gates verdi, progress tracking affidabile, ZIP portabili via make_repo_zip.bat.",
+      "required_steps": [
+        "D2.38",
+        "D2.39",
+        "D2.40",
+        "D2.41",
+        "D2.42",
+        "D2.43"
+      ],
+      "release_threshold": "dev"
+    },
+    {
+      "id": "R1_ENGINE_OFFLINE",
+      "name": "Engine offline completo (Research-grade)",
+      "goal": "Tutta la logica core (Data+Regime+Risk+WFA) disponibile offline e deterministica.",
+      "required_steps": [
+        "F1-T1",
+        "F1-T2",
+        "F1-T3",
+        "F1-T4",
+        "F2-T1",
+        "F2-T2",
+        "F2-T3",
+        "F2-T4"
+      ],
+      "release_threshold": "dev"
+    },
+    {
+      "id": "R1B_DEMO_DATA_PIPELINE",
+      "name": "Data pipeline demo differita + estrazione LLM deterministica",
+      "goal": "Acquisire snapshot demo differiti con dedup/freshness/retention, estrarre JSON con Ollama+qwen2.5, validare e produrre dataset pulito per backtest.",
+      "required_steps": [
+        "F1-T5",
+        "F1-T6",
+        "F1-T7",
+        "F1-T8",
+        "F2-T5"
+      ],
+      "release_threshold": "dev"
+    },
+    {
+      "id": "R2_PAPER_OPERATOR",
+      "name": "Paper trading operator-grade (Human-confirmed)",
+      "goal": "Connessione broker paper + ordini combo + console operatore minima (React+FastAPI) con conferma esplicita.",
+      "required_steps": [
+        "F3-T1",
+        "F3-T2",
+        "F6-T1"
+      ],
+      "release_threshold": "paper"
+    },
+    {
+      "id": "R3_PAPER_HEDGE",
+      "name": "Paper con Hedge attivo",
+      "goal": "Hedge tattico attivo in SHOCK + DD>=10% e osservabilità completa.",
+      "required_steps": [
+        "F5-T1",
+        "F5-T2",
+        "F5-T3"
+      ],
+      "release_threshold": "paper"
+    },
+    {
+      "id": "R4_GO_NO_GO",
+      "name": "GO/NO-GO pack (paper month)",
+      "goal": "Runner che produce report GO/NO-GO: Sharpe>=0.8 (>=10 trade), MaxDD<8%, violazioni=0.",
+      "required_steps": [
+        "F6-T2"
+      ],
+      "release_threshold": "paper"
+    },
+    {
+      "id": "R5_LIVE_ENABLE",
+      "name": "Live enable (sempre human-confirmed)",
+      "goal": "Profilo live con guardrail; stessa UI, stessi gating; switch controllato.",
+      "required_steps": [
+        "F6-T3"
+      ],
+      "release_threshold": "live"
+    }
+  ]
+}

@@ -1,0 +1,276 @@
+QuantOptionAI — CANON
+
+Versione: v.T.11.13
+
+Build: 2026-03-02 18:14:52 UTC
+
+
+
+Files (5):
+
+- 00_MASTER.md
+- 01_TECNICO.md
+- 02_TEST.md
+- 03_SETUP.md
+- 04_APPENDICI.md
+
+
+
+Obbligatori:
+
+- REGISTRO_INTEGRITA.md
+- MANIFEST.txt
+
+
+
+Hash SHA256 (file, size):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+8abb11f5198af88369fb689d79724a398205b247b83ace94fd9da34aa27a6eae         8177  .baseline_artifacts_vT11_1/CROSS_REFERENCE_SEZIONI_v11_vs_v11_1.md
+c923e9ab425914b34e484f1f961c067105fc51a61bb8d5adf4515c86951cbe5e        42483  .baseline_artifacts_vT11_1/DIFF_SNIPPET_MASTER_v11_to_v11_1.diff
+45911adf7645605d11aaf1e2c58edd6032392e9216980788e31805429501fab0        34033  .baseline_artifacts_vT11_1/DIFF_SNIPPET_TECNICO_v11_to_v11_1.diff
+1b35603c647c16ce0bff8b1395505ab2c238931f501446e842110b24d3be2047         1114  .baseline_artifacts_vT11_1/MIGRATION_NOTES_v11_1.md
+97dd44f5df878d68e3f20612f99f3665c02c05417442d51b18ae401b7aa2483d        22870  .canonici/00_MASTER.md
+f4901ce3b0935e4ba971202d679cb8439dce2067f2351d39ef934fb20de5eb46        20699  .canonici/01_TECNICO.md
+56e9a784e08e46b97643528e8e7943abaab494dae091c5a301e3e2d5855bd4ab        19290  .canonici/02_TEST.md
+ed6b62df92c23677ed53104035a0c85fec142e0fd006a47c897c284cadef1156         4016  .canonici/03_SETUP.md
+652300f887b5fbfb5fec58a454cb6208b38a00349700466035313aa96ad6b3c9         6470  .canonici/04_APPENDICI.md
+0604a94a79691373d9789a8bd4cfa65a01bdfdb8fb8c9fc52b4a762fb428178a        15897  .canonici/MANIFEST.txt
+3c9c51b90e9b1a25f19ea2d5445c8e3dc268fb86cb70a5841538da5a9c98f15c        18274  .canonici/REGISTRO_INTEGRITA.md
+fb92e6506bbbe23f32381f7faa1d5722ef65e6c57ac511db4b724f027300c1f9          235  .gitattributes
+38805f8ff669c98e00e2b8833d2cb5040c852e5007714fa7f273c4c62429248e          376  .gitignore
+20f2b25a6d0cab9cf77f174fc7ad46d013cab1c4c845da50baf599cb3e60e2bf        23385  .qoaistate.json
+94ff7e7f7f4ca70763e8b5475d4f7c0919e52e7720a7543911712a65a272c143          688  .step_index.json
+6c9a5717fd48797805ccdac62aa742901818623b54418f2f54c4e3173b93ee82         1230  PATCH_NOTES.md
+7cdc777a8d2118fa1d10c0c6fb44bd3789e65a14380e2997b239a66ed0249867          228  PATCH_NOTES_D2_0.md
+37e5894b743e88135164a66e6c2b8af32cdde656ecf19f0e9704646958fd8eb9          451  PATCH_NOTES_D2_1.md
+2a2cb5d199dc2dd21f549d8b97c00d2c599ce2e3b77eb5fd8f55707ddf0fcf4e          429  PATCH_NOTES_D2_1_1.md
+0d5d6346bf69227707fb992b832d9a2e67671ccafc960f0321d3aa45bcb8efb0          618  PATCH_NOTES_D2_1_3.md
+0644cee50c716a32e7dd85e25097ef53a2179658fcfaf3e426865dbc8a2269f9          470  PATCH_NOTES_D2_2.md
+ac062bcadb68bbc29ad8bef0a26eec11739f696242ac856430aa0be315e8885f          592  PATCH_NOTES_D2_2_1.md
+62f6a99f15f3fee7ad88417ac7ff502b264be64a71230efefba96e77253bc7db          464  PATCH_NOTES_D2_2_2.md
+364740594e1398ac2ebd28198c09f960fd3ed2f4af29ebe170c5863828ef60d7         3557  PROMPT PROSEGUI.txt
+d6aef457f0b46695fbbeb247dd58c3107cf88bbdf7cd3f4d37ffe577099e0372          556  config/dev.toml
+c79129dd4191aa8bfae938baae8b17f3ffee1942fcf4882bdda71bd77cec4562          551  config/live.toml
+bc061ad88cb79758caf615400d854015c8f076dbe0e4efba1e7605a26decec6a          552  config/paper.toml
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855            0  data/.gitkeep
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855            0  db/.gitkeep
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855            0  docs/.gitkeep
+155e06e2b6d6cb5dcc1e664b8709a4a417501addd7a59409fc3e4d4563a3f3d1        12319  docs/ANALISI_INTERVENTO_LLM.md
+8524efe67092b4a93f644a6ceeeded9bb5c897e3922ef97853e4d39fef6ef1c7         1294  docs/OPERATIVITA_PR_CODEX.md
+5b9e09362f203174f86c283317ce5d15c133363d4ab7efd2097317bc0b3b5bc2         6442  docs/QOAI_MASTER_CONTROL_FRAMEWORK_v1.2.md
+4515562b92fa1d489a965f0e8d7e5dd667317ca313c2f08a0078572eae06dfed         2172  docs/TRACEABILITY_PHASE0.md
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855            0  execution/__init__.py
+f4c7d3d9bf2b6bc098fff88e42b410160d604cb0f80058fa3d1e49127e1860eb         3005  execution/ack.py
+0d66906f028ea68791d05e9278ba1b7aea263472f5d3ff82d55c98c319704498         4517  execution/ack_taxonomy.py
+766e2c91c9fd9388266e633460c8498bf5a05099111f0d246e6e2f0dec4d0428         5586  execution/boundary_adapter.py
+ee23dace3992b472bb3d669995d002331e62acf6c0797dca54a6c260a39bb425         2822  execution/broker_event_schema.py
+56b483a056a444514cae83ef8554561da838df3f2552b837683439122b760b0b          172  execution/client_id.py
+c8fa239df1a3c17ffced35479553ddaebffb717cafe4a55de74585a3a561cd9b        10684  execution/dry_run_adapter.py
+c13348b230449b2c80acc29745cd9cce113ce61f7920ad007b3ea7153f434d34         2197  execution/execution_plan.py
+741b84fc984a5430a029678293144873fc7946823c4d848c91f6e6903e11d0bc         1841  execution/idempotency.py
+ac223c142e6a788b032d7405ca496865485d6c5b0ccf775eb50f6da022692b96         1683  execution/journal_state.py
+8d15b6311399c76563a7541d8dd9dd50853627cb87b942d6d1fc6eb5f501260f         4970  execution/order_reducer.py
+144abb8ba99ff41e3ab0c7c7fc7c3dc06d274f9378986de09a0a3ff1d0272203          467  execution/order_schema.py
+f500e152898d25b4f751ee91404662219fcbc8a7b666f08e930b1ced0dbba1de          344  execution/outcome.py
+dc515aabb06866717be819145fd1ba9781a6479147c6430dbd154ee9f204b21c         6544  execution/reconcile.py
+ccc496a4c4e7f1342630a6c50bfca46f22316399a1f9ec3a59d9e7e03361f003         1066  execution/smart_ladder.py
+1aa34e690cf33dbd5e395f10f5840b0dc56c033ff9f593e1e4c29d6deb99f7f3         1098  execution/state_machine.py
+2249dd3cdfc59198f33810804e07ad65f03167fc9739b0ed753f4b2e106eaf6a         7908  execution/storage.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855            0  logs/.gitkeep
+77ee201a3b2d30d6c6c7e0869f5ae2169113698bc73cf3318ecea4a13a85d148          962  make_repo_zip.bat
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855            0  reports/.gitkeep
+cc4cc667477a8b827d75a03535da7be91895dca9884ffb56f41752ea1349bd89          264  reports/phase0_validation_20260224_171403.json
+a6321d5670b4666dd138a3456189803bb15718d56a95977317ca6740875fc491          238  reports/phase0_validation_20260224_171403.md
+2adab21696bcd6966adb0e7483a24f0b9a51b8f8084399d638e11b712a7c5c14           64  reports/phase0_validation_20260224_171403.sha256
+a95895148d8c1958bb605c1ee646447bef6c9b2018e73450882f4a392a7b6824         1747  reports/phase0_validation_20260224_171537.json
+0a7dbca6c229da9fdadc28970a9a32997785e35c6e3126b8bc75add09eeb9811          892  reports/phase0_validation_20260224_171537.md
+f24f4994e13fd0c4f437c5be29ed4e9dc1453a61c8e3dc7478e177f5a143cb81           64  reports/phase0_validation_20260224_171537.sha256
+f8649b966640cc26caba07944dd2ad469ea1c23a612484deaeff0f23867c230a         1234  reports/phase0_validation_20260224_171548.json
+f706497eb7a4c3335cc4b2e168c5635e29a2aa3e87948c0d8d8012ad96d18b24          656  reports/phase0_validation_20260224_171548.md
+c66ffee5b36c2399d0c7e30c9273fc24fcfd7fc926cee2f03aa3028ff1e4d395           64  reports/phase0_validation_20260224_171548.sha256
+e80bc5f7fae4ac5c6bf1467ad8ee5c4a4ca9f8d25378f72f9ad3655d37c62da5         1233  reports/phase0_validation_20260224_171549.json
+0b2436fb86f13e6c957a12ee88dfb257154c460bf58a5be83d5c049dd03100ef          655  reports/phase0_validation_20260224_171549.md
+c92b62d1308c884273cef16b4a43f3d291e25f018d04fd1fae044a40cb4fe330           64  reports/phase0_validation_20260224_171549.sha256
+296befd5fed9cee75b6e7d06e114c9ee0e5fcceff5b1f01a68b4665f6ee57442         1747  reports/phase0_validation_20260224_171654.json
+e55f4d4543297499268987d3e8eabbadd0bf76dc109f6249715ca9478ab63242          892  reports/phase0_validation_20260224_171654.md
+12578e4b2548909de79ea902f43d3695a5db323ac2b0305f9f2a46784392a3a1           64  reports/phase0_validation_20260224_171654.sha256
+f0ac49384e79d4e30d789d8e2019f2967e597d9153160ff4d7672b5b16099c76         1747  reports/phase0_validation_20260224_171812.json
+5aaecf3c034261a49c4a1f74f4df76f975fa7b659c961ac736d7df373cd93a59          892  reports/phase0_validation_20260224_171812.md
+8ec8a0306706b1ccfd14ddce8460f466ac93a15358bd86fb2c2152991bcaa1e6           64  reports/phase0_validation_20260224_171812.sha256
+5c4bc69b1987c9d23f3dcdb732e874ae9e336d1ec9d9ddbec788993240de357d         1233  reports/phase0_validation_20260224_171924.json
+fdcd8ba58441cd00ba7c6df6fbfdc5e5c17e52745fcec046b55f7efa681da8ca          655  reports/phase0_validation_20260224_171924.md
+fdad0e2d28f6cc8803cab5560e503208293b68143dcf59b6d60fad8a83adc730           64  reports/phase0_validation_20260224_171924.sha256
+2b3ba66500c0093b50f1f9364ec97a821e45d13f94a24ce91868908546851726         1747  reports/phase0_validation_20260224_172801.json
+fb86c4f4470192cfb5f7dd66a6a3e3418b3830d8b2417da25a4595dcf877eb76          892  reports/phase0_validation_20260224_172801.md
+f12c53ef5eddcc74199fb17c59798a69af9316b4a73dfe362537076d454cfd40           64  reports/phase0_validation_20260224_172801.sha256
+3badcf2d2334fe90014ce2932cd348a9d6cdeadb4f0584adfac5bd2ec60afbc0         1747  reports/phase0_validation_20260224_172939.json
+665d4c40b74283a35c9b34dfba9d384c59cf6c958b8104c86202f26d23c2a8e9          892  reports/phase0_validation_20260224_172939.md
+5114c5ba0d9fc7295fe8d44458fd1f209bfd1b936680cff34157b58469ac030c           64  reports/phase0_validation_20260224_172939.sha256
+594faf34407c04ed53ee57a6fe6753a4ebdd168b687a71a5f561a9ee8ee61036          102  requirements-broker-ib.txt
+a92a719645da9a827934db9a6f7e10f60e110d9b49e326365bcb8ed296c85ae8           14  requirements-core.txt
+2af92fc67cc2f5571308adf2179d4c73b2a29cf2bc9f184e3d6187c81da4182b          101  requirements-dev.txt
+45918c31306c3614398a2a9f1672fae9ae318c31f3198f81df7e4feb9994c353           14  requirements.lock
+0e941694e24762bb625e4bebbe9a058075cede2e56eb893f17b817eef54e34ad        42032  samples/spy_daily_sample_2020_2022.csv
+e83af1f83966ad90e3c17b99a7e032bed2447841b27dc5a9614d7d7b4ac303cd         3054  scripts/git_eol_policy.py
+5929b8aa26adaa717797f0f8f8921ad16c68e167ee11abe1a7b802c67f2369b8        10918  scripts/healthcheck.py
+190768482e4a89e1ef2c2dd7f813e8b90f87aa3ce60e72eedc530ff8c1fab87d         1170  scripts/init_db.py
+d40d3f863c75d05e9ffbfb4ba547c0de02a8b31e91bd8ad7b0f669513e8b8672        10753  scripts/market_data_ingest.py
+baf3ba18309195c37c18b54435e57b8033e5eb0f9e45ba6c4a6a048971a0912f        12945  scripts/progress_report.py
+5c162edd4b4d1069f44e330d37a59002b7ff4d49b965ef8d496b603f3ed6d904         2963  scripts/project_status.py
+58f9be5721283f0f663b315a8836d5e687456948b6bf5316b63249d4d6ff2358          566  scripts/reconcile_execution.py
+5a6a409875d2c6a58feec698f77106d390b6830a084f5f71b74018b8a704f6b3         4357  scripts/repo_sync_status.py
+9736bfd9ff9ad88b72ce9d070c9609bd9748a454ac72fc1afaf09e08f949132e         1054  scripts/submit_order.ps1
+1659aafab6616288d1bfa38440f4083c344e15aa94eded51b1328333bbf28c86         9961  scripts/submit_order.py
+e816b4ee4357b28da7c887aaa1c2da3562cf45a8c5043f45e1841049fe21fd36         6872  scripts/test_generator_agent.py
+0954ec74412e75cd80ff6596ebcec3634d77a0946fc0f35fc35a9a9963f5b4cf          270  scripts/validate_phase0.ps1
+a654a3633cd93796a78c689e0aac7f2a7a3f48ef55df6270f86ee291012f5076          118  strategy/__init__.py
+3532cb33da129b1c188892eb22ac221339c25bca7be40b2831fa1d6765616dee         3730  strategy/scoring.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855            0  tests/__init__.py
+ed558726015231574ed4b6484bec225d3424a6ad4ac28452b0f4ce7f51c20bf9         1703  tests/test_d2_11_adapter_boundary.py
+7c3719fec29a2d763a229dab60143b6d6bf955fce53717d4e033f87b39962b75         2362  tests/test_d2_12_paperlive_event_trail.py
+eacb67a58976571005552391f341034b98b5a4b95b765d03b0fc1a28111357d2         1835  tests/test_d2_13_ack_taxonomy_paperlive.py
+07b9816551bc71692896cdaab85a70c36d4caf3ee9a36763f6f95571678e092a         1746  tests/test_d2_14_broker_event_schema.py
+abc85055365402d4b9c92dd803fe22e457507788edefc74c9e9d0ba5c30a0c37         2680  tests/test_d2_15_state_machine.py
+edb68d7ff941e28638a5470aa602ed742a07ed8f6b763fb4b449af74c4d05766         1010  tests/test_d2_16_journal_state_integration.py
+43acc9f61b21af333b07741bb3bd858439e5024003aad15fffb8c5665aefeb3d         2016  tests/test_d2_18_submit_preflight_scope.py
+0ae8711784e45e211e88d01aa36981bf86b5db0152c9a6d11c01963f0776a8a6         6887  tests/test_d2_19_healthcheck.py
+98ea8ffc572707be5713cfeefa80bb45b148c7df8c8b8c1e76b11f5846faa8a1         1156  tests/test_d2_20_dataset_mode_guard.py
+4624422188399e055fc3378b45c876e7b2c219934d0bdf7a20f2c1acfbf16b7d         1428  tests/test_d2_21_dataset_profile_consistency.py
+c884024b3576d64c1f32853967c9045614c890dd0456f70964361dc189996c68         1994  tests/test_d2_22_submit_dataset_mode_guard.py
+0f1d6175bf56c11976a7c1abf57506e8465274d9aaba25b6cab8a85e2bc9f214         5780  tests/test_d2_23_progress_report.py
+e90d273f61965a4e6fa9b975c843e9434d750306db867a9f026f1102262c6278         2678  tests/test_d2_35_repo_sync_status.py
+185c892f5746f103f1fbcc09d401b685e56eaf8e98787ceebca9c8395e42ebbe         1456  tests/test_d2_39_git_eol_policy.py
+ed763f62fdb147b2e5bbbfa31375053bd778e0543e0888c8a4788b6b34db6925         2540  tests/test_d2_3_smart_ladder.py
+4d30925917d41cb034f1422cc126fe753ce4ea9f86fdb7b40a3000e365337059         2268  tests/test_d2_40_manifest_text_normalization.py
+1148fb8550de04d9f46e5b24d6608552a966ceab743291fd24d5daff87f8de3f          894  tests/test_d2_41_project_status.py
+2a15e7f54aa1625294198c3fbdbb689b30b5705d6f9f53167e23f50982658687          525  tests/test_d2_42_phase_plan_parsing.py
+6d3eb8bfaf09f29e608d52443b776dbfd0adae3aa09c910babf23b8305fa91b9         3348  tests/test_d2_5_orders_journal.py
+241b2faabd64bf8c1a7a72a5b326cc43963dace85e2ef57bca6fb1669c1b27a9         4347  tests/test_d2_60_test_generator_agent.py
+8565f2ffd3d0ece7094e8432867ea4fa84f05b1aa67d79b79c8cb314b2660772          743  tests/test_d2_6_execution_plan.py
+4af27e3648e589541957f1eadd1d13013a97860d5dad875edefb00446de9fdba         3594  tests/test_d2_8_outcome_classification.py
+1389249be81b07f4bffa307eebdb29aefbac6c28bcafc767bc4ed98b2d76745e          999  tests/test_d2_9_ack_classification.py
+0fa34641d6a8d7883eddc8328addd81b146e95dd6770539cd9fe0c26bcd2fa65         1250  tests/test_f1_t1_market_ingest.py
+75c4926f8fda2e35a29f71a4e36a7791acd191fff3f7545352969a82ca93b828         2204  tests/test_f4_scoring_kelly.py
+2e7b22dc5dc2cdb9cd2526cf74fc01b191ad319c8ec43b80a2f9d9cad8c9076c         2466  tools/add_step_tags_minimal.py
+b273e46f4689552c3715b8ba2a3e96808c79884dc49851c39812d5f802f40cc9         3397  tools/append_registro_reconcile_step_index.py
+f65a869d79200e347e1addaee6bda42e62f49217b745ec70f7929d021ce28fbd         2296  tools/apply_patch.py
+49275a88cdba5613c78d987b37599d704213fbbefb05b270e2243b02375e9490         2356  tools/certify_steps.py
+bfe1b5aee305ad5010236ef7ca5d3b7025499435b12008c84b44e86c447f06aa         2907  tools/d2_13_apply.py
+68fd77bc4a266cf507c6ff6c7ae926dd87356accdabc5e8ecaa17511c6a56dcc         3480  tools/d2_14_apply.py
+619ff8d5816278103bbc3e7ed2f83287fa7e0533029d2e5f1731ce0310029b6d         4455  tools/f1_t1_ingest_spy.py
+06ccce9d8c883a5bc9e29d3c362ccaa65cbebd0de2b1d0d605776893ce967cf6         3913  tools/fix_make_repo_zip_bat.py
+eccedfbd4617824ab80357d1303513869f0bc1fad23bc2f7895ba6ca5f720db9         1499  tools/fix_portable_snapshot.py
+496f41788eaa0b2802c88d855debd8356ee5cfac07ac0b45678c2e86a4831217         7927  tools/rebuild_manifest.py
+2ed92be039f282bb18fa4bdbbd08346b56e8de13badff648765494923a004dab         2623  tools/reconcile_step_index.py
+757f5cb9bda6e3ae2fe9d2c1408ebac51c5a7bdc7c68e06391a7b2df535b77ae         1560  tools/run_gates.py
+2d5b0810472a54569578a2b2a1066e2723d6155139489303c146bc80ce529ae6         3976  tools/verify_manifest.py
+1480258491753e08e135c7f41258288351d0d3090af59ea0fac6460ae27cd19f        20767  validator.py

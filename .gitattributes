@@ -1,0 +1,6 @@
+# QuantOpzioni.AI
+#
+# We do NOT want Git to normalize line endings across environments.
+# The repository uses an integrity MANIFEST that is byte-sensitive.
+# Keep file contents as-is and let the developer's environment decide.
+*	-text

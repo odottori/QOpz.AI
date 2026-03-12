@@ -1,0 +1,32 @@
+@echo off
+setlocal
+cd /d %~dp0\..\ui
+
+set "PORT=5173"
+if "%OPZ_AGENT_OWNER%"=="" set "OPZ_AGENT_OWNER=assistant"
+if "%OPZ_FORCE_KILL_PORTS%"=="" set "OPZ_FORCE_KILL_PORTS=1"
+
+echo OPZ_UI: checking tracked processes and port %PORT%...
+if "%OPZ_FORCE_KILL_PORTS%"=="1" (
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0opz_stop_tracked_process.ps1" -Role ui >nul 2>nul
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "if((Test-NetConnection -ComputerName 127.0.0.1 -Port %PORT% -WarningAction SilentlyContinue).TcpTestSucceeded){ exit 0 } else { exit 1 }"
+if %errorlevel%==0 (
+  echo OPZ_UI: port %PORT% occupied by non-tracked process - startup blocked.
+  echo OPZ_UI: no forced kill on untracked processes.
+  exit /b 2
+)
+
+echo OPZ_UI: starting tracked vite on port %PORT%...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0opz_start_tracked_process.ps1" -Role ui -FilePath "npm.cmd" -ArgumentList "run","dev" -WorkingDirectory "%cd%"
+set "RC=%errorlevel%"
+if not "%RC%"=="0" (
+  echo OPZ_UI: tracked start failed rc=%RC%
+  exit /b %RC%
+)
+
+echo OPZ_UI: tracked start requested. listing registry...
+cd /d %~dp0\..
+py scripts\opz_process_registry.py list --format line --owner "%OPZ_AGENT_OWNER%"
+exit /b 0

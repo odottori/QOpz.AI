@@ -1,0 +1,42 @@
+# Runtime
+reports/*
+!reports/.gitkeep
+logs/*
+!logs/.gitkeep
+data/*
+!data/.gitkeep
+db/*
+!db/.gitkeep
+
+# Python
+__pycache__/
+_repo_cache/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archives
+*.zip
+
+# Dotfiles (ignore all) + allow canonical docs/state
+.*
+!.canonici/
+!.canonici/**
+!.qoaistate.json
+!.step_index.json
+!.gitattributes
+
+# Local-only (do not commit)
+baseline/
+PATCH_NOTES_*.md
+
+aaa.txt
+
+# UI
+ui/node_modules/
+ui/dist/
+ui/.vite/

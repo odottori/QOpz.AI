@@ -1,0 +1,629 @@
+{
+  "canonical_version": "v.T.11.13",
+  "next_step": "F1-T5",
+  "progress": {
+    "acceptance_runs": [
+      {
+        "command": ".venv/bin/python validator.py --profile dev --config config/dev.toml",
+        "exit_code": 0,
+        "key_output": "exit_code=0",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T11:24:28Z"
+      },
+      {
+        "command": ".venv/bin/python -m unittest -v",
+        "exit_code": 0,
+        "key_output": "Ran 3 tests OK",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T11:24:28Z"
+      },
+      {
+        "command": "py -m unittest -v",
+        "exit_code": 0,
+        "key_output": "unittest OK; DuckDB DDL adjusted to be compatible.",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T11:29:22.644480+00:00"
+      },
+      {
+        "command": "python scripts/init_db.py --config config/dev.toml",
+        "exit_code": 0,
+        "key_output": "OK: db/quantoptionai.duckdb + db/schema_applied.ok",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T12:16:45Z"
+      },
+      {
+        "command": "python validator.py --profile dev --config config/dev.toml",
+        "exit_code": 0,
+        "key_output": "exit_code=0",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T12:16:45Z"
+      },
+      {
+        "command": "python -m unittest -v",
+        "exit_code": 0,
+        "key_output": "Ran 4 tests OK",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T12:16:45Z"
+      },
+      {
+        "command": "python -m unittest -q",
+        "exit_code": 0,
+        "key_output": "OK (quiet)",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T15:55:54.236940+00:00"
+      },
+      {
+        "command": "python -m unittest -v",
+        "exit_code": 0,
+        "key_output": "Ran 17 tests OK",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T16:33:55.434360+00:00"
+      },
+      {
+        "command": "python -m unittest -v",
+        "exit_code": 0,
+        "key_output": "Ran 19 tests OK",
+        "profile": "dev",
+        "ts_utc": "2026-02-25T17:08:57Z"
+      }
+    ],
+    "blocked_steps": [],
+    "decisions_approved": [
+      {
+        "decision": "Proceed with D2.3A core ladder/journal in dev; no paper/live broker changes",
+        "ts_utc": "2026-02-25T11:20:12Z"
+      }
+    ],
+    "last_validation": {
+      "d2_28_tests": {
+        "command": "python -m unittest -v tests/test_d2_19_healthcheck.py",
+        "exit_code": 0
+      },
+      "d2_29_tests": {
+        "command": "python -m unittest -v tests/test_d2_23_progress_report.py",
+        "exit_code": 0
+      },
+      "d2_30_tests": {
+        "command": "python -m unittest -v tests/test_d2_19_healthcheck.py tests/test_d2_23_progress_report.py",
+        "exit_code": 0
+      },
+      "d2_31_tests": {
+        "command": "python -m unittest -v tests/test_d2_23_progress_report.py tests/test_d2_19_healthcheck.py",
+        "exit_code": 0
+      },
+      "d2_32_tests": {
+        "command": "python -m unittest -v tests/test_d2_23_progress_report.py",
+        "exit_code": 0
+      },
+      "d2_33_tests": {
+        "command": "python -m unittest -v tests/test_d2_19_healthcheck.py tests/test_d2_23_progress_report.py",
+        "exit_code": 0
+      },
+      "d2_34_tests": {
+        "command": "python -m unittest -v tests/test_d2_19_healthcheck.py tests/test_d2_23_progress_report.py",
+        "exit_code": 0
+      },
+      "d2_35_tests": {
+        "command": "python -m unittest -v tests/test_d2_19_healthcheck.py tests/test_d2_23_progress_report.py tests/test_d2_35_repo_sync_status.py",
+        "exit_code": 0
+      },
+      "d2_36_tests": {
+        "command": "python -m unittest -v tests/test_d2_19_healthcheck.py tests/test_d2_23_progress_report.py tests/test_d2_35_repo_sync_status.py",
+        "exit_code": 0
+      },
+      "d2_37_tests": {
+        "command": "python -m unittest -v tests/test_d2_19_healthcheck.py tests/test_d2_23_progress_report.py tests/test_d2_35_repo_sync_status.py",
+        "exit_code": 0
+      },
+      "healthcheck_arg_guard": {
+        "command": "python scripts/healthcheck.py --expected-progress-target-source progress.project_target_steps",
+        "exit_code": 10
+      },
+      "healthcheck_repo_sync_guard": {
+        "command": "python scripts/healthcheck.py --include-repo-sync --repo-sync-no-fetch --fail-on-repo-behind --include-progress-report --expected-progress-target-source progress.project_target_steps",
+        "exit_code": 0
+      },
+      "healthcheck_target_source_guard": {
+        "command": "python scripts/healthcheck.py --include-progress-report --expected-progress-target-source progress.project_target_steps",
+        "exit_code": 0
+      },
+      "healthcheck_with_compact_progress": {
+        "command": "python scripts/healthcheck.py --include-progress-report --progress-compact --progress-target-steps 40",
+        "exit_code": 0
+      },
+      "healthcheck_with_progress": {
+        "command": "python scripts/healthcheck.py --include-progress-report",
+        "exit_code": 0
+      },
+      "healthcheck_with_repo_sync": {
+        "command": "python scripts/healthcheck.py --include-repo-sync --include-progress-report --expected-progress-target-source progress.project_target_steps",
+        "exit_code": 0
+      },
+      "progress_report_compact": {
+        "command": "python scripts/progress_report.py --format md --compact --project-target-steps 40",
+        "exit_code": 0
+      },
+      "progress_report_line": {
+        "command": "python scripts/progress_report.py --format line --project-target-steps 40",
+        "exit_code": 0
+      },
+      "progress_report_line_default": {
+        "command": "python scripts/progress_report.py --format line",
+        "exit_code": 0
+      },
+      "repo_sync_status_json": {
+        "command": "python scripts/repo_sync_status.py --format json --no-fetch",
+        "exit_code": 0
+      },
+      "repo_sync_status_line": {
+        "command": "python scripts/repo_sync_status.py --format line --no-fetch",
+        "exit_code": 0
+      },
+      "ts_utc": "2026-02-27T10:42:07Z",
+      "unit_tests": {
+        "command": "python -m unittest -v",
+        "exit_code": 0
+      }
+    },
+    "next_step": "F1-T5",
+    "notes": [
+      {
+        "note": "D2.37 push-readiness transparency: repo_sync_status now includes remotes, push_ready and push_hint, clarifying when Codex can push directly vs when upstream setup is required.",
+        "ts_utc": "2026-02-27T10:42:07Z"
+      },
+      {
+        "note": "D2.36 operational guard: healthcheck now captures repo_sync_snapshot JSON and supports behind-policy validation (--fail-on-repo-behind) with explicit no-fetch option.",
+        "ts_utc": "2026-02-27T10:36:29Z"
+      },
+      {
+        "note": "D2.35 repository hygiene: added repo_sync_status utility and optional healthcheck repo-sync stage to inform whether GitHub realignment is recommended before continuing.",
+        "ts_utc": "2026-02-27T10:32:24Z"
+      },
+      {
+        "note": "D2.34 strict CLI semantics: healthcheck now rejects source-guard usage without progress-report stage, preventing false assurance from misconfigured invocations.",
+        "ts_utc": "2026-02-27T10:29:22Z"
+      },
+      {
+        "note": "D2.33 guardrail: healthcheck can now enforce expected progress target source, preventing silent percentage drift from unintended target baselines.",
+        "ts_utc": "2026-02-27T10:25:36Z"
+      },
+      {
+        "note": "D2.32 reporting determinism: fixed project target baseline in state (40 steps) and exposed completion target source (cli/state/default) to explain percentage shifts explicitly.",
+        "ts_utc": "2026-02-27T10:21:29Z"
+      },
+      {
+        "note": "D2.31 reporting UX: progress_report now supports a single-line heartbeat format for ultra-compact per-phase/per-project status updates.",
+        "ts_utc": "2026-02-27T10:17:44Z"
+      },
+      {
+        "note": "D2.30 operability refinement: healthcheck now forwards progress-report options (state, compact mode, target steps) and snapshot uses the same target semantics for coherent heartbeat metrics.",
+        "ts_utc": "2026-02-27T10:14:36Z"
+      },
+      {
+        "note": "D2.29 progress semantics hardening: project target steps are now configurable (state/CLI), and progress_report supports compact markdown heartbeat output for concise per-phase/per-project updates.",
+        "ts_utc": "2026-02-27T10:11:09Z"
+      },
+      {
+        "note": "D2.28 observability hardening: healthcheck now returns progress_snapshot directly in JSON payload (phase_completion/current_phase/project_completion).",
+        "ts_utc": "2026-02-27T10:07:39Z"
+      },
+      {
+        "note": "D2.27 operability: integrated progress heartbeat into healthcheck plan via --include-progress-report for single-command status+quality checks.",
+        "ts_utc": "2026-02-27T10:03:38Z"
+      },
+      {
+        "note": "D2.26 reporting semantics: added current-phase progress indicator (index/total + %) to match operator expectation like 1/7 or 43%.",
+        "ts_utc": "2026-02-27T09:50:22Z"
+      },
+      {
+        "note": "D2.25 heartbeat metric UX: progress_report now emits explicit percentage progress lines (phase/project) in markdown output.",
+        "ts_utc": "2026-02-27T09:44:17Z"
+      },
+      {
+        "note": "D2.24 reporting UX: progress_report now emits markdown heartbeat sections to match required per-phase/per-project delivery communication.",
+        "ts_utc": "2026-02-27T09:41:25Z"
+      },
+      {
+        "note": "D2.23 observability: added deterministic dual progress report (phase/project) to support heartbeat-style delivery updates.",
+        "ts_utc": "2026-02-27T09:37:30Z"
+      },
+      {
+        "note": "D2.22 boundary safety: submit_order now rejects mismatched/synthetic dataset.mode for paper/live when config is supplied, preventing accidental profile/data-mode drift at order entry.",
+        "ts_utc": "2026-02-27T09:15:02Z"
+      },
+      {
+        "note": "D2.21 data provenance hardening: validator P0-C2 now binds dataset.mode to profile to reduce accidental environment drift during synthetic->real transitions.",
+        "ts_utc": "2026-02-27T09:08:58Z"
+      },
+      {
+        "note": "D2.20 synthetic-data safety: explicit dataset.mode in configs + validator CRITICAL guard to prevent synthetic mode on paper/live.",
+        "ts_utc": "2026-02-27T09:03:22Z"
+      },
+      {
+        "note": "D2.19: introduced scripts/healthcheck.py as single entry-point for baseline checks; validator stage is optional to avoid masking code regressions with environment-specific Gate0 blockers.",
+        "ts_utc": "2026-02-27T08:47:04Z"
+      },
+      {
+        "note": "D2.18: added regression tests to lock submit_order preflight scoping (dev vs paper semantics).",
+        "ts_utc": "2026-02-27T08:44:45Z"
+      },
+      {
+        "note": "D2.17 stabilization: fixed datetime UTC compatibility in validator and aligned paper/live submit boundary behavior with broker-unavailable test contract; full unittest suite passes on clean execution DB.",
+        "ts_utc": "2026-02-27T08:42:24Z"
+      },
+      {
+        "note": "Hotfix normalization: add AckStatus.BROKER_UNAVAILABLE and broker-unavailable dominance in execution/ack_taxonomy for D2.13 paper/live tests. No behavior change for dev unless such event exists.",
+        "ts_utc": "2026-02-26T14:10:00Z"
+      },
+      {
+        "note": "This patch is intended to be behavior-preserving; run validator + unittest after apply (expected 0/0).",
+        "ts_utc": "2026-02-26T12:00:00Z"
+      },
+      {
+        "note": "Hotfix for D2.13 tests: accept ack_deadline_ts_utc keyword (absolute deadline timestamp). No functional behavior change intended.",
+        "ts_utc": "2026-02-26T13:30:00Z"
+      },
+      {
+        "note": "Phase 4 implementation aligned to canonici: F4-T1 scoring + hard filters; F4-T2 kelly_fractional with skew/lower/upper bounds.",
+        "ts_utc": "2026-02-26T00:00:00Z"
+      },
+      {
+        "note": "D2.15 adds deterministic reducer from journal events -> final order state and invariant checks for journal/state/outcome coherence. Pure helpers + tests; does not change execution unless invoked.",
+        "ts_utc": "2026-02-26T19:55:00Z"
+      },
+      {
+        "note": "D2.38: introduced mandatory gate tools (verify_manifest/certify_steps) and step index reconciliation; rebuild_manifest now includes new files automatically and eliminates duplicate hash entries.",
+        "ts_utc": "2026-03-02T10:09:32.181221Z"
+      },
+      {
+        "note": "D2.39: added scripts/git_eol_policy.py and integrated into tools/apply_patch to enforce repo-local CRLF-friendly git config; regression test added.",
+        "ts_utc": "2026-03-02T12:45:00Z"
+      },
+      {
+        "note": "D2.40: manifest text normalization widened to include dotfiles (e.g., .gitignore) and .lock files, preventing CRLF/LF-related verify_manifest drift under Windows-first git settings.",
+        "ts_utc": "2026-03-02T11:41:48.569259Z"
+      },
+      {
+        "note": "D2.41: added scripts/project_status.py as single heartbeat for repo sync + phase/project progress; regression tests added.",
+        "ts_utc": "2026-03-02T13:05:00Z"
+      },
+      {
+        "note": "D2.42: progress_report now distinguishes 'PER FASI (piano canonico)' (task-based) from 'PER TRACK D2' (steps/target) to prevent misinterpretation of near-complete D2 as 'project finished'.",
+        "ts_utc": "2026-03-02T00:00:00Z"
+      },
+      {
+        "note": "D2.43: ensure .step_index.json is tracked (not ignored) so ZIP baselines made via git archive include it; prevents verify_manifest/certify_steps failing on fresh unzip.",
+        "ts_utc": "2026-03-02T16:21:31Z"
+      },
+      {
+        "note": "F1-T3: added offline options chain quality checks (bid<=ask, delta range, IV range, parity alerts) with deterministic sampling and report tool + tests.",
+        "ts_utc": "2026-03-02T19:30:00Z"
+      },
+      {
+        "note": "HF progress tracking alignment: inserted missing F1-T2 completion marker and enabled legacy->canonical task alias mapping for progress reporting.",
+        "ts_utc": "2026-03-03T00:00:00Z"
+      },
+      {
+        "note": "F6-T1 infra: added paper telemetry tables + metrics/gates tool; API+UI endpoints for operator logging and gate visibility.",
+        "ts_utc": "2026-03-05T10:11:57Z"
+      }
+    ],
+    "project_target_steps": 40,
+    "steps_completed": [
+      {
+        "id": "D2.3A",
+        "title": "Smart Limit Order Ladder (dev/dry-run) + journal tests",
+        "ts_utc": "2026-02-25T11:20:12Z"
+      },
+      {
+        "notes": "Fix DuckDB DDL for order_events: remove AUTOINCREMENT, use SEQUENCE/nextval; tests pass locally (DuckDB-only policy).",
+        "step": "D2.3A.1",
+        "ts_utc": "2026-02-25T11:29:22.644480+00:00"
+      },
+      {
+        "id": "D2.5",
+        "title": "Orders ledger canonico (F3-T4) + reconcile invariants (no pending orders) + tests",
+        "ts_utc": "2026-02-25T12:16:45Z"
+      },
+      {
+        "step": "D2.6",
+        "title": "Execution plan selection helper",
+        "ts_utc": "2026-02-25T15:34:20.777921+00:00"
+      },
+      {
+        "step": "D2.7",
+        "summary": "Reconcile hardening: scope by run_id, optional report output, add tests.",
+        "ts_utc": "2026-02-25T15:55:54.236940+00:00"
+      },
+      {
+        "step": "D2.8",
+        "summary": "Outcome classification + reconcile invariant (orders.outcome) + dev timeout simulation",
+        "ts_utc": "2026-02-25T16:33:55.434328+00:00"
+      },
+      {
+        "step": "D2.9",
+        "summary": "Ack/timeout classification utilities + dev synthetic ACK event trail + tests",
+        "ts_utc": "2026-02-25T17:08:57Z"
+      },
+      {
+        "step": "D2.NORM",
+        "summary": "Normalization hotfix: classify_ack_status accepts ack_deadline_ts_utc kw (absolute deadline) while preserving prior ack_deadline_s behavior.",
+        "ts_utc": "2026-02-26T13:30:00Z"
+      },
+      {
+        "step": "D2.NORM.1",
+        "summary": "Ack taxonomy normalization: BROKER_UNAVAILABLE enum + dominance heuristic (paper/live).",
+        "ts_utc": "2026-02-26T14:10:00Z"
+      },
+      {
+        "step": "F4.1",
+        "summary": "Implement score composito (4 pilastri) + Kelly fractional v11.1 utilities + unit tests (F4-T1/F4-T2). Additive only; no impact on Gate0 execution.",
+        "ts_utc": "2026-02-26T00:00:00Z"
+      },
+      {
+        "step": "F4.1.HF1",
+        "summary": "Hotfix: Kelly lower-bound guard for low-RR (b<=1.10) to enforce NO_TRADE on micro-edge cases; aligns with F4 tests without changing scoring weights/filters.",
+        "ts_utc": "2026-02-26T16:45:00Z"
+      },
+      {
+        "step": "D2.15",
+        "summary": "State machine hardening (pure reducer) + reconcile invariants helper + unit tests. Additive only; no Gate0 impact unless called.",
+        "ts_utc": "2026-02-26T19:55:00Z"
+      },
+      {
+        "step": "D2.16",
+        "summary": "Journalâ†’state integration helper (opt-in) using D2.15 deterministic reducer. State machine updated to accept ACKED to match journal transitions.",
+        "ts_utc": "2026-02-26T20:45:00Z"
+      },
+      {
+        "step": "D2.17",
+        "summary": "Stabilization hardening: validator UTC compatibility for Python 3.10/3.11 and submit_order preflight scoped to dev so paper/live boundary returns broker-unavailable semantics.",
+        "ts_utc": "2026-02-27T08:42:24Z"
+      },
+      {
+        "step": "D2.18",
+        "summary": "Submit preflight scope hardening tests: enforce REJECTED_ENV only on dev missing core deps and preserve REJECTED_BROKER_UNAVAILABLE on paper boundary.",
+        "ts_utc": "2026-02-27T08:44:45Z"
+      },
+      {
+        "step": "D2.19",
+        "summary": "Added single-command healthcheck runner with optional validator stage and deterministic exit aggregation; added unit tests for plan and exit behavior.",
+        "ts_utc": "2026-02-27T08:47:04Z"
+      },
+      {
+        "step": "D2.20",
+        "summary": "Dataset mode guard: block synthetic data in paper/live via validator P0-C1 and add regression tests; configs now declare dataset.mode explicitly per profile.",
+        "ts_utc": "2026-02-27T09:03:22Z"
+      },
+      {
+        "step": "D2.21",
+        "summary": "Dataset profile consistency guard (P0-C2): enforce dev->synthetic (warning), paper->paper and live->live (critical) with regression tests.",
+        "ts_utc": "2026-02-27T09:08:58Z"
+      },
+      {
+        "step": "D2.22",
+        "summary": "Submit guard hardening: enforce dataset.mode/profile consistency at submit boundary when config is provided; add Python 3.10 TOML fallback parser for dataset.mode.",
+        "ts_utc": "2026-02-27T09:15:02Z"
+      },
+      {
+        "step": "D2.23",
+        "summary": "Added scripts/progress_report.py for dual advancement reporting (phase + project) and regression tests for phase mapping and payload structure.",
+        "ts_utc": "2026-02-27T09:37:30Z"
+      },
+      {
+        "step": "D2.24",
+        "summary": "Progress report enhanced with markdown mode (--format md) to emit operator-ready PER FASE / PER PROGETTO heartbeat blocks.",
+        "ts_utc": "2026-02-27T09:41:25Z"
+      },
+      {
+        "step": "D2.25",
+        "summary": "Progress report now includes explicit completion percentages for phase and project advancement to provide concise heartbeat metrics.",
+        "ts_utc": "2026-02-27T09:44:17Z"
+      },
+      {
+        "step": "D2.26",
+        "summary": "Progress report now includes explicit current-phase index metric (e.g., 3/6) in addition to phase completion and project completion percentages.",
+        "ts_utc": "2026-02-27T09:50:22Z"
+      },
+      {
+        "step": "D2.27",
+        "summary": "Healthcheck now optionally includes progress_report markdown heartbeat stage for unified quality + status run in a single command.",
+        "ts_utc": "2026-02-27T10:03:38Z"
+      },
+      {
+        "step": "D2.28",
+        "summary": "Healthcheck payload now embeds compact progress_snapshot (phase/project percentages) when progress-report stage is included, without import-path fragility.",
+        "ts_utc": "2026-02-27T10:07:39Z"
+      },
+      {
+        "step": "D2.29",
+        "summary": "Progress report now supports configurable project target steps and compact markdown mode for operator heartbeat output.",
+        "ts_utc": "2026-02-27T10:11:09Z"
+      },
+      {
+        "step": "D2.30",
+        "summary": "Healthcheck now supports progress-report option passthrough (--progress-compact, --progress-target-steps, --progress-state) with aligned progress_snapshot semantics.",
+        "ts_utc": "2026-02-27T10:14:36Z"
+      },
+      {
+        "step": "D2.31",
+        "summary": "Added line-format heartbeat output in progress_report for concise operator updates, with regression coverage.",
+        "ts_utc": "2026-02-27T10:17:44Z"
+      },
+      {
+        "step": "D2.32",
+        "summary": "Progress report now exposes completion_target_source and state now pins project_target_steps=40 to avoid ambiguous project % swings.",
+        "ts_utc": "2026-02-27T10:21:29Z"
+      },
+      {
+        "step": "D2.33",
+        "summary": "Added healthcheck guard --expected-progress-target-source and propagated project_target_source in progress_snapshot for deterministic reporting checks.",
+        "ts_utc": "2026-02-27T10:25:36Z"
+      },
+      {
+        "step": "D2.34",
+        "summary": "Added healthcheck argument validation so --expected-progress-target-source requires --include-progress-report; returns deterministic exit 10 on misuse.",
+        "ts_utc": "2026-02-27T10:29:22Z"
+      },
+      {
+        "step": "D2.35",
+        "summary": "Added scripts/repo_sync_status.py and integrated optional healthcheck repo_sync stage for alignment visibility (ahead/behind/upstream warning).",
+        "ts_utc": "2026-02-27T10:32:24Z"
+      },
+      {
+        "step": "D2.36",
+        "summary": "Healthcheck now supports repo_sync snapshot capture and behind-policy guard with --fail-on-repo-behind/--repo-sync-no-fetch.",
+        "ts_utc": "2026-02-27T10:36:29Z"
+      },
+      {
+        "step": "D2.37",
+        "summary": "Repo sync now reports push readiness metadata (remotes/push_ready/push_hint) and tests cover these fields for deterministic operator guidance.",
+        "ts_utc": "2026-02-27T10:42:07Z"
+      },
+      {
+        "step": "D2.38",
+        "summary": "Operational gate toolchain: verify_manifest + certify_steps + reconcile_step_index + gate runner/apply_patch. Manifest rebuild now scans repo + dedup.",
+        "ts_utc": "2026-03-02T10:09:32.181221Z"
+      },
+      {
+        "step": "D2.39",
+        "summary": "Windows-first Git EOL policy enforcement tool + apply_patch integration; prevents CRLF/LF staging blocks.",
+        "ts_utc": "2026-03-02T12:45:00Z"
+      },
+      {
+        "step": "D2.40",
+        "summary": "Manifest text detection hardening: treat .gitignore/.editorconfig/.gitattributes and *.lock as text; hash/size normalize CRLF->LF; add regression tests.",
+        "ts_utc": "2026-03-02T11:41:48.569259Z"
+      },
+      {
+        "step": "D2.41",
+        "summary": "Added scripts/project_status.py aggregator (repo sync + phase/project progress) with smoke tests.",
+        "ts_utc": "2026-03-02T13:05:00Z"
+      },
+      {
+        "step": "D2.42",
+        "summary": "Progress semantics hardening: add canonical phase-plan task progress (from canonici/02_TEST.md) and clarify D2 track vs overall phases in progress_report/project_status outputs.",
+        "ts_utc": "2026-03-02T00:00:00Z"
+      },
+      {
+        "step": "D2.43",
+        "summary": "Baseline ZIP correctness: track .step_index.json (unignore + commit) so git-archive ZIPs remain self-contained for verify_manifest/certify_steps.",
+        "ts_utc": "2026-03-02T16:21:31Z"
+      },
+      {
+        "id": "F1-T1",
+        "title": "Market data ingestion (SPY daily) into DuckDB + completeness report",
+        "ts_utc": "2026-03-02T16:44:26Z"
+      },
+      {
+        "id": "F1-T2",
+        "title": "IV Rank (252d) offline ground truth + edge cases",
+        "ts_utc": "2026-03-03T00:00:00Z"
+      },
+      {
+        "id": "F1-T3",
+        "title": "Options chain data quality checks (bid/ask, delta, IV, parity alerts) + offline sample + report tool",
+        "ts_utc": "2026-03-02T19:30:00Z"
+      },
+      {
+        "id": "F1-T4",
+        "title": "DB integrity checks (PK/FK/timestamps/perf) + report tool + tests",
+        "ts_utc": "2026-03-03T19:45:00Z"
+      },
+      {
+        "id": "F2-T1",
+        "title": "Regime classifier (offline) + calibration + feature importance report",
+        "ts_utc": "2026-03-03T20:30:00Z"
+      },
+      {
+        "id": "F2-T2",
+        "title": "Fit HMM rolling 252g (3-state) + early-warning shock lead vs classifier + report tool",
+        "ts_utc": "2026-03-03T21:15:00Z"
+      },
+      {
+        "id": "F2-T3",
+        "title": "Regime-weighted risk scalar (classifier+HMM, hysteresis, EMA)",
+        "ts_utc": "2026-03-03T09:47:45Z"
+      },
+      {
+        "id": "F2-T4",
+        "title": "WFA backtest Bull Put (IWM) offline synthetic + fold metrics/plots",
+        "ts_utc": "2026-03-03T09:53:24Z"
+      },
+      {
+        "id": "F6-T1",
+        "title": "Paper trading telemetry + gate evaluation (equity snapshots + trade journal) + Operator Console integration",
+        "ts_utc": "2026-03-05T10:11:57Z"
+      },
+      {
+        "id": "F5-T1",
+        "ts_utc": "2026-03-05T15:40:57Z"
+      },
+      {
+        "id": "F5-T2",
+        "ts_utc": "2026-03-05T15:40:58Z"
+      },
+      {
+        "id": "F5-T3",
+        "ts_utc": "2026-03-05T15:40:58Z"
+      },
+      {
+        "id": "F6-T3",
+        "ts_utc": "2026-03-05T15:43:58Z"
+      },
+      {
+        "id": "F3-T1",
+        "ts_utc": "2026-03-05T15:44:29Z"
+      },
+      {
+        "id": "F3-T2",
+        "ts_utc": "2026-03-05T15:44:50Z"
+      },
+      {
+        "id": "F3-T3",
+        "ts_utc": "2026-03-05T15:45:19Z"
+      },
+      {
+        "id": "F3-T4",
+        "ts_utc": "2026-03-05T15:45:20Z"
+      },
+      {
+        "id": "F4-T3",
+        "ts_utc": "2026-03-05T15:46:16Z"
+      },
+      {
+        "id": "F1-T_margin_efficiency_metric",
+        "ts_utc": "2026-03-05T15:49:45Z"
+      },
+      {
+        "id": "F2-T_leakage_guard",
+        "ts_utc": "2026-03-05T15:49:45Z"
+      },
+      {
+        "id": "F2-T_HMM_event_OOS",
+        "ts_utc": "2026-03-05T15:49:45Z"
+      },
+      {
+        "id": "F2-T_HMM_qualification_nonVIX",
+        "ts_utc": "2026-03-05T15:49:45Z"
+      },
+      {
+        "id": "F2-T_correlation_breakdown_flag",
+        "ts_utc": "2026-03-05T15:49:45Z"
+      },
+      {
+        "id": "F4-T_adaptive_fixed_fractional",
+        "ts_utc": "2026-03-05T15:49:45Z"
+      },
+      {
+        "id": "F4-T_min_track_record_kelly",
+        "ts_utc": "2026-03-05T15:49:45Z"
+      },
+      {
+        "id": "F6-T2",
+        "ts_utc": "2026-03-07T17:38:48Z"
+      }
+    ]
+  },
+  "project": "QuantOptionAI"
+}
