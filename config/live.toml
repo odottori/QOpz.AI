@@ -1,29 +1,38 @@
+# =============================================================================
+# LIVE profile — IBKR live account, real money, real execution
+# Use: python validator.py --profile live --config config/live.toml
+# Prerequisites: Kelly gate satisfied (VENDOR_REAL_CHAIN + N_closed_trades>=50)
+# WARNING: This profile enables real order submission. Use with extreme caution.
+# =============================================================================
+
 [phase0]
 requirements_lock = "requirements.lock"
-ibkr_timeout_sec = 10
-md_timeout_sec = 10
-md_symbol = "SPY"
-md_exchange = "SMART"
-md_currency = "USD"
-md_right = "P"          # P or C
-md_dte_min = 30
-md_dte_max = 60
+ibkr_timeout_sec  = 10
+md_timeout_sec    = 10
+md_symbol         = "SPY"
+md_exchange       = "SMART"
+md_currency       = "USD"
+md_right          = "P"      # P = Put, C = Call
+md_dte_min        = 30
+md_dte_max        = 60
 
 [storage]
-duckdb_path = "db/quantoptionai.duckdb"
+duckdb_path        = "db/quantoptionai.duckdb"
 parquet_convention = "asof_ts=YYYY-MM-DDTHH:MM:SSZ"
 
 [dataset]
 seed = 42
-mode = "live"
+mode = "live"      # DATA_MODE watermark: live mode — Kelly ENABLED if N>=50
 
 [broker]
-host = "127.0.0.1"
-port = 7497
-client_id = 7
+# port 7497 = TWS live (default); port 7496 = paper
+# IMPORTANT: double-check port before connecting with live credentials
+host      = "127.0.0.1"
+port      = 7497        # LIVE port — real money, real execution
+client_id = 7           # must be unique per connected client
 
 [ops]
-log_dir = "logs"
+log_dir          = "logs"
 log_rotation_days = 7
 
 [ops.kill_switch]

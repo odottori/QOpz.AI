@@ -1,29 +1,37 @@
+# =============================================================================
+# PAPER profile — IBKR paper trading account, real market data, no Kelly sizing
+# Use: python validator.py --profile paper --config config/paper.toml
+# Prerequisites: TWS or IBG running, paper account logged in, port 7496 open
+# Kelly: DISABLED (requires DATA_MODE=VENDOR_REAL_CHAIN AND N_closed_trades>=50)
+# =============================================================================
+
 [phase0]
 requirements_lock = "requirements.lock"
-ibkr_timeout_sec = 10
-md_timeout_sec = 10
-md_symbol = "SPY"
-md_exchange = "SMART"
-md_currency = "USD"
-md_right = "P"          # P or C
-md_dte_min = 30
-md_dte_max = 60
+ibkr_timeout_sec  = 10       # seconds to wait for IBKR API connection (validator check)
+md_timeout_sec    = 10       # seconds to wait for market-data response
+md_symbol         = "SPY"    # reference symbol used in phase-0 market-data check
+md_exchange       = "SMART"
+md_currency       = "USD"
+md_right          = "P"      # P = Put, C = Call
+md_dte_min        = 30       # min days-to-expiry for option filter
+md_dte_max        = 60       # max days-to-expiry for option filter
 
 [storage]
-duckdb_path = "db/quantoptionai.duckdb"
+duckdb_path        = "db/quantoptionai.duckdb"
 parquet_convention = "asof_ts=YYYY-MM-DDTHH:MM:SSZ"
 
 [dataset]
 seed = 42
-mode = "paper"
+mode = "paper"     # DATA_MODE watermark: paper trading mode
 
 [broker]
-host = "127.0.0.1"
-port = 7496
-client_id = 7
+# port 7496 = paper (default IBKR paper port); port 7497 = live TWS
+host      = "127.0.0.1"
+port      = 7496        # PAPER port — no real money, simulated execution
+client_id = 7           # must be unique per connected client
 
 [ops]
-log_dir = "logs"
+log_dir          = "logs"
 log_rotation_days = 7
 
 [ops.kill_switch]
@@ -31,4 +39,3 @@ manual_trigger_file = "ops/kill_switch.trigger"
 
 [secrets]
 required_env = []
-

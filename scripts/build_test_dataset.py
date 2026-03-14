@@ -102,9 +102,16 @@ def _collect_rows(
     dedup_keys: set[tuple[str, str, str, str]] = set()
     skipped_duplicates = 0
 
+    skipped_missing = 0
     for row in rows:
         output_path = Path(str(row["output_path"]))
         if not output_path.exists():
+            skipped_missing += 1
+            dpl.append_jsonl(
+                Path(str(dpl.DEFAULT_LOG_DIR / "build_dataset.jsonl")),
+                {"event": "skipped_missing_output", "output_path": output_path.as_posix(),
+                 "capture_id": row.get("capture_id")},
+            )
             continue
 
         payload = _load_output_payload(output_path)
@@ -147,7 +154,7 @@ def _collect_rows(
         )
 
     conn.close()
-    return out, skipped_duplicates
+    return out, skipped_duplicates, skipped_missing
 
 
 def _csv_sha256(path: Path) -> str:
@@ -184,7 +191,7 @@ def run_build(args: argparse.Namespace) -> dict[str, Any]:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    rows, skipped_duplicates = _collect_rows(
+    rows, skipped_duplicates, skipped_missing = _collect_rows(
         db_path,
         model=args.model if args.model else None,
         prompt_version=args.prompt_version if args.prompt_version else None,
@@ -209,6 +216,7 @@ def run_build(args: argparse.Namespace) -> dict[str, Any]:
         "dataset_name": args.dataset_name,
         "record_count": len(rows),
         "dedup_skipped": skipped_duplicates,
+        "missing_output_skipped": skipped_missing,
         "db_path": db_path.as_posix(),
         "dataset_csv": csv_path.as_posix(),
         "dataset_csv_sha256": csv_hash,

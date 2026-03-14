@@ -14,9 +14,14 @@ from datetime import datetime, time as time_cls, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException
+import logging
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("opz_api")
 
 from execution.paper_metrics import (
     compute_paper_summary,
@@ -52,7 +57,7 @@ async def _app_lifespan(_app: FastAPI):
     try:
         init_execution_schema()
     except Exception as exc:
-        print(f"STARTUP_STORAGE_WARN {exc}")
+        logger.warning("STARTUP_STORAGE_WARN %s", exc)
     yield
 
 
@@ -65,6 +70,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"ok": False, "stage": "internal", "reason": f"{type(exc).__name__}: {exc}"},
+    )
 
 
 class PreviewRequest(BaseModel):
@@ -1224,9 +1238,8 @@ def execution_preview(req: PreviewRequest) -> PreviewResponse:
         "ts_unix": int(time.time()),
         "note": "PREVIEW ONLY. Requires explicit operator confirmation (confirm endpoint).",
     }
-    (LOG_DIR / "operator_previews.jsonl").open("a", encoding="utf-8").write(
-        json.dumps({"token": token, "preview": preview}, ensure_ascii=False) + "\n"
-    )
+    with (LOG_DIR / "operator_previews.jsonl").open("a", encoding="utf-8") as _fh:
+        _fh.write(json.dumps({"token": token, "preview": preview}, ensure_ascii=False) + "\n")
     return PreviewResponse(confirm_token=token, preview=preview)
 
 
@@ -1251,7 +1264,8 @@ def execution_confirm(req: ConfirmRequest) -> Dict[str, Any]:
         "ts_unix": int(time.time()),
         "note": "HUMAN CONFIRMED. No broker submit performed in F6-T1 skeleton.",
     }
-    (LOG_DIR / "operator_confirms.jsonl").open("a", encoding="utf-8").write(json.dumps(event, ensure_ascii=False) + "\n")
+    with (LOG_DIR / "operator_confirms.jsonl").open("a", encoding="utf-8") as _fh:
+        _fh.write(json.dumps(event, ensure_ascii=False) + "\n")
     return {"ok": True, "event": event}
 
 

@@ -3,6 +3,7 @@
 import hashlib
 import importlib
 import json
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,8 +38,16 @@ def parse_json(path: Path) -> Any:
 
 
 def write_json(path: Path, payload: Any) -> None:
+    """Write payload as JSON atomically (temp file + rename) to avoid corruption on crash."""
     ensure_parent(path)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    content = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    tmp = Path(tempfile.mktemp(dir=path.parent, prefix=".tmp_", suffix=".json"))
+    try:
+        tmp.write_text(content, encoding="utf-8")
+        tmp.replace(path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def append_jsonl(path: Path, payload: dict[str, Any]) -> None:

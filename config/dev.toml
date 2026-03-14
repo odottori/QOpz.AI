@@ -1,33 +1,43 @@
+# =============================================================================
+# DEV profile — local development, no real broker, synthetic data
+# Use: python validator.py --profile dev --config config/dev.toml
+#      python scripts/planner_status.py
+# =============================================================================
+
 [phase0]
 requirements_lock = "requirements.lock"
-ibkr_timeout_sec = 10
-md_timeout_sec = 10
-md_symbol = "SPY"
-md_exchange = "SMART"
-md_currency = "USD"
-md_right = "P"          # P or C
-md_dte_min = 30
-md_dte_max = 60
+ibkr_timeout_sec  = 10       # seconds to wait for IBKR API connection (validator check)
+md_timeout_sec    = 10       # seconds to wait for market-data response
+md_symbol         = "SPY"    # reference symbol used in phase-0 market-data check
+md_exchange       = "SMART"
+md_currency       = "USD"
+md_right          = "P"      # P = Put, C = Call
+md_dte_min        = 30       # min days-to-expiry for option filter
+md_dte_max        = 60       # max days-to-expiry for option filter
 
 [storage]
-duckdb_path = "db/quantoptionai.duckdb"
-parquet_convention = "asof_ts=YYYY-MM-DDTHH:MM:SSZ"
+duckdb_path        = "db/quantoptionai.duckdb"
+parquet_convention = "asof_ts=YYYY-MM-DDTHH:MM:SSZ"   # timestamp column naming convention
 
 [dataset]
-seed = 42
-mode = "synthetic"
+seed = 42           # RNG seed for reproducibility
+mode = "synthetic"  # DATA_MODE watermark: synthetic surface calibrated data
 
 [broker]
-host = "127.0.0.1"
-port = 7497
-client_id = 7
+# TWS/IBG paper account — port 7497 = paper, 7496 = live (see IBKR Gateway settings)
+host      = "127.0.0.1"
+port      = 7497        # DEV uses paper port; no real money at risk
+client_id = 7           # must be unique per connected client (change if conflict)
 
 [ops]
-log_dir = "logs"
-log_rotation_days = 7
+log_dir          = "logs"
+log_rotation_days = 7   # days before log files are rotated/archived
 
 [ops.kill_switch]
+# Touch this file to trigger immediate system halt (monitoring loop checks every cycle)
 manual_trigger_file = "ops/kill_switch.trigger"
 
 [secrets]
+# List env-var names that must be set before the system can start in this profile.
+# Empty in dev (no external credentials required).
 required_env = []

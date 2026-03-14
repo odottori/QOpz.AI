@@ -42,8 +42,11 @@ def _year(d: date) -> int:
 
 
 def parse_date_iso(s: str) -> date:
-    y, m, d = s.split("-")
-    return date(int(y), int(m), int(d))
+    try:
+        y, m, d = s.split("-")
+        return date(int(y), int(m), int(d))
+    except (ValueError, AttributeError) as exc:
+        raise ValueError(f"Invalid date format {s!r} — expected YYYY-MM-DD") from exc
 
 
 def load_dataset_csv(path: str | Path) -> list[dict[str, Any]]:

@@ -1,13 +1,18 @@
+#!/usr/bin/env python
 from __future__ import annotations
 
-import platform
-import sys
-import os
+import argparse
+import dataclasses
 import datetime as dt
-#!/usr/bin/env python
-import argparse, dataclasses, datetime as dt, hashlib, json, os, re, time
+import hashlib
+import json
+import os
+import platform
+import re
+import sys
+import time
 from pathlib import Path
-from typing import Any, Dict, List, Callable, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 try:
     import tomllib
