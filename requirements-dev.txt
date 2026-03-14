@@ -1,5 +1,14 @@
 # QuantOptionAI — Dev/QA requirements
 # Solo per sviluppo locale e test. Non installare in produzione.
+#
+# Setup completo:
+#   pip install -r requirements-core.txt
+#   pip install -r requirements-web.txt   # fastapi + uvicorn
+#   pip install -r requirements-dev.txt   # questo file
+#
+# I test API (test_f6_t2_*.py, test_bootstrap_guard.py) richiedono
+# fastapi + httpx (in requirements-web.txt e requirements-core.txt).
+# Senza di essi i 22 test vengono skippati anziché girare.
 
 # Test runner
 pytest>=8.0
