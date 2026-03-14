@@ -684,8 +684,11 @@ def run_universe_scan_from_ibkr_settings(
     scanner_name_persisted = ""
     if isinstance(scanner, dict):
         scanner_name_persisted = str(scanner.get("scanner_name") or "").strip()
-    if not scanner_name_persisted and scanner_name:
+    # Explicit scanner_name from caller takes priority — operator intent over XML label
+    if scanner_name:
         scanner_name_persisted = str(scanner_name).strip()
+    elif not scanner_name_persisted:
+        scanner_name_persisted = ""
 
     symbols_raw = ctx.get("symbols")
     symbols = [str(x) for x in symbols_raw] if isinstance(symbols_raw, list) else None
