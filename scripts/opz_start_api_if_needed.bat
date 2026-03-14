@@ -2,6 +2,10 @@
 setlocal
 cd /d %~dp0\..
 
+set "OPZ_ROOT=%cd%\"
+set "OPZ_PY=py"
+if exist "%OPZ_ROOT%.venv\Scripts\python.exe" set "OPZ_PY=%OPZ_ROOT%.venv\Scripts\python.exe"
+
 set "PORT=8000"
 if "%OPZ_AGENT_OWNER%"=="" set "OPZ_AGENT_OWNER=assistant"
 if "%OPZ_FORCE_KILL_PORTS%"=="" set "OPZ_FORCE_KILL_PORTS=1"
@@ -18,8 +22,8 @@ if %errorlevel%==0 (
   exit /b 2
 )
 
-echo OPZ_API: starting tracked uvicorn on port %PORT%...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0opz_start_tracked_process.ps1" -Role api -FilePath "py" -ArgumentList "-m","uvicorn","api.opz_api:app","--reload","--port","%PORT%" -WorkingDirectory "%cd%"
+echo OPZ_API: starting tracked uvicorn on port %PORT%... (python: %OPZ_PY%)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0opz_start_tracked_process.ps1" -Role api -FilePath "%OPZ_PY%" -ArgumentList "-m","uvicorn","api.opz_api:app","--reload","--port","%PORT%" -WorkingDirectory "%cd%"
 set "RC=%errorlevel%"
 if not "%RC%"=="0" (
   echo OPZ_API: tracked start failed rc=%RC%
@@ -27,5 +31,5 @@ if not "%RC%"=="0" (
 )
 
 echo OPZ_API: tracked start requested. listing registry...
-py scripts\opz_process_registry.py list --format line --owner "%OPZ_AGENT_OWNER%"
+"%OPZ_PY%" scripts\opz_process_registry.py list --format line --owner "%OPZ_AGENT_OWNER%"
 exit /b 0

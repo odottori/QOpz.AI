@@ -12,7 +12,7 @@ Design constraints:
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
 from .state_machine import normalize_state, is_allowed, OrderState
@@ -36,7 +36,7 @@ def _parse_ts(ts: datetime | str) -> tuple[int, str]:
     if isinstance(ts, datetime):
         # treat naive as UTC (consistent with storage.utc_now producing tz-aware)
         if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=datetime.now().astimezone().tzinfo)
+            ts = ts.replace(tzinfo=timezone.utc)
         return (int(ts.timestamp() * 1_000_000), "")
     s = str(ts or "")
     # Best-effort ISO parse without third-party deps

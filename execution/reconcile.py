@@ -32,119 +32,121 @@ def reconcile(run_id: Optional[str] = None, report_path: Optional[str] = None) -
     """
     init_execution_schema()
     con = _connect()
+    try:
+        where = ""
+        params: tuple[Any, ...] = ()
+        if run_id:
+            where = "WHERE o.run_id = ?"
+            params = (run_id,)
 
-    where = ""
-    params: tuple[Any, ...] = ()
-    if run_id:
-        where = "WHERE o.run_id = ?"
-        params = (run_id,)
-
-    # Missing events for orders in scope
-    missing_events = con.execute(f"""
-        SELECT o.client_order_id, o.state
-        FROM orders o
-        LEFT JOIN order_events e ON e.client_order_id = o.client_order_id
-        {where}
-        AND e.client_order_id IS NULL
-    """, params).fetchall() if run_id else con.execute("""
-        SELECT o.client_order_id, o.state
-        FROM orders o
-        LEFT JOIN order_events e ON e.client_order_id = o.client_order_id
-        WHERE e.client_order_id IS NULL
-    """).fetchall()
-
-    # Pending orders in scope
-    pending = con.execute(f"""
-        SELECT client_order_id, state, updated_at
-        FROM orders o
-        {where}
-        AND state IN ('NEW','SUBMITTED')
-    """, params).fetchall() if run_id else con.execute("""
-        SELECT client_order_id, state, updated_at
-        FROM orders
-        WHERE state IN ('NEW','SUBMITTED')
-    """).fetchall()
-
-    # State mismatches in scope
-    if run_id:
-        mismatches = con.execute("""
-            WITH scoped AS (
-              SELECT client_order_id
-              FROM orders
-              WHERE run_id = ?
-            ),
-            latest AS (
-              SELECT e.client_order_id, MAX(e.ts_utc) AS mx
-              FROM order_events e
-              JOIN scoped s ON s.client_order_id = e.client_order_id
-              GROUP BY e.client_order_id
-            )
-            SELECT o.client_order_id, o.state AS order_state, e.new_state AS event_state, e.event_type, e.ts_utc
+        # Missing events for orders in scope
+        missing_events = con.execute(f"""
+            SELECT o.client_order_id, o.state
             FROM orders o
-            JOIN latest l ON l.client_order_id = o.client_order_id
-            JOIN order_events e ON e.client_order_id = l.client_order_id AND e.ts_utc = l.mx
-            WHERE o.run_id = ? AND e.new_state IS NOT NULL AND o.state <> e.new_state
-        """, (run_id, run_id)).fetchall()
-    else:
-        mismatches = con.execute("""
-            WITH latest AS (
-              SELECT client_order_id, MAX(ts_utc) AS mx
-              FROM order_events
-              GROUP BY client_order_id
-            )
-            SELECT o.client_order_id, o.state AS order_state, e.new_state AS event_state, e.event_type, e.ts_utc
+            LEFT JOIN order_events e ON e.client_order_id = o.client_order_id
+            {where}
+            AND e.client_order_id IS NULL
+        """, params).fetchall() if run_id else con.execute("""
+            SELECT o.client_order_id, o.state
             FROM orders o
-            JOIN latest l ON l.client_order_id = o.client_order_id
-            JOIN order_events e ON e.client_order_id = l.client_order_id AND e.ts_utc = l.mx
-            WHERE e.new_state IS NOT NULL AND o.state <> e.new_state
+            LEFT JOIN order_events e ON e.client_order_id = o.client_order_id
+            WHERE e.client_order_id IS NULL
         """).fetchall()
 
-    con.close()
+        # Pending orders in scope
+        pending = con.execute(f"""
+            SELECT client_order_id, state, updated_at
+            FROM orders o
+            {where}
+            AND state IN ('NEW','SUBMITTED')
+        """, params).fetchall() if run_id else con.execute("""
+            SELECT client_order_id, state, updated_at
+            FROM orders
+            WHERE state IN ('NEW','SUBMITTED')
+        """).fetchall()
+
+        # State mismatches in scope
+        if run_id:
+            mismatches = con.execute("""
+                WITH scoped AS (
+                  SELECT client_order_id
+                  FROM orders
+                  WHERE run_id = ?
+                ),
+                latest AS (
+                  SELECT e.client_order_id, MAX(e.ts_utc) AS mx
+                  FROM order_events e
+                  JOIN scoped s ON s.client_order_id = e.client_order_id
+                  GROUP BY e.client_order_id
+                )
+                SELECT o.client_order_id, o.state AS order_state, e.new_state AS event_state, e.event_type, e.ts_utc
+                FROM orders o
+                JOIN latest l ON l.client_order_id = o.client_order_id
+                JOIN order_events e ON e.client_order_id = l.client_order_id AND e.ts_utc = l.mx
+                WHERE o.run_id = ? AND e.new_state IS NOT NULL AND o.state <> e.new_state
+            """, (run_id, run_id)).fetchall()
+        else:
+            mismatches = con.execute("""
+                WITH latest AS (
+                  SELECT client_order_id, MAX(ts_utc) AS mx
+                  FROM order_events
+                  GROUP BY client_order_id
+                )
+                SELECT o.client_order_id, o.state AS order_state, e.new_state AS event_state, e.event_type, e.ts_utc
+                FROM orders o
+                JOIN latest l ON l.client_order_id = o.client_order_id
+                JOIN order_events e ON e.client_order_id = l.client_order_id AND e.ts_utc = l.mx
+                WHERE e.new_state IS NOT NULL AND o.state <> e.new_state
+            """).fetchall()
+    finally:
+        con.close()
 
     # Outcome invariants (Domain 2.8): terminal orders must have outcome set and coherent.
     con = _connect()
-    if run_id:
-        missing_outcome = con.execute(
-            """
-            SELECT client_order_id, state
-            FROM orders
-            WHERE run_id = ? AND state IN ('REJECTED','FILLED','CANCELLED') AND (outcome IS NULL OR outcome = '')
-            """,
-            (run_id,),
-        ).fetchall()
-        wrong_outcome = con.execute(
-            """
-            SELECT client_order_id, state, outcome
-            FROM orders
-            WHERE run_id = ?
-              AND (
-                (state='REJECTED' AND outcome <> 'REJECTED') OR
-                (state='FILLED' AND outcome <> 'FILLED') OR
-                (state='CANCELLED' AND outcome NOT IN ('CANCELLED','ABANDONED','TIMEOUT'))
-              )
-            """,
-            (run_id,),
-        ).fetchall()
-    else:
-        missing_outcome = con.execute(
-            """
-            SELECT client_order_id, state
-            FROM orders
-            WHERE state IN ('REJECTED','FILLED','CANCELLED') AND (outcome IS NULL OR outcome = '')
-            """
-        ).fetchall()
-        wrong_outcome = con.execute(
-            """
-            SELECT client_order_id, state, outcome
-            FROM orders
-            WHERE (
-              (state='REJECTED' AND outcome <> 'REJECTED') OR
-              (state='FILLED' AND outcome <> 'FILLED') OR
-              (state='CANCELLED' AND outcome NOT IN ('CANCELLED','ABANDONED','TIMEOUT'))
-            )
-            """
-        ).fetchall()
-    con.close()
+    try:
+        if run_id:
+            missing_outcome = con.execute(
+                """
+                SELECT client_order_id, state
+                FROM orders
+                WHERE run_id = ? AND state IN ('REJECTED','FILLED','CANCELLED') AND (outcome IS NULL OR outcome = '')
+                """,
+                (run_id,),
+            ).fetchall()
+            wrong_outcome = con.execute(
+                """
+                SELECT client_order_id, state, outcome
+                FROM orders
+                WHERE run_id = ?
+                  AND (
+                    (state='REJECTED' AND outcome <> 'REJECTED') OR
+                    (state='FILLED' AND outcome <> 'FILLED') OR
+                    (state='CANCELLED' AND outcome NOT IN ('CANCELLED','ABANDONED','TIMEOUT'))
+                  )
+                """,
+                (run_id,),
+            ).fetchall()
+        else:
+            missing_outcome = con.execute(
+                """
+                SELECT client_order_id, state
+                FROM orders
+                WHERE state IN ('REJECTED','FILLED','CANCELLED') AND (outcome IS NULL OR outcome = '')
+                """
+            ).fetchall()
+            wrong_outcome = con.execute(
+                """
+                SELECT client_order_id, state, outcome
+                FROM orders
+                WHERE (
+                  (state='REJECTED' AND outcome <> 'REJECTED') OR
+                  (state='FILLED' AND outcome <> 'FILLED') OR
+                  (state='CANCELLED' AND outcome NOT IN ('CANCELLED','ABANDONED','TIMEOUT'))
+                )
+                """
+            ).fetchall()
+    finally:
+        con.close()
 
     ok = (
         len(missing_events) == 0

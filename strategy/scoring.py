@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+
+# Kelly gate sentinel — must be aligned with DATA_MODE rules in CLAUDE.md
+_KELLY_ALLOWED_DATA_MODE = "VENDOR_REAL_CHAIN"
 
 
 class Regime(str, Enum):
@@ -105,6 +109,7 @@ def kelly_fractional(
     fraction: float = 0.5,
     min_trade_pct: float = 0.5,
     f_max: float = 0.25,
+    _data_mode: Optional[str] = None,
 ) -> float:
     """
     Kelly Fractional v11.1 (TECNICO snippet):
@@ -117,7 +122,19 @@ def kelly_fractional(
     Hotfix policy (test-aligned, low-RR guard):
       When b is very close to 1, enforce a stricter minimum size threshold to avoid
       noisy "micro-edge" allocations (NO TRADE).
+
+    DATA_MODE gate: Kelly sizing is disabled unless DATA_MODE == VENDOR_REAL_CHAIN.
+    Pass _data_mode explicitly or it is read from the OPZ_DATA_MODE env var.
+    Raises RuntimeError if the gate is not satisfied.
     """
+    data_mode = _data_mode or os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
+    if data_mode != _KELLY_ALLOWED_DATA_MODE:
+        raise RuntimeError(
+            f"kelly_fractional() blocked: DATA_MODE={data_mode!r} — "
+            f"Kelly sizing requires DATA_MODE={_KELLY_ALLOWED_DATA_MODE!r} "
+            f"and N_closed_trades >= 50 (IBKR onboarding pending)"
+        )
+
     if b <= 0:
         return 0.0
     if p <= 0 or p >= 1:

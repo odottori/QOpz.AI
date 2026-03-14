@@ -54,10 +54,10 @@ def main() -> int:
         _run([str(py_exe), "-m", "pip", "install", "-U", "pip"], cwd=root)
 
     req_map = {
-        "core": ["requirements.txt"],
+        "core": ["requirements-core.txt", "requirements-dev.txt"],
         "broker": ["requirements-broker-ib.txt"],
         "web": ["requirements-web.txt"],
-        "all": ["requirements.txt", "requirements-broker-ib.txt", "requirements-web.txt"],
+        "all": ["requirements-core.txt", "requirements-dev.txt", "requirements-broker-ib.txt", "requirements-web.txt"],
     }
 
     installed_any = False

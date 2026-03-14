@@ -28,5 +28,8 @@ if not "%RC%"=="0" (
 
 echo OPZ_UI: tracked start requested. listing registry...
 cd /d %~dp0\..
-py scripts\opz_process_registry.py list --format line --owner "%OPZ_AGENT_OWNER%"
+set "OPZ_ROOT=%cd%\"
+set "OPZ_PY=py"
+if exist "%OPZ_ROOT%.venv\Scripts\python.exe" set "OPZ_PY=%OPZ_ROOT%.venv\Scripts\python.exe"
+"%OPZ_PY%" scripts\opz_process_registry.py list --format line --owner "%OPZ_AGENT_OWNER%"
 exit /b 0

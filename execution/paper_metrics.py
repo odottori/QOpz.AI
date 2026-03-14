@@ -109,37 +109,39 @@ def record_trade(
     exit_s = _norm_ts_utc(exit_ts_utc)
     strikes_json = json.dumps(strikes, ensure_ascii=False) if strikes is not None else None
 
-    con.execute(
-        """
-        INSERT INTO paper_trades (
-            trade_id, profile, symbol, strategy, entry_ts_utc, exit_ts_utc,
-            strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason,
-            pnl, pnl_pct, slippage_ticks, violations, note, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            tid,
-            profile,
-            symbol,
-            strategy,
-            entry_s,
-            exit_s,
-            strikes_json,
-            _norm_optional_text(regime_at_entry),
-            float(score_at_entry) if score_at_entry is not None else None,
-            float(kelly_fraction) if kelly_fraction is not None else None,
-            _norm_optional_text(exit_reason),
-            float(pnl),
-            float(pnl_pct) if pnl_pct is not None else None,
-            float(slippage_ticks) if slippage_ticks is not None else None,
-            int(violations),
-            note,
-            created,
-        ),
-    )
-    if hasattr(con, "commit"):
-        con.commit()
-    con.close()
+    try:
+        con.execute(
+            """
+            INSERT INTO paper_trades (
+                trade_id, profile, symbol, strategy, entry_ts_utc, exit_ts_utc,
+                strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason,
+                pnl, pnl_pct, slippage_ticks, violations, note, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                tid,
+                profile,
+                symbol,
+                strategy,
+                entry_s,
+                exit_s,
+                strikes_json,
+                _norm_optional_text(regime_at_entry),
+                float(score_at_entry) if score_at_entry is not None else None,
+                float(kelly_fraction) if kelly_fraction is not None else None,
+                _norm_optional_text(exit_reason),
+                float(pnl),
+                float(pnl_pct) if pnl_pct is not None else None,
+                float(slippage_ticks) if slippage_ticks is not None else None,
+                int(violations),
+                note,
+                created,
+            ),
+        )
+        if hasattr(con, "commit"):
+            con.commit()
+    finally:
+        con.close()
     return tid
 
 
@@ -157,13 +159,15 @@ def record_compliance_event(
     ts = (ts_utc or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     details_json = json.dumps(details or {}, ensure_ascii=False) if details is not None else None
 
-    con.execute(
-        "INSERT INTO compliance_events (event_id, profile, ts_utc, code, severity, details_json) VALUES (?, ?, ?, ?, ?, ?)",
-        (eid, profile, ts, code, severity, details_json),
-    )
-    if hasattr(con, "commit"):
-        con.commit()
-    con.close()
+    try:
+        con.execute(
+            "INSERT INTO compliance_events (event_id, profile, ts_utc, code, severity, details_json) VALUES (?, ?, ?, ?, ?, ?)",
+            (eid, profile, ts, code, severity, details_json),
+        )
+        if hasattr(con, "commit"):
+            con.commit()
+    finally:
+        con.close()
     return eid
 
 
@@ -178,137 +182,137 @@ def compute_paper_summary(
     start_date = d0 - timedelta(days=window_days - 1)
 
     con = _connect()
+    try:
+        rows = con.execute(
+            "SELECT asof_date, equity FROM paper_equity_snapshots WHERE profile = ? AND asof_date >= ? AND asof_date <= ? ORDER BY asof_date ASC",
+            (profile, start_date.isoformat(), d0.isoformat()),
+        ).fetchall()
 
-    rows = con.execute(
-        "SELECT asof_date, equity FROM paper_equity_snapshots WHERE profile = ? AND asof_date >= ? AND asof_date <= ? ORDER BY asof_date ASC",
-        (profile, start_date.isoformat(), d0.isoformat()),
-    ).fetchall()
-
-    equities: list[float] = []
-    for _, eq in rows:
-        try:
-            equities.append(float(eq))
-        except Exception:
-            continue
-
-    daily_returns: list[float] = []
-    sharpe_a: Optional[float] = None
-    mdd: Optional[float] = None
-    if len(equities) >= 2:
-        for i in range(1, len(equities)):
-            prev = equities[i - 1]
-            cur = equities[i]
-            if prev and prev > 0:
-                daily_returns.append((cur / prev) - 1.0)
-        sharpe_a = float(annualized_sharpe(daily_returns, periods_per_year=252))
-        mdd = float(max_drawdown(equities))
-
-    trows = con.execute(
-        """
-        SELECT
-          pnl, slippage_ticks, violations,
-          entry_ts_utc, symbol, strategy, strikes_json,
-          regime_at_entry, score_at_entry, kelly_fraction, exit_reason, note
-        FROM paper_trades
-        WHERE profile = ? AND created_at IS NOT NULL
-        ORDER BY created_at ASC
-        """,
-        (profile,),
-    ).fetchall()
-
-    pnls: list[float] = []
-    slippages: list[float] = []
-    violation_sum = 0
-
-    required_missing = {
-        "entry_ts_utc": 0,
-        "symbol_strategy_strikes": 0,
-        "regime_at_entry": 0,
-        "score_at_entry": 0,
-        "kelly_fraction": 0,
-        "pnl_realized": 0,
-        "slippage_actual": 0,
-        "exit_reason": 0,
-        "note_operational": 0,
-    }
-
-    for row in trows:
-        pnl, slip, v, entry_ts, symbol, strategy, strikes_json, regime, score, kelly, exit_reason, note = row
-
-        pnl_ok = False
-        if pnl is not None:
+        equities: list[float] = []
+        for _, eq in rows:
             try:
-                fv = float(pnl)
-                pnls.append(fv)
-                pnl_ok = True
+                equities.append(float(eq))
             except Exception:
-                pnl_ok = False
-        if not pnl_ok:
-            required_missing["pnl_realized"] += 1
+                continue
 
-        slip_ok = False
-        if slip is not None:
+        daily_returns: list[float] = []
+        sharpe_a: Optional[float] = None
+        mdd: Optional[float] = None
+        if len(equities) >= 2:
+            for i in range(1, len(equities)):
+                prev = equities[i - 1]
+                cur = equities[i]
+                if prev and prev > 0:
+                    daily_returns.append((cur / prev) - 1.0)
+            sharpe_a = float(annualized_sharpe(daily_returns, periods_per_year=252))
+            mdd = float(max_drawdown(equities))
+
+        trows = con.execute(
+            """
+            SELECT
+              pnl, slippage_ticks, violations,
+              entry_ts_utc, symbol, strategy, strikes_json,
+              regime_at_entry, score_at_entry, kelly_fraction, exit_reason, note
+            FROM paper_trades
+            WHERE profile = ? AND created_at IS NOT NULL
+            ORDER BY created_at ASC
+            """,
+            (profile,),
+        ).fetchall()
+
+        pnls: list[float] = []
+        slippages: list[float] = []
+        violation_sum = 0
+
+        required_missing = {
+            "entry_ts_utc": 0,
+            "symbol_strategy_strikes": 0,
+            "regime_at_entry": 0,
+            "score_at_entry": 0,
+            "kelly_fraction": 0,
+            "pnl_realized": 0,
+            "slippage_actual": 0,
+            "exit_reason": 0,
+            "note_operational": 0,
+        }
+
+        for row in trows:
+            pnl, slip, v, entry_ts, symbol, strategy, strikes_json, regime, score, kelly, exit_reason, note = row
+
+            pnl_ok = False
+            if pnl is not None:
+                try:
+                    fv = float(pnl)
+                    pnls.append(fv)
+                    pnl_ok = True
+                except Exception:
+                    pnl_ok = False
+            if not pnl_ok:
+                required_missing["pnl_realized"] += 1
+
+            slip_ok = False
+            if slip is not None:
+                try:
+                    sv = float(slip)
+                    slippages.append(sv)
+                    slip_ok = True
+                except Exception:
+                    slip_ok = False
+            if not slip_ok:
+                required_missing["slippage_actual"] += 1
+
+            if not _is_present_text(entry_ts):
+                required_missing["entry_ts_utc"] += 1
+
+            has_symbol = _is_present_text(symbol)
+            has_strategy = _is_present_text(strategy)
+            has_strikes = _is_present_text(strikes_json)
+            if not (has_symbol and has_strategy and has_strikes):
+                required_missing["symbol_strategy_strikes"] += 1
+
+            if not _is_present_text(regime):
+                required_missing["regime_at_entry"] += 1
+
+            if score is None:
+                required_missing["score_at_entry"] += 1
+
+            if kelly is None:
+                required_missing["kelly_fraction"] += 1
+
+            if not _is_present_text(exit_reason):
+                required_missing["exit_reason"] += 1
+
+            if not _is_present_text(note):
+                required_missing["note_operational"] += 1
+
             try:
-                sv = float(slip)
-                slippages.append(sv)
-                slip_ok = True
+                violation_sum += int(v or 0)
             except Exception:
-                slip_ok = False
-        if not slip_ok:
-            required_missing["slippage_actual"] += 1
+                pass
 
-        if not _is_present_text(entry_ts):
-            required_missing["entry_ts_utc"] += 1
+        trade_count = len(trows)
+        wr: Optional[float] = None
+        pf: Optional[float] = None
+        if pnls:
+            wr = float(sum(1 for p in pnls if p > 0) / len(pnls))
+            pos = sum(p for p in pnls if p > 0)
+            neg = sum(p for p in pnls if p < 0)
+            if neg < 0:
+                pf = float(pos / abs(neg)) if abs(neg) > 1e-18 else float("inf")
+            else:
+                pf = float("inf") if pos > 0 else 0.0
 
-        has_symbol = _is_present_text(symbol)
-        has_strategy = _is_present_text(strategy)
-        has_strikes = _is_present_text(strikes_json)
-        if not (has_symbol and has_strategy and has_strikes):
-            required_missing["symbol_strategy_strikes"] += 1
+        avg_slip: Optional[float] = None
+        if slippages:
+            avg_slip = float(sum(slippages) / len(slippages))
 
-        if not _is_present_text(regime):
-            required_missing["regime_at_entry"] += 1
-
-        if score is None:
-            required_missing["score_at_entry"] += 1
-
-        if kelly is None:
-            required_missing["kelly_fraction"] += 1
-
-        if not _is_present_text(exit_reason):
-            required_missing["exit_reason"] += 1
-
-        if not _is_present_text(note):
-            required_missing["note_operational"] += 1
-
-        try:
-            violation_sum += int(v or 0)
-        except Exception:
-            pass
-
-    trade_count = len(trows)
-    wr: Optional[float] = None
-    pf: Optional[float] = None
-    if pnls:
-        wr = float(sum(1 for p in pnls if p > 0) / len(pnls))
-        pos = sum(p for p in pnls if p > 0)
-        neg = sum(p for p in pnls if p < 0)
-        if neg < 0:
-            pf = float(pos / abs(neg)) if abs(neg) > 1e-18 else float("inf")
-        else:
-            pf = float("inf") if pos > 0 else 0.0
-
-    avg_slip: Optional[float] = None
-    if slippages:
-        avg_slip = float(sum(slippages) / len(slippages))
-
-    crows = con.execute(
-        "SELECT COUNT(*) FROM compliance_events WHERE profile = ?",
-        (profile,),
-    ).fetchall()
-    compliance_events = int(crows[0][0]) if crows else 0
-
-    con.close()
+        crows = con.execute(
+            "SELECT COUNT(*) FROM compliance_events WHERE profile = ?",
+            (profile,),
+        ).fetchall()
+        compliance_events = int(crows[0][0]) if crows else 0
+    finally:
+        con.close()
 
     reasons_go: list[str] = []
     reasons_f6: list[str] = []
