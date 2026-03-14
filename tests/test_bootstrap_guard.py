@@ -36,6 +36,31 @@ class TestBootstrapGuard(unittest.TestCase):
         self.assertEqual(detail.get("stage"), "bootstrap")
         self.assertIn("allow_demo=true", detail.get("reason", ""))
 
+    def test_bootstrap_seeds_demo_data_with_allow_demo(self):
+        r = self.client.post("/opz/bootstrap?profile=paper&allow_demo=true")
+        self.assertEqual(r.status_code, 200, r.text)
+        payload = r.json()
+        self.assertTrue(payload.get("ok"))
+        self.assertTrue(payload.get("changed"))
+        self.assertEqual(payload.get("seeded_snapshots"), 60)
+        self.assertEqual(payload.get("seeded_trades"), 20)
+        self.assertEqual(payload.get("profile"), "paper")
+
+    def test_bootstrap_idempotent_when_data_exists(self):
+        # First call seeds data
+        r1 = self.client.post("/opz/bootstrap?profile=paper&allow_demo=true")
+        self.assertEqual(r1.status_code, 200, r1.text)
+        self.assertTrue(r1.json().get("changed"))
+
+        # Second call on same DB — already seeded, must be a no-op
+        r2 = self.client.post("/opz/bootstrap?profile=paper&allow_demo=true")
+        self.assertEqual(r2.status_code, 200, r2.text)
+        payload2 = r2.json()
+        self.assertTrue(payload2.get("ok"))
+        self.assertFalse(payload2.get("changed"))
+        self.assertEqual(payload2.get("seeded_snapshots"), 0)
+        self.assertEqual(payload2.get("seeded_trades"), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
