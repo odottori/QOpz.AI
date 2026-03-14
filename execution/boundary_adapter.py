@@ -114,8 +114,9 @@ class PaperLiveAdapterBase:
                 new_state="REJECTED",
                 details={"reason": self._reason, "profile": self._profile},
             )
-        except Exception:
-            pass
+        except Exception as _exc:  # best-effort — do not mask the real BrokerUnavailableError
+            import logging as _log
+            _log.getLogger(__name__).warning("record_event failed during broker-unavailable path: %s", _exc)
 
         raise BrokerUnavailableError(self._reason)
 

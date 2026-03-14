@@ -199,7 +199,7 @@ def _resolve_safe_path(path: Optional[str], *, field_name: str, allowed_roots: l
     p = Path(raw).expanduser()
     try:
         resolved = (ROOT / p).resolve() if not p.is_absolute() else p.resolve()
-    except Exception:
+    except OSError:
         raise HTTPException(status_code=400, detail=f"invalid {field_name} (unresolvable path)")
 
     for base in allowed_roots:
@@ -231,7 +231,7 @@ def _load_state() -> Dict[str, Any]:
         return {}
     try:
         return json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return {}
 
 
@@ -262,7 +262,7 @@ def _run_script_json(script_rel: str, args: list[str]) -> dict[str, Any]:
             parsed = json.loads(stdout)
             if isinstance(parsed, dict):
                 payload = parsed
-        except Exception:
+        except json.JSONDecodeError:
             s = stdout.find("{")
             e = stdout.rfind("}")
             if s >= 0 and e > s:
@@ -270,7 +270,7 @@ def _run_script_json(script_rel: str, args: list[str]) -> dict[str, Any]:
                     parsed = json.loads(stdout[s : e + 1])
                     if isinstance(parsed, dict):
                         payload = parsed
-                except Exception:
+                except json.JSONDecodeError:
                     payload = {}
 
     return {
@@ -291,7 +291,7 @@ def _read_tutorial_markdown(path: Optional[str] = None) -> dict[str, Any]:
         return {"path": str(p), "exists": False, "content": ""}
     try:
         content = p.read_text(encoding="utf-8")
-    except Exception:
+    except UnicodeDecodeError:
         content = p.read_text(encoding="utf-8", errors="ignore")
     return {"path": str(p), "exists": True, "content": content}
 
@@ -305,7 +305,7 @@ def _read_fallback_tts_pid() -> Optional[int]:
         pid = int(raw)
         _TTS_FALLBACK_PID_MEM = pid if pid > 0 else None
         return _TTS_FALLBACK_PID_MEM
-    except Exception:
+    except (OSError, ValueError):
         return _TTS_FALLBACK_PID_MEM
 
 
@@ -314,7 +314,7 @@ def _write_fallback_tts_pid(pid: int) -> None:
     _TTS_FALLBACK_PID_MEM = int(pid)
     try:
         TTS_FALLBACK_PID_PATH.write_text(str(int(pid)), encoding="utf-8")
-    except Exception:
+    except OSError:
         return
 
 
@@ -325,7 +325,7 @@ def _read_fallback_tts_state() -> str:
     try:
         _TTS_FALLBACK_STATE_MEM = TTS_FALLBACK_STATE_PATH.read_text(encoding="utf-8").strip().lower()
         return _TTS_FALLBACK_STATE_MEM
-    except Exception:
+    except OSError:
         return _TTS_FALLBACK_STATE_MEM
 
 
@@ -334,7 +334,7 @@ def _write_fallback_tts_state(state: str) -> None:
     _TTS_FALLBACK_STATE_MEM = (state or "").strip().lower()
     try:
         TTS_FALLBACK_STATE_PATH.write_text(_TTS_FALLBACK_STATE_MEM, encoding="utf-8")
-    except Exception:
+    except OSError:
         return
 
 
@@ -344,7 +344,7 @@ def _clear_fallback_tts_pid() -> None:
     try:
         if TTS_FALLBACK_PID_PATH.exists():
             TTS_FALLBACK_PID_PATH.unlink()
-    except Exception:
+    except OSError:
         return
 
 
@@ -354,7 +354,7 @@ def _clear_fallback_tts_state() -> None:
     try:
         if TTS_FALLBACK_STATE_PATH.exists():
             TTS_FALLBACK_STATE_PATH.unlink()
-    except Exception:
+    except OSError:
         return
 
 
@@ -377,7 +377,7 @@ def _pause_fallback_tts_process() -> bool:
                 return True
             return False
         return False
-    except Exception:
+    except OSError:
         return False
 
 
@@ -400,7 +400,7 @@ def _resume_fallback_tts_process() -> bool:
                 return True
             return False
         return False
-    except Exception:
+    except OSError:
         return False
 
 
@@ -421,7 +421,7 @@ def _stop_fallback_tts_process() -> bool:
         else:
             os.kill(pid, 9)
         return True
-    except Exception:
+    except OSError:
         return False
     finally:
         _clear_fallback_tts_pid()
@@ -618,7 +618,7 @@ def _run_ollama_prompt(prompt: str) -> dict[str, Any]:
     timeout_sec_raw = os.environ.get("OPZ_AI_TIMEOUT_SEC", "180")
     try:
         timeout_sec = max(10, int(timeout_sec_raw))
-    except Exception:
+    except (ValueError, TypeError):
         timeout_sec = 180
 
     cmd = ["ollama", "run", model, txt]
@@ -727,7 +727,7 @@ def _parse_ts_utc(value: Optional[str], field_name: str) -> Optional[datetime]:
         return None
     try:
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-    except Exception:
+    except ValueError:
         raise HTTPException(status_code=400, detail=f"invalid {field_name} (expected ISO datetime)")
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
@@ -739,7 +739,7 @@ def _read_jsonl_tail(path: Path, limit: int) -> list[dict[str, Any]]:
         return []
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-    except Exception:
+    except OSError:
         return []
 
     out: list[dict[str, Any]] = []
@@ -748,7 +748,7 @@ def _read_jsonl_tail(path: Path, limit: int) -> list[dict[str, Any]]:
             continue
         try:
             obj = json.loads(raw)
-        except Exception:
+        except json.JSONDecodeError:
             continue
         if isinstance(obj, dict):
             out.append(obj)
@@ -762,7 +762,7 @@ def _read_jsonl_all(path: Path) -> list[dict[str, Any]]:
         return []
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-    except Exception:
+    except OSError:
         return []
 
     out: list[dict[str, Any]] = []
@@ -771,7 +771,7 @@ def _read_jsonl_all(path: Path) -> list[dict[str, Any]]:
             continue
         try:
             obj = json.loads(raw)
-        except Exception:
+        except json.JSONDecodeError:
             continue
         if isinstance(obj, dict):
             out.append(obj)
@@ -795,7 +795,7 @@ def _confirm_token_already_used(confirm_token: str) -> bool:
 def _canonical_json(value: Any) -> str:
     try:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    except Exception:
+    except (TypeError, ValueError):
         return json.dumps(str(value), ensure_ascii=False)
 
 
@@ -827,7 +827,7 @@ def _count_profile_rows(con: Any, table_name: str, profile: str) -> int:
         return 0
     try:
         return int(row[0])
-    except Exception:
+    except (ValueError, TypeError):
         return 0
 
 
@@ -842,7 +842,8 @@ def _pick_bootstrap_candidate(profile: str) -> tuple[str, str, float]:
 
     try:
         out = run_universe_scan_from_ibkr_settings(profile=profile, regime="NORMAL", top_n=6)
-    except Exception:
+    except Exception as _exc:  # IBKR settings unavailable — fall back to manual scan
+        logger.debug("IBKR settings scan failed, falling back: %s", _exc)
         out = run_universe_scan(profile=profile, symbols=["SPY", "QQQ", "IWM"], regime="NORMAL", top_n=3, source="manual")
 
     items = out.get("items") if isinstance(out, dict) else None
@@ -1146,7 +1147,7 @@ def opz_paper_summary(profile: str = "paper", window_days: int = 60, asof_date: 
             from datetime import date as _date
 
             d = _date.fromisoformat(asof_date)
-        except Exception:
+        except ValueError:
             raise HTTPException(status_code=400, detail="invalid asof_date (expected YYYY-MM-DD)")
     s = compute_paper_summary(profile=profile, window_days=window_days, as_of_date=d)
     return {
@@ -1175,7 +1176,7 @@ def opz_paper_equity_snapshot(req: EquitySnapshotRequest) -> Dict[str, Any]:
         from datetime import date as _date
 
         d = _date.fromisoformat(req.asof_date)
-    except Exception:
+    except ValueError:
         raise HTTPException(status_code=400, detail="invalid asof_date (expected YYYY-MM-DD)")
     sid = record_equity_snapshot(profile=profile, asof_date=d, equity=equity, note=req.note.strip())
     return {"ok": True, "snapshot_id": sid}

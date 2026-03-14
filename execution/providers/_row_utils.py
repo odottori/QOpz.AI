@@ -21,7 +21,7 @@ def to_float(value: Any) -> float | None:
         if not s:
             return None
         return float(s)
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 

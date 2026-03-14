@@ -60,7 +60,7 @@ def init_execution_schema() -> None:
 
         try:
             con.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS outcome VARCHAR")
-        except Exception:
+        except Exception:  # column already exists — safe to ignore
             pass
 
         con.execute(
@@ -120,7 +120,7 @@ def init_execution_schema() -> None:
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS score_at_entry DOUBLE")
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS kelly_fraction DOUBLE")
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS exit_reason VARCHAR")
-        except Exception:
+        except Exception:  # column already exists — safe to ignore
             pass
 
         con.execute(
@@ -213,7 +213,7 @@ def record_event(
         }
         with log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
+    except OSError:  # best-effort JSONL trail — do not propagate I/O errors
         pass
 
 

@@ -38,7 +38,7 @@ def _to_dt_utc(value: Any) -> datetime | None:
         s = s[:-1] + "+00:00"
     try:
         dt = datetime.fromisoformat(s)
-    except Exception:
+    except (ValueError, TypeError):
         return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
@@ -57,7 +57,7 @@ def _num(v: Any) -> float | None:
         if v is None:
             return None
         return float(v)
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 

@@ -51,11 +51,11 @@ def _normalize_broker(cfg: Dict[str, Any]) -> None:
     # Coerce to int if possible.
     try:
         camel_i = int(camel)
-    except Exception:
+    except (ValueError, TypeError):
         camel_i = camel  # leave as-is (will surface downstream)
     try:
         snake_i = int(snake)
-    except Exception:
+    except (ValueError, TypeError):
         snake_i = snake
 
     broker["clientId"] = camel_i

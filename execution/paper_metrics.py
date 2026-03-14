@@ -192,7 +192,7 @@ def compute_paper_summary(
         for _, eq in rows:
             try:
                 equities.append(float(eq))
-            except Exception:
+            except (ValueError, TypeError):
                 continue
 
         daily_returns: list[float] = []
@@ -245,7 +245,7 @@ def compute_paper_summary(
                     fv = float(pnl)
                     pnls.append(fv)
                     pnl_ok = True
-                except Exception:
+                except (ValueError, TypeError):
                     pnl_ok = False
             if not pnl_ok:
                 required_missing["pnl_realized"] += 1
@@ -256,7 +256,7 @@ def compute_paper_summary(
                     sv = float(slip)
                     slippages.append(sv)
                     slip_ok = True
-                except Exception:
+                except (ValueError, TypeError):
                     slip_ok = False
             if not slip_ok:
                 required_missing["slippage_actual"] += 1
@@ -287,7 +287,7 @@ def compute_paper_summary(
 
             try:
                 violation_sum += int(v or 0)
-            except Exception:
+            except (ValueError, TypeError):
                 pass
 
         trade_count = len(trows)

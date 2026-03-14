@@ -43,7 +43,7 @@ def _parse_ts(ts: datetime | str) -> tuple[int, str]:
     try:
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         return (int(dt.timestamp() * 1_000_000), "")
-    except Exception:
+    except (ValueError, TypeError):
         return (0, s)
 
 
