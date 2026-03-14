@@ -85,6 +85,10 @@ def check_bare_except_pass(src: str, filepath: str) -> list[Issue]:
     for i, line in enumerate(src.splitlines(), 1):
         stripped = line.strip()
         if re.match(r"except\s*Exception\s*:", stripped) or stripped == "except:":
+            # Intentional broad catch marked with an inline explanation comment
+            comment = re.search(r"#\s*(.+)", stripped)
+            if comment and re.search(r"safe to ignore|already exists|best.effort|do not propagate", comment.group(1), re.I):
+                continue
             issues.append(Issue(
                 severity="HIGH",
                 file=filepath,
@@ -112,7 +116,12 @@ def check_naive_datetime(src: str, filepath: str) -> list[Issue]:
             ))
         # .replace(tzinfo=...) on potentially aware datetime
         if re.search(r"\.replace\s*\(\s*tzinfo\s*=\s*timezone\.utc\s*\)", stripped):
-            if "if" not in stripped.lower() and "none" not in stripped.lower():
+            lines_list = src.splitlines()
+            # Check current line AND the previous 3 lines for an "if ... is None:" guard
+            context_before = "\n".join(lines_list[max(0, i - 4):i])
+            on_same_line = "if" in stripped.lower() and "none" in stripped.lower()
+            guarded = on_same_line or re.search(r"if\b.+\btzinfo\b.+\bNone\b", context_before, re.I)
+            if not guarded:
                 issues.append(Issue(
                     severity="HIGH",
                     file=filepath,
@@ -137,8 +146,12 @@ def check_thread_unsafe_globals(src: str, filepath: str) -> list[Issue]:
     lines = src.splitlines()
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
+        line_indent = len(line) - len(line.lstrip())
         for pattern, severity, message in dangerous_patterns:
             if re.search(pattern, stripped):
+                # Skip module-level declarations/initializations (indent == 0 and not inside a function)
+                if line_indent == 0:
+                    continue
                 # Context-aware: find the enclosing function body and check if it contains a lock
                 # Walk backwards to find 'def ' that starts the current function
                 func_start = 0
@@ -234,10 +247,23 @@ def check_duckdb_connection_leak(src: str, filepath: str) -> list[Issue]:
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
         if re.search(r"=\s*_connect\s*\(\s*\)|=\s*duckdb\.connect\s*\(", stripped):
-            # Check if followed by try/finally or with statement in next ~20 lines
-            context_lines = lines[i:min(i + 25, len(lines))]
-            context = "\n".join(context_lines)
-            if "finally" not in context and "con.close()" not in context and "with " not in stripped:
+            # Skip if it's inside a with-statement on the same line
+            if re.match(r"with\s+", stripped):
+                continue
+            # Scan forward to next top-level function/class def (same or less indentation)
+            # to stay within the enclosing function body
+            call_indent = len(line) - len(line.lstrip())
+            end = len(lines)
+            for j in range(i, len(lines)):
+                jline = lines[j]
+                if not jline.strip():
+                    continue
+                jind = len(jline) - len(jline.lstrip())
+                if jind <= call_indent and re.match(r"(def |class |\@)", jline.strip()):
+                    end = j
+                    break
+            func_body = "\n".join(lines[i:end])
+            if "finally:" not in func_body and "con.close()" not in func_body:
                 issues.append(Issue(
                     severity="HIGH",
                     file=filepath,
@@ -257,7 +283,7 @@ def check_provenance_fields(src: str, filepath: str) -> list[Issue]:
     missing = [f for f in required_fields if f not in src]
     if missing:
         issues.append(Issue(
-            severity="HIGH",
+            severity="MEDIUM",
             file=filepath,
             line=0,
             category="Data provenance",

@@ -8,6 +8,7 @@ import secrets
 import shlex
 import subprocess
 import sys
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, time as time_cls, timedelta, timezone
@@ -50,6 +51,7 @@ TTS_FALLBACK_PID_PATH = LOG_DIR / "tts_fallback_pid.txt"
 TTS_FALLBACK_STATE_PATH = LOG_DIR / "tts_fallback_state.txt"
 _TTS_FALLBACK_PID_MEM: Optional[int] = None
 _TTS_FALLBACK_STATE_MEM: str = ""
+_TTS_LOCK = threading.Lock()
 
 
 @asynccontextmanager
@@ -298,64 +300,70 @@ def _read_tutorial_markdown(path: Optional[str] = None) -> dict[str, Any]:
 
 def _read_fallback_tts_pid() -> Optional[int]:
     global _TTS_FALLBACK_PID_MEM
-    if not TTS_FALLBACK_PID_PATH.exists():
-        return _TTS_FALLBACK_PID_MEM
-    try:
-        raw = TTS_FALLBACK_PID_PATH.read_text(encoding="utf-8").strip()
-        pid = int(raw)
-        _TTS_FALLBACK_PID_MEM = pid if pid > 0 else None
-        return _TTS_FALLBACK_PID_MEM
-    except (OSError, ValueError):
-        return _TTS_FALLBACK_PID_MEM
+    with _TTS_LOCK:
+        if not TTS_FALLBACK_PID_PATH.exists():
+            return _TTS_FALLBACK_PID_MEM
+        try:
+            raw = TTS_FALLBACK_PID_PATH.read_text(encoding="utf-8").strip()
+            pid = int(raw)
+            _TTS_FALLBACK_PID_MEM = pid if pid > 0 else None
+            return _TTS_FALLBACK_PID_MEM
+        except (OSError, ValueError):
+            return _TTS_FALLBACK_PID_MEM
 
 
 def _write_fallback_tts_pid(pid: int) -> None:
     global _TTS_FALLBACK_PID_MEM
-    _TTS_FALLBACK_PID_MEM = int(pid)
-    try:
-        TTS_FALLBACK_PID_PATH.write_text(str(int(pid)), encoding="utf-8")
-    except OSError:
-        return
+    with _TTS_LOCK:
+        _TTS_FALLBACK_PID_MEM = int(pid)
+        try:
+            TTS_FALLBACK_PID_PATH.write_text(str(int(pid)), encoding="utf-8")
+        except OSError:
+            return
 
 
 def _read_fallback_tts_state() -> str:
     global _TTS_FALLBACK_STATE_MEM
-    if not TTS_FALLBACK_STATE_PATH.exists():
-        return _TTS_FALLBACK_STATE_MEM
-    try:
-        _TTS_FALLBACK_STATE_MEM = TTS_FALLBACK_STATE_PATH.read_text(encoding="utf-8").strip().lower()
-        return _TTS_FALLBACK_STATE_MEM
-    except OSError:
-        return _TTS_FALLBACK_STATE_MEM
+    with _TTS_LOCK:
+        if not TTS_FALLBACK_STATE_PATH.exists():
+            return _TTS_FALLBACK_STATE_MEM
+        try:
+            _TTS_FALLBACK_STATE_MEM = TTS_FALLBACK_STATE_PATH.read_text(encoding="utf-8").strip().lower()
+            return _TTS_FALLBACK_STATE_MEM
+        except OSError:
+            return _TTS_FALLBACK_STATE_MEM
 
 
 def _write_fallback_tts_state(state: str) -> None:
     global _TTS_FALLBACK_STATE_MEM
-    _TTS_FALLBACK_STATE_MEM = (state or "").strip().lower()
-    try:
-        TTS_FALLBACK_STATE_PATH.write_text(_TTS_FALLBACK_STATE_MEM, encoding="utf-8")
-    except OSError:
-        return
+    with _TTS_LOCK:
+        _TTS_FALLBACK_STATE_MEM = (state or "").strip().lower()
+        try:
+            TTS_FALLBACK_STATE_PATH.write_text(_TTS_FALLBACK_STATE_MEM, encoding="utf-8")
+        except OSError:
+            return
 
 
 def _clear_fallback_tts_pid() -> None:
     global _TTS_FALLBACK_PID_MEM
-    _TTS_FALLBACK_PID_MEM = None
-    try:
-        if TTS_FALLBACK_PID_PATH.exists():
-            TTS_FALLBACK_PID_PATH.unlink()
-    except OSError:
-        return
+    with _TTS_LOCK:
+        _TTS_FALLBACK_PID_MEM = None
+        try:
+            if TTS_FALLBACK_PID_PATH.exists():
+                TTS_FALLBACK_PID_PATH.unlink()
+        except OSError:
+            return
 
 
 def _clear_fallback_tts_state() -> None:
     global _TTS_FALLBACK_STATE_MEM
-    _TTS_FALLBACK_STATE_MEM = ""
-    try:
-        if TTS_FALLBACK_STATE_PATH.exists():
-            TTS_FALLBACK_STATE_PATH.unlink()
-    except OSError:
-        return
+    with _TTS_LOCK:
+        _TTS_FALLBACK_STATE_MEM = ""
+        try:
+            if TTS_FALLBACK_STATE_PATH.exists():
+                TTS_FALLBACK_STATE_PATH.unlink()
+        except OSError:
+            return
 
 
 def _pause_fallback_tts_process() -> bool:
