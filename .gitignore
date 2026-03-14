@@ -5,6 +5,8 @@ logs/*
 !logs/.gitkeep
 data/*
 !data/.gitkeep
+!data/providers/
+!data/providers/*.csv
 db/*
 !db/.gitkeep
 
