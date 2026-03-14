@@ -785,3 +785,554 @@ def fetch_and_filter_chain(
         cache_age_hours=cache_age_hours,
         error=fetch_error,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8.  ScanResult + OpportunityCandidate dataclasses
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class OpportunityCandidate:
+    """Single ranked opportunity output from scan_opportunities()."""
+    symbol: str
+    strategy: str                          # BULL_PUT | BULL_CALL | IRON_CONDOR | STRADDLE
+    score: float                           # 0–100
+    score_breakdown: dict                  # {vol_edge, liquidity, risk_reward, regime_align}
+    expiry: str                            # ISO date
+    dte: int
+    strikes: list                          # strike(s) involved (short, long or [atm])
+    delta: float                           # primary leg delta (abs)
+    iv: float                              # ATM IV decimal
+    iv_zscore_30: Optional[float]
+    iv_zscore_60: Optional[float]
+    iv_interp: str                         # cheap | fair | expensive | unknown
+    expected_move: Optional[float]         # decimal (0.035 = 3.5%)
+    signal_vs_em_ratio: Optional[float]    # technical_signal_pct / EM; None if no signal
+    spread_pct: float                      # primary leg bid-ask spread %
+    open_interest: int                     # primary leg OI
+    volume: int                            # primary leg volume
+    max_loss: float                        # absolute $ (positive)
+    max_loss_pct: float                    # % of account capital
+    breakeven: float                       # $ breakeven price
+    breakeven_pct: float                   # % from current spot
+    credit_or_debit: float                 # positive=credit received, negative=debit paid
+    sizing_suggested: float                # % of account (Adaptive Fixed Fractional)
+    kelly_fraction: Optional[float]        # None until Kelly gate unlocked
+    events_flag: Optional[str]             # EARNINGS_2D | EARNINGS_7D | DIVIDEND_5D | None
+    human_review_required: bool            # True if signal > 2× EM
+    stress_base: float                     # P&L estimate at VIX+30%
+    stress_shock: float                    # P&L estimate at VIX+100%
+    data_quality: str                      # real_time | cache | stale | synthetic
+    source: str                            # ibkr_paper | ibkr_live | csv_delayed
+    underlying_price: float
+
+
+@dataclass
+class ScanResult:
+    """Output of scan_opportunities(): ranked list + audit metadata."""
+    profile: str
+    regime: str
+    data_mode: str                         # DATA_MODE watermark
+    scan_ts: str                           # UTC ISO timestamp
+    symbols_scanned: int
+    symbols_with_chain: int
+    filtered_count: int                    # total contracts rejected by hard filters
+    cache_used: bool
+    cache_age_hours: Optional[float]
+    candidates: list                       # list[OpportunityCandidate]
+    ranking_suspended: bool
+    suspension_reason: Optional[str]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9.  Strategy selector
+# ─────────────────────────────────────────────────────────────────────────────
+
+_STRATEGY_BULL_PUT   = "BULL_PUT"
+_STRATEGY_BULL_CALL  = "BULL_CALL"
+_STRATEGY_IRON_CONDOR = "IRON_CONDOR"
+_STRATEGY_STRADDLE   = "STRADDLE"
+
+_BASE_SIZING_PCT = 2.0   # % of account (Adaptive Fixed Fractional base)
+
+def _select_strategy(
+    regime: str,
+    iv_zscore: Optional[float],
+    signal: Optional[str],   # "bullish" | "bearish" | "neutral" | None
+    ivr: Optional[float],    # 0–100
+) -> str:
+    """
+    Select options strategy per PROJECT_OPZ_COMPLETE_V2 §2.1 Step 5.
+
+    Precedence: regime → signal direction → IV Z-Score → IVR.
+    CAUTION allows only narrow spreads → returns BULL_PUT (credit, defined-risk).
+    """
+    if regime == "SHOCK":
+        return ""   # no strategy in SHOCK
+
+    is_bullish  = signal in ("bullish", None)   # default bullish if no signal
+    is_neutral  = signal == "neutral"
+
+    z = iv_zscore if iv_zscore is not None else 0.0
+
+    if regime == "CAUTION":
+        # Only narrow credit spreads (defined-risk, vega-negative)
+        return _STRATEGY_BULL_PUT
+
+    # NORMAL regime
+    if is_neutral and ivr is not None and ivr >= 45.0:
+        return _STRATEGY_IRON_CONDOR
+
+    if is_neutral:
+        return _STRATEGY_STRADDLE
+
+    if is_bullish:
+        if z > Z_EXPENSIVE_THRESHOLD:
+            return _STRATEGY_BULL_PUT   # IV high → sell premium
+        if z < Z_CHEAP_THRESHOLD:
+            return _STRATEGY_BULL_CALL  # IV low → buy debit spread
+        return _STRATEGY_BULL_PUT       # default credit (IV fair, bullish)
+
+    # bearish: mirror of bullish (beyond current scope — default to credit put)
+    return _STRATEGY_BULL_PUT
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10.  Contract picker — choose primary leg(s) per strategy
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _closest_delta(
+    contracts: list[OptionContract],
+    right: str,
+    target_delta_abs: float,
+) -> Optional[OptionContract]:
+    """Return contract with |delta| closest to target_delta_abs."""
+    candidates = [c for c in contracts if c.right == right]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda c: abs(c.delta_abs - target_delta_abs))
+
+
+def _pick_spread_legs(
+    contracts: list[OptionContract],
+    strategy: str,
+) -> tuple[Optional[OptionContract], Optional[OptionContract]]:
+    """
+    Pick (short_leg, long_leg) for spread strategies.
+
+    Returns (None, None) if insufficient contracts.
+    """
+    if strategy == _STRATEGY_BULL_PUT:
+        short = _closest_delta(contracts, "P", 0.30)
+        # Long leg: lower delta (further OTM) than short
+        if short is None:
+            return None, None
+        long_cands = [
+            c for c in contracts
+            if c.right == "P" and c.delta_abs < short.delta_abs and c.strike < short.strike
+        ]
+        if not long_cands:
+            return short, None
+        long = min(long_cands, key=lambda c: abs(c.delta_abs - 0.20))
+        return short, long
+
+    if strategy == _STRATEGY_BULL_CALL:
+        short = _closest_delta(contracts, "C", 0.20)   # sell higher call
+        long = _closest_delta(contracts, "C", 0.35)    # buy lower call (primary leg)
+        return long, short   # long = primary (lower strike), short = hedge
+
+    if strategy == _STRATEGY_STRADDLE:
+        call = _closest_delta(contracts, "C", 0.50)
+        put  = _closest_delta(contracts, "P", 0.50)
+        return call, put
+
+    if strategy == _STRATEGY_IRON_CONDOR:
+        short_call = _closest_delta(contracts, "C", 0.30)
+        short_put  = _closest_delta(contracts, "P", 0.30)
+        return short_call, short_put   # simplified: just the two short legs
+
+    return None, None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11.  Payoff + sizing approximations
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _approx_payoff(
+    strategy: str,
+    short_leg: Optional[OptionContract],
+    long_leg: Optional[OptionContract],
+    underlying: float,
+) -> tuple[float, float, float, float]:
+    """
+    Return (credit_or_debit, max_loss, breakeven, rr_ratio).
+    All approximations for ranking purposes (not order-ready).
+    Spread width default = 5 points when long_leg missing.
+    """
+    if short_leg is None:
+        return 0.0, 9999.0, underlying, 0.0
+
+    if strategy == _STRATEGY_BULL_PUT:
+        credit = short_leg.mid - (long_leg.mid if long_leg else 0.0)
+        width  = (short_leg.strike - long_leg.strike) if long_leg else 5.0
+        max_loss = max(width - credit, 0.01) * 100   # per contract, 100x
+        credit_per_contract = credit * 100
+        breakeven = short_leg.strike - credit
+        rr = credit / (width - credit) if (width - credit) > 0 else 0.0
+        return credit_per_contract, max_loss, breakeven, rr
+
+    if strategy == _STRATEGY_BULL_CALL:
+        debit  = short_leg.mid - (long_leg.mid if long_leg else 0.0)
+        # short_leg here is the higher-strike call hedge
+        width  = (long_leg.strike - short_leg.strike) if long_leg else 5.0
+        # For bull call: short=long-strike (higher), long=primary (lower)
+        # Recompute: long_leg is the bought call, short_leg is the sold call
+        if long_leg is not None:
+            debit_paid = long_leg.mid - short_leg.mid
+        else:
+            debit_paid = short_leg.mid
+        max_gain = max(width - debit_paid, 0.0) * 100
+        max_loss = debit_paid * 100
+        breakeven = (short_leg.strike + debit_paid) if long_leg is None else (long_leg.strike + debit_paid)
+        rr = max_gain / max_loss if max_loss > 0 else 0.0
+        return -debit_paid * 100, max_loss, breakeven, rr
+
+    if strategy == _STRATEGY_STRADDLE:
+        cost = ((short_leg.mid if short_leg else 0.0) +
+                (long_leg.mid if long_leg else 0.0)) * 100
+        breakeven_up   = (short_leg.strike if short_leg else underlying) + cost / 100
+        breakeven_down = (short_leg.strike if short_leg else underlying) - cost / 100
+        return -cost, cost, breakeven_up, 1.0   # report upper breakeven
+
+    if strategy == _STRATEGY_IRON_CONDOR:
+        credit_call = short_leg.mid if short_leg else 0.0
+        credit_put  = long_leg.mid  if long_leg  else 0.0
+        total_credit = (credit_call + credit_put) * 100
+        width = 5.0  # assume 5-point wing width
+        max_loss = (width - total_credit / 100) * 100
+        breakeven = underlying   # simplified center
+        rr = (total_credit / 100) / (width - total_credit / 100) if width > total_credit / 100 else 0.0
+        return total_credit, max(max_loss, 0.01), breakeven, rr
+
+    return 0.0, 9999.0, underlying, 0.0
+
+
+def _stress_estimate(strategy: str, credit_or_debit: float, max_loss: float) -> tuple[float, float]:
+    """
+    Simplified stress scenario estimates.
+    VIX+30%: assume 60% of max adverse move.
+    VIX+100%: assume 95% of max loss for credit strategies; full debit for debit.
+    """
+    is_credit = credit_or_debit > 0
+    if is_credit:
+        stress_base  = -max_loss * 0.60
+        stress_shock = -max_loss * 0.95
+    else:
+        loss = abs(credit_or_debit)
+        stress_base  = -loss * 0.40
+        stress_shock = -loss * 0.90
+    return round(stress_base, 2), round(stress_shock, 2)
+
+
+def _sizing_adaptive_fixed(regime: str) -> float:
+    """Adaptive Fixed Fractional: base_pct × regime_multiplier."""
+    multiplier = {"NORMAL": 1.0, "CAUTION": 0.5, "SHOCK": 0.0}.get(regime, 0.0)
+    return round(_BASE_SIZING_PCT * multiplier, 2)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12.  IVR proxy from IV history
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _ivr_from_history(iv_current: float, iv_history: list[float], lookback: int = 252) -> Optional[float]:
+    """
+    IV Rank (0–100) from history: (iv_current - min_iv) / (max_iv - min_iv) * 100.
+    Returns None if history too short (< 30 points).
+    """
+    if not iv_history or len(iv_history) < 30:
+        return None
+    window = iv_history[-lookback:] if len(iv_history) > lookback else iv_history
+    mn, mx = min(window), max(window)
+    if mx == mn:
+        return 50.0
+    rank = (iv_current - mn) / (mx - mn) * 100.0
+    return round(max(0.0, min(100.0, rank)), 2)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 13.  Build OpportunityCandidate
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_candidate(
+    chain_result: ChainFilterResult,
+    analytics: ChainAnalytics,
+    strategy: str,
+    regime: str,
+    iv_history: list[float],
+    account_size: float = 10_000.0,
+    signal_pct: Optional[float] = None,   # technical signal expected move % (decimal)
+) -> Optional[OpportunityCandidate]:
+    """
+    Build an OpportunityCandidate from ChainFilterResult + ChainAnalytics.
+    Returns None if insufficient data for scoring.
+    """
+    if not chain_result.contracts_kept:
+        return None
+
+    short_leg, long_leg = _pick_spread_legs(chain_result.contracts_kept, strategy)
+    if short_leg is None:
+        return None
+
+    underlying = chain_result.underlying_price or analytics.underlying_price
+    credit_or_debit, max_loss, breakeven, rr = _approx_payoff(
+        strategy, short_leg, long_leg, underlying
+    )
+
+    # ── Score via existing 4-pillar scorer ───────────────────────────────
+    iv_current = analytics.iv_current or short_leg.iv
+    ivr = _ivr_from_history(iv_current, iv_history) if iv_history else None
+    ivr_for_score = ivr if ivr is not None else 30.0   # safe default
+
+    from strategy.scoring import compute_trade_score, Regime as SRegime
+    try:
+        score_result = compute_trade_score(
+            ivr=ivr_for_score,
+            bid_ask_spread_pct=short_leg.spread_pct,
+            open_interest=short_leg.open_interest,
+            rr=rr,
+            regime=regime,
+        )
+    except Exception:
+        return None
+
+    if not score_result.accepted:
+        return None
+
+    score = round(score_result.score, 2)
+
+    # Approximate score breakdown (regime component + inferred split)
+    vol_edge_score   = round(min(100.0, ivr_for_score * 1.25), 2)
+    liq_score        = round(max(0.0, 100.0 - short_leg.spread_pct * 5.0), 2)
+    rr_score         = round(min(100.0, rr * 33.0), 2)
+    regime_align     = 100.0 if regime == "NORMAL" else (50.0 if regime == "CAUTION" else 0.0)
+    score_breakdown  = {
+        "vol_edge": vol_edge_score,
+        "liquidity": liq_score,
+        "risk_reward": rr_score,
+        "regime_align": regime_align,
+    }
+
+    # ── Signal vs EM ratio ────────────────────────────────────────────────
+    em = analytics.expected_move
+    signal_vs_em: Optional[float] = None
+    if signal_pct is not None and em is not None and em > 0.0:
+        signal_vs_em = round(signal_pct / em, 3)
+    human_review = (signal_vs_em is not None and signal_vs_em > 2.0)
+
+    # ── Stress + sizing ───────────────────────────────────────────────────
+    stress_base, stress_shock = _stress_estimate(strategy, credit_or_debit, max_loss)
+    sizing = _sizing_adaptive_fixed(regime)
+    max_loss_pct = round(max_loss / account_size * 100.0, 3) if account_size > 0 else 0.0
+    breakeven_pct = round((breakeven - underlying) / underlying * 100.0, 4) if underlying > 0 else 0.0
+
+    # ── Strikes list ─────────────────────────────────────────────────────
+    strikes = [short_leg.strike]
+    if long_leg is not None:
+        strikes.append(long_leg.strike)
+
+    z30 = analytics.iv_zscore_30
+    iv_interp = analytics.iv_interp_30 if z30 is not None else analytics.iv_interp_60
+
+    return OpportunityCandidate(
+        symbol=chain_result.symbol,
+        strategy=strategy,
+        score=score,
+        score_breakdown=score_breakdown,
+        expiry=chain_result.expiry,
+        dte=chain_result.dte,
+        strikes=sorted(strikes),
+        delta=short_leg.delta_abs,
+        iv=iv_current,
+        iv_zscore_30=z30,
+        iv_zscore_60=analytics.iv_zscore_60,
+        iv_interp=iv_interp,
+        expected_move=em,
+        signal_vs_em_ratio=signal_vs_em,
+        spread_pct=short_leg.spread_pct,
+        open_interest=short_leg.open_interest,
+        volume=short_leg.volume,
+        max_loss=round(max_loss, 2),
+        max_loss_pct=max_loss_pct,
+        breakeven=round(breakeven, 4),
+        breakeven_pct=breakeven_pct,
+        credit_or_debit=round(credit_or_debit, 2),
+        sizing_suggested=sizing,
+        kelly_fraction=None,   # Kelly gate not unlocked in dev/paper
+        events_flag=None,      # ROC2 (calendar integration)
+        human_review_required=human_review,
+        stress_base=stress_base,
+        stress_shock=stress_shock,
+        data_quality=chain_result.data_quality,
+        source=chain_result.source,
+        underlying_price=underlying,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 14.  scan_opportunities — main entry point
+# ─────────────────────────────────────────────────────────────────────────────
+
+def scan_opportunities(
+    profile: str = "dev",
+    regime: str = "NORMAL",
+    symbols: list[str] | None = None,
+    *,
+    top_n: int = 5,
+    signal_map: dict[str, str] | None = None,     # symbol → "bullish"|"bearish"|"neutral"
+    signal_pct_map: dict[str, float] | None = None, # symbol → expected_move_pct (decimal)
+    params: FilterParams | None = None,
+    use_cache: bool = True,
+    config: dict[str, Any] | None = None,
+    account_size: float = 10_000.0,
+    iv_history_map: dict[str, list[float]] | None = None,  # pre-loaded; if None → load from files
+    min_dte: int = DEFAULT_MIN_DTE,
+    max_dte: int = DEFAULT_MAX_DTE,
+    min_score: float = 60.0,
+) -> ScanResult:
+    """
+    Full opportunity scan pipeline per PROJECT_OPZ_COMPLETE_V2 §2.1.
+
+    For each symbol:
+      1. Load IV history (file or synthetic fallback)
+      2. fetch_and_filter_chain() → ChainFilterResult
+      3. compute_chain_analytics() → ChainAnalytics
+      4. Select strategy (regime + IV Z-Score + signal)
+      5. Build OpportunityCandidate (score via 4 pillars)
+
+    Returns ScanResult with candidates ranked by score desc (top_n max).
+    SHOCK → ranking_suspended=True, empty candidates.
+    """
+    from scripts.fetch_iv_history import load_iv_history  # lazy to avoid circular import
+
+    scan_ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    data_mode = os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
+
+    # SHOCK circuit breaker
+    if regime == "SHOCK":
+        return ScanResult(
+            profile=profile,
+            regime=regime,
+            data_mode=data_mode,
+            scan_ts=scan_ts,
+            symbols_scanned=0,
+            symbols_with_chain=0,
+            filtered_count=0,
+            cache_used=False,
+            cache_age_hours=None,
+            candidates=[],
+            ranking_suspended=True,
+            suspension_reason="SHOCK regime — no new positions allowed",
+        )
+
+    if symbols is None or len(symbols) == 0:
+        return ScanResult(
+            profile=profile,
+            regime=regime,
+            data_mode=data_mode,
+            scan_ts=scan_ts,
+            symbols_scanned=0,
+            symbols_with_chain=0,
+            filtered_count=0,
+            cache_used=use_cache,
+            cache_age_hours=None,
+            candidates=[],
+            ranking_suspended=False,
+            suspension_reason=None,
+        )
+
+    candidates: list[OpportunityCandidate] = []
+    total_filtered = 0
+    symbols_with_chain = 0
+    cache_ages: list[float] = []
+
+    for sym in symbols:
+        sym = sym.upper()
+
+        # ── IV history ───────────────────────────────────────────────────
+        if iv_history_map and sym in iv_history_map:
+            iv_hist = iv_history_map[sym]
+        else:
+            iv_hist = load_iv_history(sym)
+
+        # ── Chain fetch + filter ─────────────────────────────────────────
+        chain_result = fetch_and_filter_chain(
+            sym, profile,
+            params=params,
+            use_cache=use_cache,
+            config=config,
+            min_dte=min_dte,
+            max_dte=max_dte,
+        )
+
+        total_filtered += chain_result.reject_stats.total_rejected
+        if chain_result.cache_age_hours is not None:
+            cache_ages.append(chain_result.cache_age_hours)
+
+        if not chain_result.contracts_kept:
+            continue
+
+        symbols_with_chain += 1
+
+        # ── Analytics ────────────────────────────────────────────────────
+        analytics = compute_chain_analytics(chain_result, iv_history=iv_hist or None)
+
+        # ── Strategy selection ───────────────────────────────────────────
+        signal = (signal_map or {}).get(sym)
+        iv_current = analytics.iv_current
+        ivr = _ivr_from_history(iv_current, iv_hist) if (iv_current and iv_hist) else None
+        strategy = _select_strategy(
+            regime=regime,
+            iv_zscore=analytics.iv_zscore_30,
+            signal=signal,
+            ivr=ivr,
+        )
+        if not strategy:
+            continue
+
+        # ── Build candidate ──────────────────────────────────────────────
+        spct = (signal_pct_map or {}).get(sym)
+        candidate = _build_candidate(
+            chain_result=chain_result,
+            analytics=analytics,
+            strategy=strategy,
+            regime=regime,
+            iv_history=iv_hist or [],
+            account_size=account_size,
+            signal_pct=spct,
+        )
+        if candidate is not None:
+            candidates.append(candidate)
+
+    # ── Sort by score, take top_n ────────────────────────────────────────
+    candidates.sort(key=lambda c: c.score, reverse=True)
+    top_candidates = [c for c in candidates if c.score >= min_score][:top_n]
+
+    cache_used = bool(cache_ages)
+    avg_cache_age: Optional[float] = (
+        round(sum(cache_ages) / len(cache_ages), 2) if cache_ages else None
+    )
+
+    return ScanResult(
+        profile=profile,
+        regime=regime,
+        data_mode=data_mode,
+        scan_ts=scan_ts,
+        symbols_scanned=len(symbols),
+        symbols_with_chain=symbols_with_chain,
+        filtered_count=total_filtered,
+        cache_used=cache_used,
+        cache_age_hours=avg_cache_age,
+        candidates=top_candidates,
+        ranking_suspended=False,
+        suspension_reason=None,
+    )
