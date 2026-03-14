@@ -2,7 +2,7 @@ QuantOptionAI — CANON
 
 Versione: v.T.11.13
 
-Build: 2026-03-14 09:25:10 UTC
+Build: 2026-03-14 15:58:23 UTC
 
 
 
@@ -148,10 +148,10 @@ c923e9ab425914b34e484f1f961c067105fc51a61bb8d5adf4515c86951cbe5e        42483  .
 45e735da4eb096e5ad5a3df704ac6b0e219f38b8510851e2967278163ebab75e        22303  .canonici/02_TEST.md
 ed6b62df92c23677ed53104035a0c85fec142e0fd006a47c897c284cadef1156         4016  .canonici/03_SETUP.md
 cf4cec39f934d36c4d75fec46a034cd0f2308403ca61b3d9c1024b7ad0fa547d         8245  .canonici/04_APPENDICI.md
-d4b9a7618bdb225f05dc39479f843370f3d1eacfb93cd48356f81da2b36b8fb2       161360  .canonici/MANIFEST.txt
+6685644d6a21577928b49a8ffefd19dd1ffcdacdc557cd365271b8e222939f16       161360  .canonici/MANIFEST.txt
 c1af9751a985cc8a3772d753190ff2a028f630576e4df86fab993bb14ac7e5fd        20454  .canonici/REGISTRO_INTEGRITA.md
 fc41050b3e74dd19defdccb7fc066a6eca095d93bb232f67f29881c349a7965d          211  .claude/launch.json
-c94ebe224c33811cd8ddf0729717f24c53869afdc5a7a6e7362b5d2ca4957590         6661  .claude/settings.local.json
+f7199996003a6b0eec40a56767af9871663b498ff89a15a8cd2a1074865ca633         6707  .claude/settings.local.json
 fb92e6506bbbe23f32381f7faa1d5722ef65e6c57ac511db4b724f027300c1f9          235  .gitattributes
 a2b5f181a4a52eec3ea14554772a402d0d9641e986ad0fc723ab7ea52292e664          441  .gitignore
 830bffa9eec8b78847625f77d73f615ff43c1aa02d62e27e27aa48956ccfbed7        27020  .qoaistate.json
@@ -1295,7 +1295,7 @@ bab463ae101485b8d8eed2f937357c63332d522248128922376425cc63502ecb          319  u
 d480ee708068dbc94e803ba6da8a2e3318d2daabc89cff5aebfffca6d5511f97        58034  ui/package-lock.json
 76e6e62fcf15a93c76f6f484acbb38aad9fe5388794d1c0581859b140adcf659          451  ui/package.json
 83d681d0bcc6af169cb5f38694c364f775f74ee4d867434a059f3942db10f871        16800  ui/src/App.css
-03fed9dff45a82cae4a92d1a356a9dbaf6fa4ff92ce566d2e397c0eae659d40a        81042  ui/src/App.tsx
+8f1ef5ede76a918ff0334b9c3ce589ec5e62eff56175b1d3225d4156f2b46d63        81166  ui/src/App.tsx
 7b50e87aea9f82442f456429a13ead8f31d42bd4308e71c604a527338775e12b          223  ui/src/main.tsx
 cccb312a83e8fcb994ed1c8e62702bbeafdf976fda8005450dc6dca4bbbebc10          368  ui/tsconfig.json
 71ad9c58d517fb5fe6119904c4c9878e97c0c4a7d8f2d0be8b32180086c4fd05          199  ui/vite.config.ts

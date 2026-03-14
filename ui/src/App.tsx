@@ -163,6 +163,7 @@ type DemoPipelineAutoResponse = {
   ok: boolean;
   profile: string;
   regime: string;
+  ibkr_settings_path?: string | null;
   fetch?: { captured?: number; failed?: number };
   capture?: { captured?: number; duplicates?: number; skipped_fresh?: number };
   extract?: { valid?: number; needs_review?: number; errors?: number };
@@ -1134,9 +1135,9 @@ export default function App() {
         <div className="logo">QuantOPTION<span className="logo-ai">.AI</span></div>
         <div className="topbar-center">
           <span className={`regime-pill ${regimeView.cls}`}>REGIME: {regimeView.text}</span>
-          <span className="top-mini">XGBoost: {goGate?.pass ? "87%" : "72%"}</span>
-          <span className="top-mini">HMM P(shock): {f6Gate?.pass ? "0.12" : "0.28"}</span>
-          <span className="top-mini">Sizing: {goGate?.pass ? "100%" : "50%"}</span>
+          <span className="top-mini">XGBoost: {apiOnline ? "—" : "—"}</span>
+          <span className="top-mini">HMM P(shock): {apiOnline ? "—" : "—"}</span>
+          <span className="top-mini">Sizing: {regimeView.text === "NORMAL" ? "100%" : regimeView.text === "CAUTION" ? "50%" : regimeView.text === "SHOCK" ? "0%" : "—"}</span>
         </div>
         <div className="topbar-right">
           <span className="clock">{clockText}</span>
