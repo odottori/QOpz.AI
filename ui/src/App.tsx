@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
 type ReleaseStatusResponse = { format: string; content: string };
@@ -1078,6 +1078,15 @@ export default function App() {
   }, [paperSummary?.win_rate, paperSummary?.profit_factor]);
 
   useEffect(() => {
+    if (!message && !error) return;
+    const id = window.setTimeout(() => {
+      setMessage("");
+      setError("");
+    }, 5000);
+    return () => window.clearTimeout(id);
+  }, [message, error]);
+
+  useEffect(() => {
     const init = async () => {
       await refreshAll();
     };
@@ -1107,15 +1116,6 @@ export default function App() {
   }, []);
 
   const navItems: Array<{ id: TabKey; label: string }> = [
-    { id: "warroom", label: "WAR ROOM" },
-    { id: "pipeline", label: "PIPELINE AUTO" },
-    { id: "universe", label: "UNIVERSE SCANNER" },
-    { id: "opportunity", label: "OPPORTUNITY" },
-    { id: "trades", label: "TRADE LOG" },
-    { id: "regime", label: "REGIME MATRIX" },
-    { id: "tests", label: "TEST SUITE" },
-  ];
-  const centerTabItems: Array<{ id: TabKey; label: string }> = [
     { id: "warroom", label: "WAR ROOM" },
     { id: "universe", label: "UNIVERSE SCANNER" },
     { id: "opportunity", label: "OPPORTUNITY" },
@@ -1193,7 +1193,7 @@ export default function App() {
           </div>
 
           <div className="tabs">
-            {centerTabItems.map((tab) => (
+            {navItems.map((tab) => (
               <button key={tab.id} className={`tab ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)}>
                 {tab.label}
               </button>
@@ -1343,7 +1343,7 @@ export default function App() {
                   <input
                     value={universeSettingsPath}
                     onChange={(e) => setUniverseSettingsPath(e.target.value)}
-                    placeholder="default: docs/IBKE setting decriptato.sanitized.xml"
+                    placeholder="default: docs/IBKR setting decriptato.sanitized.xml"
                   />
 
                   <label>Scanner</label>
@@ -1826,71 +1826,3 @@ export default function App() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
