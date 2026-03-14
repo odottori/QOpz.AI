@@ -1162,7 +1162,7 @@ export default function App() {
             <div className="nav-label">PIPELINE DATI</div>
             <div className="nav-item static"><span className="nav-dot dot-green" /> yfinance / CBOE <span className="nav-badge ok">OK</span></div>
             <div className="nav-item static"><span className="nav-dot dot-green" /> FRED API <span className="nav-badge ok">OK</span></div>
-            <div className="nav-item static"><span className="nav-dot dot-amber" /> ORATS (5 tkr) <span className="nav-badge warn">LAG</span></div>
+            <div className="nav-item static"><span className="nav-dot dot-amber" /> ORATS (5 ticker) <span className="nav-badge warn">LAG</span></div>
           </div>
 
           <div className="nav-section">
@@ -1230,7 +1230,7 @@ export default function App() {
                   <li>API: {apiOnline ? "ONLINE" : "OFFLINE"}</li>
                   <li>Execution config: {executionConfigReady ? "VALID" : "INVALID"}</li>
                   <li>Paper data: {hasPaperData ? "PRESENT" : "MISSING"}</li>
-                  <li>blocked_steps: {blockedCount}</li>
+                  <li>Blocked steps: {blockedCount}</li>
                   {(lastActions?.paper_trades ?? []).slice(0, 5).map((x, i) => (
                     <li key={`af-${i}`}><code>{fmtTs(x.ts_utc)}</code> {x.symbol}/{x.strategy} pnl={x.pnl ?? "-"}</li>
                   ))}
@@ -1238,13 +1238,13 @@ export default function App() {
                 <div className="panel-title mt10">AUTOMATION PIPELINE</div>
                 <div className="pipeline-row">
                   <span className="pipe-step done">DATA</span>
-                  <span className="pipe-arrow">-&gt;</span>
+                  <span className="pipe-arrow">→</span>
                   <span className="pipe-step done">IVR</span>
-                  <span className="pipe-arrow">-&gt;</span>
+                  <span className="pipe-arrow">→</span>
                   <span className="pipe-step done">REGIME</span>
-                  <span className="pipe-arrow">-&gt;</span>
+                  <span className="pipe-arrow">→</span>
                   <span className="pipe-step run">SCORE</span>
-                  <span className="pipe-arrow">-&gt;</span>
+                  <span className="pipe-arrow">→</span>
                   <span className="pipe-step wait">KELLY</span>
                 </div>
               </article>
@@ -1298,7 +1298,7 @@ export default function App() {
                   </select>
                   <button className="btn btn-danger" onClick={doConfirm} disabled={busy || !preview || payloadJsonError || previewDirty}>CONFIRM</button>
                 </div>
-                <pre className="console">{preview ? JSON.stringify(preview, null, 2) : "No preview yet."}</pre>
+                <pre className="console">{preview ? JSON.stringify(preview, null, 2) : "Nessuna anteprima."}</pre>
               </article>
             </div>
           )}
@@ -1490,7 +1490,7 @@ export default function App() {
           {activeTab === "opportunity" && (
             <div className="panel-grid two">
               <article className="panel">
-                <div className="panel-title">OPPORTUNITY QUEUE (SHADOW)</div>
+                <div className="panel-title">OPPORTUNITY QUEUE</div>
                 <ul className="activity-list">
                   <li>Universe batch: <code>{universeLatest?.batch_id ?? "-"}</code></li>
                   <li>Scanner: {universeLatest?.scanner_name?.trim() ? universeLatest.scanner_name : "-"}</li>
@@ -1539,7 +1539,7 @@ export default function App() {
               </article>
 
               <article className="panel">
-                <div className="panel-title">VALIDAZIONE OPERATORE (SHADOW ONLY)</div>
+                <div className="panel-title">VALIDAZIONE OPERATORE</div>
                 <div className="form-grid">
                   <label>Selected candidate</label>
                   <input value={selectedOpportunity ? `${selectedOpportunity.symbol} / ${selectedOpportunity.strategy}` : "-"} readOnly />
@@ -1614,7 +1614,7 @@ export default function App() {
                     {(lastActions?.paper_trades ?? []).map((x, i) => (
                       <tr key={`t-${i}`}><td>{fmtTs(x.ts_utc)}</td><td>{x.symbol}</td><td>{x.strategy}</td><td>{x.pnl ?? "-"}</td><td>{x.violations}</td></tr>
                     ))}
-                    {(lastActions?.paper_trades.length ?? 0) === 0 && <tr><td colSpan={5} className="dim">No trade action yet.</td></tr>}
+                    {(lastActions?.paper_trades.length ?? 0) === 0 && <tr><td colSpan={5} className="dim">Nessun trade registrato.</td></tr>}
                   </tbody>
                 </table>
               </article>
@@ -1646,8 +1646,8 @@ export default function App() {
               <article className="panel">
                 <div className="panel-title">REGIME INPUTS</div>
                 <ul className="activity-list">
-                  <li>GO/NO-GO: {goGate?.pass ? "PASS" : "FAIL"}</li>
-                  <li>F6-T1: {f6Gate?.pass ? "PASS" : "FAIL"}</li>
+                  <li>GO/NO-GO: {goGate === undefined ? <span className="dim">–</span> : <GateBadge pass={goGate.pass} />}</li>
+                  <li>F6-T1: {f6Gate === undefined ? <span className="dim">–</span> : <GateBadge pass={f6Gate.pass} />}</li>
                   <li>F6-T2 ratio: {f6t2Gate ? `${(f6t2Gate.completeness_ratio * 100).toFixed(2)}%` : "-"}</li>
                   <li>MaxDD: {fmtPct(paperSummary?.max_drawdown ?? null)}</li>
                   <li>Win rate: {fmtPct(paperSummary?.win_rate ?? null)}</li>
@@ -1660,11 +1660,11 @@ export default function App() {
             <div className="panel-grid two">
               <article className="panel">
                 <div className="panel-title">STATE SNAPSHOT</div>
-                <pre className="console">{stateJson ? JSON.stringify(stateJson, null, 2) : "Press Refresh status."}</pre>
+                <pre className="console">{stateJson ? JSON.stringify(stateJson, null, 2) : "Premi REFRESH per aggiornare."}</pre>
               </article>
               <article className="panel">
                 <div className="panel-title">RELEASE STATUS</div>
-                {!releaseMd && <pre className="console">Press Refresh status.</pre>}
+                {!releaseMd && <pre className="console">Premi REFRESH per aggiornare.</pre>}
                 {releaseMd && (
                   <div className="release-md">
                     {releaseView.before && <pre className="console">{releaseView.before}</pre>}
@@ -1714,10 +1714,10 @@ export default function App() {
           <section className="rp-section">
             <div className="rp-title">FASE CORRENTE</div>
             <div className="phase-d-name">{nextStep}</div>
-            <div className="checklist-item"><span className="ci-label">blocked_steps</span><span>{blockedCount}</span></div>
+            <div className="checklist-item"><span className="ci-label">Blocked steps</span><span>{blockedCount}</span></div>
             <div className="checklist-item"><span className="ci-label">equity points</span><span>{paperSummary?.equity_points ?? 0}</span></div>
             <div className="checklist-item"><span className="ci-label">trade journal</span><span>{paperSummary?.trades ?? 0}</span></div>
-            <div className="checklist-item"><span className="ci-label">as_of_date</span><span>{paperSummary?.as_of_date ?? "-"}</span></div>
+            <div className="checklist-item"><span className="ci-label">Data aggiorn.</span><span>{paperSummary?.as_of_date ?? "-"}</span></div>
           </section>
 
           <section className="rp-section">

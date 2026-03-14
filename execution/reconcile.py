@@ -35,7 +35,7 @@ def reconcile(run_id: Optional[str] = None, report_path: Optional[str] = None) -
     try:
         where = ""
         params: tuple[Any, ...] = ()
-        if run_id:
+        if run_id and run_id.strip():
             where = "WHERE o.run_id = ?"
             params = (run_id,)
 
@@ -66,7 +66,7 @@ def reconcile(run_id: Optional[str] = None, report_path: Optional[str] = None) -
         """).fetchall()
 
         # State mismatches in scope
-        if run_id:
+        if run_id and run_id.strip():
             mismatches = con.execute("""
                 WITH scoped AS (
                   SELECT client_order_id
@@ -104,7 +104,7 @@ def reconcile(run_id: Optional[str] = None, report_path: Optional[str] = None) -
     # Outcome invariants (Domain 2.8): terminal orders must have outcome set and coherent.
     con = _connect()
     try:
-        if run_id:
+        if run_id and run_id.strip():
             missing_outcome = con.execute(
                 """
                 SELECT client_order_id, state
