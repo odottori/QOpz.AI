@@ -1,7 +1,7 @@
 {
   "project": "QuantOptionAI",
   "canonical_version": "v.T.11.13",
-  "next_step": "F1-T5",
+  "next_step": "COMPLETE",
   "project_target_steps": 40,
   "steps_completed": [
     "D2.3A",
@@ -69,6 +69,11 @@
     "F2-T_HMM_qualification_nonVIX",
     "F2-T_correlation_breakdown_flag",
     "F4-T_adaptive_fixed_fractional",
-    "F4-T_min_track_record_kelly"
+    "F4-T_min_track_record_kelly",
+    "F1-T5",
+    "F1-T6",
+    "F1-T7",
+    "F1-T8",
+    "F2-T5"
   ]
 }

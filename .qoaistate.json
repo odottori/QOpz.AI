@@ -1,6 +1,6 @@
 {
   "canonical_version": "v.T.11.13",
-  "next_step": "F1-T5",
+  "next_step": "F1-T6",
   "progress": {
     "acceptance_runs": [
       {
@@ -165,7 +165,7 @@
         "exit_code": 0
       }
     },
-    "next_step": "F1-T5",
+    "next_step": "F2-T5",
     "notes": [
       {
         "note": "D2.37 push-readiness transparency: repo_sync_status now includes remotes, push_ready and push_hint, clarifying when Codex can push directly vs when upstream setup is required.",
