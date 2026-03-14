@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from scripts.metrics import annualized_sharpe, max_drawdown
-from .storage import _connect, init_execution_schema
+from .storage import _connect, _prov, init_execution_schema
 
 
 def _utc_now_iso() -> str:
@@ -64,17 +64,18 @@ def record_equity_snapshot(
     sid = str(uuid.uuid4())
     backend = type(con).__module__.split(".")[0]
     created = _utc_now_iso()
+    prov = _prov(profile, created)
     if backend == "duckdb":
         con.execute(
-            "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (sid, profile, asof_date.isoformat(), float(equity), note, created),
+            "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (sid, profile, asof_date.isoformat(), float(equity), note, created, *prov),
         )
         con.close()
         return sid
 
     con.execute(
-        "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (sid, profile, asof_date.isoformat(), float(equity), note, created),
+        "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (sid, profile, asof_date.isoformat(), float(equity), note, created, *prov),
     )
     if hasattr(con, "commit"):
         con.commit()
@@ -108,6 +109,7 @@ def record_trade(
     entry_s = _norm_ts_utc(entry_ts_utc)
     exit_s = _norm_ts_utc(exit_ts_utc)
     strikes_json = json.dumps(strikes, ensure_ascii=False) if strikes is not None else None
+    prov = _prov(profile, entry_s or created)
 
     try:
         con.execute(
@@ -115,8 +117,9 @@ def record_trade(
             INSERT INTO paper_trades (
                 trade_id, profile, symbol, strategy, entry_ts_utc, exit_ts_utc,
                 strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason,
-                pnl, pnl_pct, slippage_ticks, violations, note, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                pnl, pnl_pct, slippage_ticks, violations, note, created_at,
+                source_system, source_mode, source_quality, asof_ts, received_ts
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 tid,
@@ -136,6 +139,7 @@ def record_trade(
                 int(violations),
                 note,
                 created,
+                *prov,
             ),
         )
         if hasattr(con, "commit"):
@@ -158,11 +162,12 @@ def record_compliance_event(
     eid = str(uuid.uuid4())
     ts = (ts_utc or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     details_json = json.dumps(details or {}, ensure_ascii=False) if details is not None else None
+    prov = _prov(profile, ts)
 
     try:
         con.execute(
-            "INSERT INTO compliance_events (event_id, profile, ts_utc, code, severity, details_json) VALUES (?, ?, ?, ?, ?, ?)",
-            (eid, profile, ts, code, severity, details_json),
+            "INSERT INTO compliance_events (event_id, profile, ts_utc, code, severity, details_json, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (eid, profile, ts, code, severity, details_json, *prov),
         )
         if hasattr(con, "commit"):
             con.commit()

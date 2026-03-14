@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,18 @@ from .state_machine import normalize_state
 EXEC_DB_PATH = Path("db/execution.duckdb")
 _SCHEMA_READY = False
 _SCHEMA_LOCK = threading.Lock()
+_SOURCE_SYSTEM = "qopz_ai"
+
+
+def _prov(profile: str, asof_ts: Any) -> tuple[str, str, str, Any, str]:
+    """Return (source_system, source_mode, source_quality, asof_ts, received_ts) provenance tuple.
+
+    All DB inserts must include these five fields per project invariant.
+    """
+    source_mode = os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
+    received_ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    asof_s = asof_ts.isoformat().replace("+00:00", "Z") if hasattr(asof_ts, "isoformat") else str(asof_ts)
+    return (_SOURCE_SYSTEM, source_mode, profile, asof_s, received_ts)
 
 
 def _duckdb():
@@ -53,7 +66,12 @@ def init_execution_schema() -> None:
                 state VARCHAR,
                 timestamp TIMESTAMP,
                 created_at TIMESTAMP,
-                updated_at TIMESTAMP
+                updated_at TIMESTAMP,
+                source_system VARCHAR,
+                source_mode VARCHAR,
+                source_quality VARCHAR,
+                asof_ts VARCHAR,
+                received_ts VARCHAR
             )
             """
         )
@@ -62,6 +80,11 @@ def init_execution_schema() -> None:
             con.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS outcome VARCHAR")
         except Exception:  # column already exists — safe to ignore
             pass
+        for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
+            try:
+                con.execute(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {_col}")
+            except Exception:  # column already exists — safe to ignore
+                pass
 
         con.execute(
             """
@@ -74,10 +97,20 @@ def init_execution_schema() -> None:
                 prev_state VARCHAR,
                 new_state VARCHAR,
                 ts_utc TIMESTAMP,
-                details_json VARCHAR
+                details_json VARCHAR,
+                source_system VARCHAR,
+                source_mode VARCHAR,
+                source_quality VARCHAR,
+                asof_ts VARCHAR,
+                received_ts VARCHAR
             )
             """
         )
+        for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
+            try:
+                con.execute(f"ALTER TABLE order_events ADD COLUMN IF NOT EXISTS {_col}")
+            except Exception:  # column already exists — safe to ignore
+                pass
 
         con.execute(
             """
@@ -87,10 +120,21 @@ def init_execution_schema() -> None:
                 asof_date DATE,
                 equity DOUBLE,
                 note VARCHAR,
-                created_at TIMESTAMP
+                created_at TIMESTAMP,
+                source_system VARCHAR,
+                source_mode VARCHAR,
+                source_quality VARCHAR,
+                asof_ts VARCHAR,
+                received_ts VARCHAR
             )
             """
         )
+        for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
+            try:
+                con.execute(f"ALTER TABLE paper_equity_snapshots ADD COLUMN IF NOT EXISTS {_col}")
+            except Exception:  # column already exists — safe to ignore
+                pass
+
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS paper_trades (
@@ -110,7 +154,12 @@ def init_execution_schema() -> None:
                 slippage_ticks DOUBLE,
                 violations INTEGER,
                 note VARCHAR,
-                created_at TIMESTAMP
+                created_at TIMESTAMP,
+                source_system VARCHAR,
+                source_mode VARCHAR,
+                source_quality VARCHAR,
+                asof_ts VARCHAR,
+                received_ts VARCHAR
             )
             """
         )
@@ -122,6 +171,11 @@ def init_execution_schema() -> None:
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS exit_reason VARCHAR")
         except Exception:  # column already exists — safe to ignore
             pass
+        for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
+            try:
+                con.execute(f"ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS {_col}")
+            except Exception:  # column already exists — safe to ignore
+                pass
 
         con.execute(
             """
@@ -131,10 +185,20 @@ def init_execution_schema() -> None:
                 ts_utc TIMESTAMP,
                 code VARCHAR,
                 severity VARCHAR,
-                details_json VARCHAR
+                details_json VARCHAR,
+                source_system VARCHAR,
+                source_mode VARCHAR,
+                source_quality VARCHAR,
+                asof_ts VARCHAR,
+                received_ts VARCHAR
             )
             """
         )
+        for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
+            try:
+                con.execute(f"ALTER TABLE compliance_events ADD COLUMN IF NOT EXISTS {_col}")
+            except Exception:  # column already exists — safe to ignore
+                pass
 
         con.execute(
             """
@@ -151,10 +215,20 @@ def init_execution_schema() -> None:
                 decision VARCHAR,
                 confidence INTEGER,
                 note VARCHAR,
-                created_at TIMESTAMP
+                created_at TIMESTAMP,
+                source_system VARCHAR,
+                source_mode VARCHAR,
+                source_quality VARCHAR,
+                asof_ts VARCHAR,
+                received_ts VARCHAR
             )
             """
         )
+        for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
+            try:
+                con.execute(f"ALTER TABLE operator_opportunity_decisions ADD COLUMN IF NOT EXISTS {_col}")
+            except Exception:  # column already exists — safe to ignore
+                pass
 
         con.close()
         _SCHEMA_READY = True
@@ -178,8 +252,9 @@ def record_event(
     con = _connect()
     ts = utc_now()
     try:
+        prov = _prov(profile, ts)
         con.execute(
-            "INSERT INTO order_events (event_id, client_order_id, run_id, profile, event_type, prev_state, new_state, ts_utc, details_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO order_events (event_id, client_order_id, run_id, profile, event_type, prev_state, new_state, ts_utc, details_json, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 str(uuid.uuid4()),
                 client_order_id,
@@ -190,6 +265,7 @@ def record_event(
                 new_state,
                 ts,
                 None if details is None else json.dumps(details, ensure_ascii=False),
+                *prov,
             ),
         )
         if hasattr(con, "commit"):
@@ -236,10 +312,11 @@ def upsert_order(
     try:
         now = utc_now()
         status = state
+        prov = _prov(profile, now)
         con.execute(
             """
-            INSERT INTO orders (client_order_id, run_id, profile, symbol, side, quantity, limit_price, fill_price, slippage, outcome, status, state, timestamp, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO orders (client_order_id, run_id, profile, symbol, side, quantity, limit_price, fill_price, slippage, outcome, status, state, timestamp, created_at, updated_at, source_system, source_mode, source_quality, asof_ts, received_ts)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (client_order_id) DO UPDATE SET
               run_id=excluded.run_id,
               profile=excluded.profile,
@@ -253,7 +330,9 @@ def upsert_order(
               status=excluded.status,
               state=excluded.state,
               timestamp=excluded.timestamp,
-              updated_at=excluded.updated_at
+              updated_at=excluded.updated_at,
+              source_mode=excluded.source_mode,
+              received_ts=excluded.received_ts
             """,
             (
                 client_order_id,
@@ -271,6 +350,7 @@ def upsert_order(
                 now,
                 now,
                 now,
+                *prov,
             ),
         )
         if hasattr(con, "commit"):

@@ -29,7 +29,7 @@ from execution.paper_metrics import (
     record_equity_snapshot,
     record_trade,
 )
-from execution.storage import _connect, init_execution_schema
+from execution.storage import _connect, _prov, init_execution_schema
 from execution.ibkr_settings_profile import extract_ibkr_universe_context
 from execution.universe import (
     build_universe_compare,
@@ -1291,15 +1291,17 @@ def opz_opportunity_decision(req: OpportunityDecisionRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail={"stage": "opportunity_decision", "reason": f"note required for {req.decision}"})
     score = None if req.score is None else _require_finite(req.score, "score")
     ts = datetime.now(timezone.utc)
+    ts_s = ts.replace(microsecond=0).isoformat().replace("+00:00", "Z")
     decision_id = secrets.token_urlsafe(12)
+    prov = _prov(profile, ts_s)
 
     init_execution_schema()
     con = _connect()
     con.execute(
         """
         INSERT INTO operator_opportunity_decisions
-        (decision_id, profile, batch_id, symbol, strategy, score, regime, scanner_name, source, decision, confidence, note, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (decision_id, profile, batch_id, symbol, strategy, score, regime, scanner_name, source, decision, confidence, note, created_at, source_system, source_mode, source_quality, asof_ts, received_ts)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             decision_id,
@@ -1314,7 +1316,8 @@ def opz_opportunity_decision(req: OpportunityDecisionRequest) -> Dict[str, Any]:
             req.decision,
             int(req.confidence),
             note,
-            ts,
+            ts_s,
+            *prov,
         ),
     )
     if hasattr(con, "commit"):

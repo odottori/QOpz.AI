@@ -276,10 +276,16 @@ def check_duckdb_connection_leak(src: str, filepath: str) -> list[Issue]:
 
 
 def check_provenance_fields(src: str, filepath: str) -> list[Issue]:
+    """Check that files with INSERT statements include the mandatory provenance watermark fields.
+
+    run_id is required for execution tables (orders, order_events) but optional for observation
+    tables (paper_metrics, compliance, opportunity_decisions) which use their own IDs.
+    The four cross-table required fields are: source_system, source_mode, asof_ts, received_ts.
+    """
     issues = []
     if "INSERT INTO" not in src.upper() and "insert into" not in src:
         return issues
-    required_fields = ["source_mode", "source_system", "run_id", "asof_ts"]
+    required_fields = ["source_mode", "source_system", "asof_ts", "received_ts"]
     missing = [f for f in required_fields if f not in src]
     if missing:
         issues.append(Issue(
@@ -288,7 +294,7 @@ def check_provenance_fields(src: str, filepath: str) -> list[Issue]:
             line=0,
             category="Data provenance",
             message=f"File contains INSERT but may lack provenance fields: {missing}",
-            suggestion="Every DB insert must include: source_system, source_mode, source_quality, run_id, asof_ts, received_ts"
+            suggestion="Every DB insert must include: source_system, source_mode, source_quality, asof_ts, received_ts (+ run_id for execution tables)"
         ))
     return issues
 
