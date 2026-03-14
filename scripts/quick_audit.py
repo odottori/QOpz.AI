@@ -45,6 +45,19 @@ PRIORITY_MODULES = [
     "api/opz_api.py",
 ]
 
+SCRIPTS_MODULES = [
+    "scripts/regime_classifier.py",
+    "scripts/demo_pipeline_lib.py",
+    "scripts/build_test_dataset.py",
+    "scripts/reconcile_execution.py",
+    "scripts/ingest.py",
+    "scripts/metrics.py",
+    "scripts/healthcheck.py",
+    "tools/planner_guard.py",
+    "tools/run_gates.py",
+    "tools/rebuild_manifest.py",
+]
+
 
 @dataclass
 class Issue:
@@ -87,7 +100,7 @@ def check_bare_except_pass(src: str, filepath: str) -> list[Issue]:
         if re.match(r"except\s*Exception\s*:", stripped) or stripped == "except:":
             # Intentional broad catch marked with an inline explanation comment
             comment = re.search(r"#\s*(.+)", stripped)
-            if comment and re.search(r"safe to ignore|already exists|best.effort|do not propagate", comment.group(1), re.I):
+            if comment and re.search(r"safe to ignore|already exists|best.effort|do not propagate|re-raise|reraise", comment.group(1), re.I):
                 continue
             issues.append(Issue(
                 severity="HIGH",
@@ -358,10 +371,16 @@ def main() -> int:
     parser.add_argument("--severity", default="LOW", choices=["CRITICAL", "HIGH", "MEDIUM", "LOW"],
                         help="Minimum severity to report (default: LOW)")
     parser.add_argument("--summary", action="store_true", help="Print summary table only")
+    parser.add_argument("--scope", default="core", choices=["core", "scripts", "all"],
+                        help="Module scope: core (execution+strategy+api), scripts (scripts+tools), all (default: core)")
     args = parser.parse_args()
 
     if args.module:
         modules = [ROOT / args.module]
+    elif args.scope == "scripts":
+        modules = [ROOT / m for m in SCRIPTS_MODULES if (ROOT / m).exists()]
+    elif args.scope == "all":
+        modules = [ROOT / m for m in PRIORITY_MODULES + SCRIPTS_MODULES if (ROOT / m).exists()]
     else:
         modules = [ROOT / m for m in PRIORITY_MODULES if (ROOT / m).exists()]
 

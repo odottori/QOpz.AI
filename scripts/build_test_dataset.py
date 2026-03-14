@@ -41,7 +41,7 @@ def _to_float(v: Any) -> float | None:
         if v is None or v == "":
             return None
         return float(v)
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 
@@ -175,7 +175,7 @@ def _write_parquet_if_requested(csv_path: Path, parquet_path: Path, *, write_par
         return False, "disabled"
     try:
         import pandas as pd  # type: ignore
-    except Exception:
+    except ModuleNotFoundError:
         return False, "pandas not available"
 
     try:

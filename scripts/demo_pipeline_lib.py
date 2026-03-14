@@ -45,7 +45,7 @@ def write_json(path: Path, payload: Any) -> None:
     try:
         tmp.write_text(content, encoding="utf-8")
         tmp.replace(path)
-    except Exception:
+    except OSError:  # file write error — clean up tmp and re-raise
         tmp.unlink(missing_ok=True)
         raise
 

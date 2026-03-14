@@ -1135,8 +1135,8 @@ export default function App() {
         <div className="logo">QuantOPTION<span className="logo-ai">.AI</span></div>
         <div className="topbar-center">
           <span className={`regime-pill ${regimeView.cls}`}>REGIME: {regimeView.text}</span>
-          <span className="top-mini">XGBoost: {apiOnline ? "—" : "—"}</span>
-          <span className="top-mini">HMM P(shock): {apiOnline ? "—" : "—"}</span>
+          {apiOnline && <span className="top-mini">XGBoost: {(stateObj as any)?.model_scores?.xgboost ?? "—"}</span>}
+          {apiOnline && <span className="top-mini">HMM P(shock): {(stateObj as any)?.model_scores?.hmm_p_shock ?? "—"}</span>}
           <span className="top-mini">Sizing: {regimeView.text === "NORMAL" ? "100%" : regimeView.text === "CAUTION" ? "50%" : regimeView.text === "SHOCK" ? "0%" : "—"}</span>
         </div>
         <div className="topbar-right">
