@@ -2,7 +2,7 @@ QuantOptionAI — CANON
 
 Versione: v.T.11.13
 
-Build: 2026-03-14 06:56:17 UTC
+Build: 2026-03-14 07:10:41 UTC
 
 
 
@@ -148,7 +148,7 @@ c923e9ab425914b34e484f1f961c067105fc51a61bb8d5adf4515c86951cbe5e        42483  .
 45e735da4eb096e5ad5a3df704ac6b0e219f38b8510851e2967278163ebab75e        22303  .canonici/02_TEST.md
 ed6b62df92c23677ed53104035a0c85fec142e0fd006a47c897c284cadef1156         4016  .canonici/03_SETUP.md
 cf4cec39f934d36c4d75fec46a034cd0f2308403ca61b3d9c1024b7ad0fa547d         8245  .canonici/04_APPENDICI.md
-396a3bd049b85a7c36137f5f58fa8abffcfc98a47754e627aa85ee19fb1d02ec       137436  .canonici/MANIFEST.txt
+806526089697a88eb1bd49c8da3d264c5ab307b44a03aa2f20157b77b4965fe7       142201  .canonici/MANIFEST.txt
 c1af9751a985cc8a3772d753190ff2a028f630576e4df86fab993bb14ac7e5fd        20454  .canonici/REGISTRO_INTEGRITA.md
 72faf5225438d54cbb170c62525740092347b72c84e505d8b02399783cd44d84         5647  .claude/settings.local.json
 fb92e6506bbbe23f32381f7faa1d5722ef65e6c57ac511db4b724f027300c1f9          235  .gitattributes
@@ -169,6 +169,9 @@ cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .
 2cea48464158cc03e40a07327b16e5e3413253287edc6bd28b69f89857666260          606  .tmp_test/case_02ee7dc4cc0f43ab8524bce65e31a15f/capture.jsonl
 cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .tmp_test/case_02ee7dc4cc0f43ab8524bce65e31a15f/inbox/IWM__quote__001.json
 cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .tmp_test/case_02ee7dc4cc0f43ab8524bce65e31a15f/raw/IWM/quote/20260312/135706_cd400975.json
+94a36ddd665b5cc80fcbb904dfbafeb7fb67f900b8b373365d1617d3e63a932f          490  .tmp_test/case_02eff77ed47b41db967310f1ab3be283/extract.jsonl
+7b857217ea710dcd26aeaa08b4c4e4f46d542f0a1ef3e05b0fef10fb6a3b4be2          533  .tmp_test/case_02eff77ed47b41db967310f1ab3be283/extracted/1.json
+837a49c0de0f6ce53775635fb7acf6c3da39777d4581185a4679d28e341379cf          135  .tmp_test/case_02eff77ed47b41db967310f1ab3be283/raw/msft_quote_row.json
 31b83cd138e586b4e14f34a83136b930a4b8c19cb3b1ce9fc45a495f14f5a275          475  .tmp_test/case_03721110270a4f7c95b0275a600a1689/extract.jsonl
 b5fe76c011690824ffa05c963a1def8514ce0d269b51774ba1a10ec7b0db1d5e          509  .tmp_test/case_03721110270a4f7c95b0275a600a1689/extracted/1.json
 9558fd8fa15ca1245ab9f2b1ddefec56a97fd3acdd2dd0611c46fda2861e59a1           43  .tmp_test/case_03721110270a4f7c95b0275a600a1689/raw/q1.json
@@ -317,6 +320,7 @@ cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .
 e1d54910cebfe08649cfb3dfdecf3c1fd23bee0c8cac240cf57fa1c684a246c7          397  .tmp_test/case_4047307dd13b40ab8db67665c5298dcc/datasets/demo_dataset.csv
 c6785ae6494848930848ee4c4976925554906f3d51d644e7e51efd3b25c650a2         1044  .tmp_test/case_4047307dd13b40ab8db67665c5298dcc/datasets/demo_dataset.provenance.json
 9f835192fb8408213aae37cf70f8e39f78a6aa8b76d17f7863755b80e9f35b90          351  .tmp_test/case_4047307dd13b40ab8db67665c5298dcc/extracted/1.json
+12c93d651fecb61b749dacbd6c571a0cd3833075a8cc98a53dafbb0180d5f061          740  .tmp_test/case_414b9cb356a6477795abd5315ee948f7/datasets/demo_dataset.csv
 fe140aeda9f45391feec471a32aa3c1cd4ec9db14a771954132d2a5716d65574          440  .tmp_test/case_4169218c84de4a489fdeb3859323f673/dataset.jsonl
 ed2ff2c2daea6550c26c071ecf2c857c8c64f69c4433fbc0b473fc8112db4f04          397  .tmp_test/case_4169218c84de4a489fdeb3859323f673/datasets/demo_dataset.csv
 8236f7215e4d9ce59365e6eba0a7f2bbd878ddb27bc6a920d7a0babeaf722fef         1044  .tmp_test/case_4169218c84de4a489fdeb3859323f673/datasets/demo_dataset.provenance.json
@@ -344,6 +348,11 @@ ae321f599af0e694f6436e0f0066f90f8a59315050363512cb3d22c7e82ae4db          533  .
 aaa95d2e92fd003ca8f893be7d2cb9bf577670801394628e2a94a35a0997cc70          140  .tmp_test/case_4c6059f918f245a88a0be6a69d9e1cef/raw/amzn_quote_row.json
 74eef188b373f8714f1317547d37370b6a33050fc885d999ab9f2021cf4ae613         1095  .tmp_test/case_4d64bc4575304d20916929af2ccf0a3d/capture.jsonl
 117fa3bbd68cee683709219ab971f6ecbf1c34a697134bf6813dfb4fdadcaafc           24  .tmp_test/case_4d64bc4575304d20916929af2ccf0a3d/inbox/IWM__quote__001.json
+d481ace7f99f8460b8723d50a1a3577de587876d6f7cd0f5921763c00338464d          801  .tmp_test/case_4d6c09983ff64b3199a322e0a88f992d/extract.jsonl
+92d71890fa3750f7bf7ed2fcb7369e4d7ad53ad67819dea12d2461f8627a678e           25  .tmp_test/case_4d6c09983ff64b3199a322e0a88f992d/raw/q2.json
+6d32fab3231733fcad4b1610cf9a0ced3a34721c97a834bf1945b2acc34ea296          490  .tmp_test/case_4ded49f38cc14818b330770eacb11020/extract.jsonl
+76c249e923d53928aa331ccde24d378503a4287e0810cbf2e3e61fa79d198bd0          533  .tmp_test/case_4ded49f38cc14818b330770eacb11020/extracted/1.json
+1e6b5f7ff7102ccf672eecbd29b6bfe2250a8c5cba6e5d1b726be9ef0848f613          137  .tmp_test/case_4ded49f38cc14818b330770eacb11020/raw/nvda_quote_row.json
 f94a645c67aa9c85b094eb0674230e83f7bbe5989805ee013be9b3f1e13645fd          271  .tmp_test/case_4e7880194dd44d068fcaa41145c45b74/extract.jsonl
 6224e9793b86cf3b2b17fcc7d46de0c1ebdaf9233c599e61ed32f26e3dd3b804          509  .tmp_test/case_4e7880194dd44d068fcaa41145c45b74/extracted/1.json
 9558fd8fa15ca1245ab9f2b1ddefec56a97fd3acdd2dd0611c46fda2861e59a1           43  .tmp_test/case_4e7880194dd44d068fcaa41145c45b74/raw/q1.json
@@ -359,6 +368,10 @@ a5d42b4db48a5714de708dc2f16c89ca04835d3a8a28b2730c6725b09a3b4493          533  .
 aaa95d2e92fd003ca8f893be7d2cb9bf577670801394628e2a94a35a0997cc70          140  .tmp_test/case_5286f7558596461b8c82efdaeea966b0/raw/amzn_quote_row.json
 d29d16e950ebb4337e68294bed9211c1165f0731d7eee849208e7b21abf7df6d         1095  .tmp_test/case_52b6ba944fb44167b704e4a71ac77798/capture.jsonl
 117fa3bbd68cee683709219ab971f6ecbf1c34a697134bf6813dfb4fdadcaafc           24  .tmp_test/case_52b6ba944fb44167b704e4a71ac77798/inbox/IWM__quote__001.json
+650a176be17c30776f727b66ba1b805a5fa8d02e0e69c4e4c7bef136ceebb556          440  .tmp_test/case_53137f318a5f445bac26029c028a8fd5/dataset.jsonl
+1cfdba3263abb4e8df2530b352d622d3c6c035b8024e37b19ea7aa7f8dafe178          397  .tmp_test/case_53137f318a5f445bac26029c028a8fd5/datasets/demo_dataset.csv
+9a7a0709a1c16c23141090c1a59a7a75352cd99088bae333684c58a4008e3d51         1075  .tmp_test/case_53137f318a5f445bac26029c028a8fd5/datasets/demo_dataset.provenance.json
+9f835192fb8408213aae37cf70f8e39f78a6aa8b76d17f7863755b80e9f35b90          351  .tmp_test/case_53137f318a5f445bac26029c028a8fd5/extracted/1.json
 339a709141d230ea261056a1af1112e06317e65d1e892e85a5bb0b74f270d2dc          440  .tmp_test/case_54267347ec19420788eb94bae41c19e4/dataset.jsonl
 5a93a1a82af309346bf9b0f4fdca12b003364a04343a6bcffa024efe5c33db38          397  .tmp_test/case_54267347ec19420788eb94bae41c19e4/datasets/demo_dataset.csv
 0540825d4207521cad5be72ad30b42653184ec9d84f28ff84182cd678fa0480b         1044  .tmp_test/case_54267347ec19420788eb94bae41c19e4/datasets/demo_dataset.provenance.json
@@ -367,15 +380,26 @@ bc933a7e18766a48f0c0fde99d7f03add0939960f1d1971eda384415648471ed          684  .
 c0b87e59deb02aebfb9f698931306b4c966e4ac654c2bd589c329886adf87161           26  .tmp_test/case_55cea76776c848908d13ac1800752882/inbox/IWM__quote__001.json
 cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .tmp_test/case_55cea76776c848908d13ac1800752882/raw/IWM/quote/20260314/061514_cd400975.json
 3aeef15a7f82188566d1ffb6e1889d640ec48f909e1bfc36f2de81d43b51d0a2          430  .tmp_test/case_56884e04e43b4882af7f206a9f3bb066/datasets/demo_dataset.csv
+fde57ae61b85c4eafb4a48c2de62448e24a86e1ee1f4b5adc0bd9afea49ec209          475  .tmp_test/case_57fef3d490364b89841f625adb018bf1/extract.jsonl
+368a576b5d94a513768d1c602a1b61095ee0e8256b3b5bdb7aa43850f07533ee          509  .tmp_test/case_57fef3d490364b89841f625adb018bf1/extracted/1.json
+9558fd8fa15ca1245ab9f2b1ddefec56a97fd3acdd2dd0611c46fda2861e59a1           43  .tmp_test/case_57fef3d490364b89841f625adb018bf1/raw/q1.json
 f86b98866890f2396750808c11248bbaad47abc710e184f1756e6412061365c4          271  .tmp_test/case_592fc406213443a3aec1a880ed9b4b0b/extract.jsonl
 1ec7397589d7c86fcbeeee5616826dd9e3ee2ae8052cf6083f7a8870f6a53c81          533  .tmp_test/case_592fc406213443a3aec1a880ed9b4b0b/extracted/1.json
 1e6b5f7ff7102ccf672eecbd29b6bfe2250a8c5cba6e5d1b726be9ef0848f613          137  .tmp_test/case_592fc406213443a3aec1a880ed9b4b0b/raw/nvda_quote_row.json
+475072884f12da7f723b130d428fdffa1838539f54f642a10d0b4e81de8751c6         1709  .tmp_test/case_594c6d9cf6154533ac1803a80c541c1e/capture.jsonl
+e2c0977cb3efb36f96aec3d416a461515a640b17ca57c1bd78c525d02a455bc8       716800  .tmp_test/case_594c6d9cf6154533ac1803a80c541c1e/inbox/IWM__quote__001.txt
+473b516e6bc7e4bda36300cf902f42ead933242d7d434a4566eea82c378f9bb5       716800  .tmp_test/case_594c6d9cf6154533ac1803a80c541c1e/inbox/IWM__quote__002.txt
+e2c0977cb3efb36f96aec3d416a461515a640b17ca57c1bd78c525d02a455bc8       716800  .tmp_test/case_594c6d9cf6154533ac1803a80c541c1e/raw/IWM/quote/20260314/070829_e2c0977c.txt
+90cdc10a528172b327f52e1960397ceae98d46ace9b1f4212ae85d4d3e1e6313          490  .tmp_test/case_59726fb9cb8343eebb96b7c547b23aff/extract.jsonl
+1b2ea07b2210e482388091e6ca9bf1826fce042e9d1904d20fceb470977b5561          533  .tmp_test/case_59726fb9cb8343eebb96b7c547b23aff/extracted/1.json
+aaa95d2e92fd003ca8f893be7d2cb9bf577670801394628e2a94a35a0997cc70          140  .tmp_test/case_59726fb9cb8343eebb96b7c547b23aff/raw/amzn_quote_row.json
 1a55ae9ee5db7b52b4fd0b0e9061f1307478c959a8ff271204c724d5861b72ea          684  .tmp_test/case_5abfd2bdcded48248ffefe7bb5acfe81/capture.jsonl
 c0b87e59deb02aebfb9f698931306b4c966e4ac654c2bd589c329886adf87161           26  .tmp_test/case_5abfd2bdcded48248ffefe7bb5acfe81/inbox/IWM__quote__001.json
 cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .tmp_test/case_5abfd2bdcded48248ffefe7bb5acfe81/raw/IWM/quote/20260312/134336_cd400975.json
 798214334a7a0cab9e9dcbe5c74a88f0f234f7dc472466e0a001f1483a8bad5b          490  .tmp_test/case_5b7352213d344053943a6974d75a8f4d/extract.jsonl
 91114cff66e80bb0ee3e70348eebcbea66d6ebad36c042308cebfd2a13400668          533  .tmp_test/case_5b7352213d344053943a6974d75a8f4d/extracted/1.json
 1e6b5f7ff7102ccf672eecbd29b6bfe2250a8c5cba6e5d1b726be9ef0848f613          137  .tmp_test/case_5b7352213d344053943a6974d75a8f4d/raw/nvda_quote_row.json
+3aeef15a7f82188566d1ffb6e1889d640ec48f909e1bfc36f2de81d43b51d0a2          430  .tmp_test/case_5f5ec371342b4f959e0e29aa8025424a/datasets/demo_dataset.csv
 966a45a68485973b3ed643ea75c559f6b66a26c861aaf46e95a6f4edf561d69b         1095  .tmp_test/case_61296aeda1a34ea3af7499aace26171d/capture.jsonl
 117fa3bbd68cee683709219ab971f6ecbf1c34a697134bf6813dfb4fdadcaafc           24  .tmp_test/case_61296aeda1a34ea3af7499aace26171d/inbox/IWM__quote__001.json
 0ef6d3c6a8d3365fd16396c469d407f9116e05da21f12a2348ee8d5c11250549          308  .tmp_test/case_6155534f481f44509eb452e293cb71ac/capture.jsonl
@@ -423,6 +447,9 @@ ae6497462d026b506230fc0014c4894f04a3d4d9660a2371fe6af0c10f24e2ef          490  .
 6419dcf2a0f994ad8782fb2a62142cd6d66bbe9644fe73fb004ed46a9224409c          271  .tmp_test/case_73feb6e6473f4b5d9c46744eb2b22ad2/extract.jsonl
 e3d2297e26844f07f80440c4525f88f6cd9e8e82a46eec616f65ed26f94371dd          533  .tmp_test/case_73feb6e6473f4b5d9c46744eb2b22ad2/extracted/1.json
 1e6b5f7ff7102ccf672eecbd29b6bfe2250a8c5cba6e5d1b726be9ef0848f613          137  .tmp_test/case_73feb6e6473f4b5d9c46744eb2b22ad2/raw/nvda_quote_row.json
+b7a97d1a9a327f90d441c76cc9091b75deb22acdab4da3d7ecfc6f96fa93fbfa          684  .tmp_test/case_7502f222ae6a48d883fa0240d49ee9ca/capture.jsonl
+c0b87e59deb02aebfb9f698931306b4c966e4ac654c2bd589c329886adf87161           26  .tmp_test/case_7502f222ae6a48d883fa0240d49ee9ca/inbox/IWM__quote__001.json
+cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .tmp_test/case_7502f222ae6a48d883fa0240d49ee9ca/raw/IWM/quote/20260314/070827_cd400975.json
 a6feaed327a198c89300db776b50acc46a961bea933eeb08fd73b9b12a39a4cd          271  .tmp_test/case_753f27f92a324b408b7ea0578751cf06/extract.jsonl
 0858803aadf33bcf3a94ff78e82cd92fc2bfbb63a2918e3c03f94f66e6c8da2f          533  .tmp_test/case_753f27f92a324b408b7ea0578751cf06/extracted/1.json
 1e6b5f7ff7102ccf672eecbd29b6bfe2250a8c5cba6e5d1b726be9ef0848f613          137  .tmp_test/case_753f27f92a324b408b7ea0578751cf06/raw/nvda_quote_row.json
@@ -477,6 +504,8 @@ c476590f113742d635bec94cab4716deb632491e0a9b8a1a7aa09a69b66a51b9         1044  .
 7df88777b9793d17b58b244cf09561e002c67788d02cb07362976283f687cfe1          475  .tmp_test/case_844c178e687f47b7adb58ae2d69f9648/extract.jsonl
 66bf930c9241f8f7a38a7ff326b5e08e5cdef0efcc73552e73ddc8552213b9ce          509  .tmp_test/case_844c178e687f47b7adb58ae2d69f9648/extracted/1.json
 9558fd8fa15ca1245ab9f2b1ddefec56a97fd3acdd2dd0611c46fda2861e59a1           43  .tmp_test/case_844c178e687f47b7adb58ae2d69f9648/raw/q1.json
+78fcaf08cba2a0e8cb5aec2d4dbf7e9fdb3a7f92046050f4775d73434863102a         1095  .tmp_test/case_8610c3d4b1524880b383bd2de8114a18/capture.jsonl
+117fa3bbd68cee683709219ab971f6ecbf1c34a697134bf6813dfb4fdadcaafc           24  .tmp_test/case_8610c3d4b1524880b383bd2de8114a18/inbox/IWM__quote__001.json
 229b6a849967aaaafd8d3b4a6a78885733c0597eea98712933fc921662042f37          440  .tmp_test/case_86b621ff6df645a785f434e998d52a2f/dataset.jsonl
 19660772f8ad411fa80aa306458da1e42cfbc671f83c8f400d0b87b3513a4396          397  .tmp_test/case_86b621ff6df645a785f434e998d52a2f/datasets/demo_dataset.csv
 5bbac92e60640ce3b052ce005c3960917af277c0f801a1720eb021e6e54f14b4         1044  .tmp_test/case_86b621ff6df645a785f434e998d52a2f/datasets/demo_dataset.provenance.json
@@ -687,6 +716,9 @@ db6078844e0f979598d6896349dedb8b31551060ab8b53caa378f108cf680dea          509  .
 92d71890fa3750f7bf7ed2fcb7369e4d7ad53ad67819dea12d2461f8627a678e           25  .tmp_test/case_c5762189f99941a2abe6edbe81ec2f09/raw/q2.json
 1ffb9831984bfb70b631c599c0f43fa7372fd1975408ec751f68e883234d207f          393  .tmp_test/case_c6146dccddca4d23b44bc1af3c32cbbc/extract.jsonl
 92d71890fa3750f7bf7ed2fcb7369e4d7ad53ad67819dea12d2461f8627a678e           25  .tmp_test/case_c6146dccddca4d23b44bc1af3c32cbbc/raw/q2.json
+5943a50c181121977d5618c724b4a1172d64700ea17f194893613aed907b8a00          606  .tmp_test/case_c677a82b50da4e9cbf597594276ab512/capture.jsonl
+cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .tmp_test/case_c677a82b50da4e9cbf597594276ab512/inbox/IWM__quote__001.json
+cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .tmp_test/case_c677a82b50da4e9cbf597594276ab512/raw/IWM/quote/20260314/070827_cd400975.json
 295175b8d1aa082ba90a0a56ddbf38ecc5c40112607fdae9bf8d27ce0b4494da          684  .tmp_test/case_c89583e27be04598a287861e54e6108b/capture.jsonl
 c0b87e59deb02aebfb9f698931306b4c966e4ac654c2bd589c329886adf87161           26  .tmp_test/case_c89583e27be04598a287861e54e6108b/inbox/IWM__quote__001.json
 cd4009754b511799c775b6a30c2774d8967f19f631bdb64c90d9b73b0aef5d35           24  .tmp_test/case_c89583e27be04598a287861e54e6108b/raw/IWM/quote/20260312/121230_cd400975.json
@@ -874,7 +906,7 @@ e707a1e4b806f81470cb51a27d28f196868a32aba8605c6947c742a96ab7257d          427  O
 860cdcd763cc1ffb91b1f8709e54a131a68e3b9afd83dbd48aeb9081bc809bb4        10419  PROMPT PROSEGUI.txt
 410371d5ca2b3e1e332720d9952d962cff7b06f9ef43eeaf4cfe6c5e0822974b         4608  PROMPT_MASTER_OPZ_QUANT_WORKFLOW.md
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855            0  api/__init__.py
-ad72f848058fde3eb27f6382ed5dc85c18a2e176b3e3159287e74fcf1f45240e        52117  api/opz_api.py
+b6338b2098ce6fe74afc1e8abcae99d7fb8064716400122328f9ace055576d77        52435  api/opz_api.py
 b5c0540efe571fb9cabb0db57a8c96c2137b5a211db8e9f1f98684dc9263bb9c         1847  config/dev.toml
 6088a3267504c58718ff8857f6c68fd61200030145f87fbdd6dadf3330d0ebb3         1372  config/live.toml
 750c9ef5668eae1e0400268804f9a71af41152a5dc27fa0ff9583f824fe5720a         1585  config/paper.toml
@@ -1002,7 +1034,7 @@ c707be37d4f07171ed9a1eb051a27bcac467bbf1e978e2110fa1068d05069b52         1074  s
 05ea6f1a6ff98c4491d5f1605f36d630f12ff9f5d161f71a8ce03e2fb9be768a         6880  scripts/planner_status.py
 954ef00a20ae480f3610c90bf83e76a6a3473cbda6a9a85f07e1828de9656e5f        14188  scripts/progress_report.py
 a0ec4504d0c681400fa8e4a123349eee9b17d9f99d753e04ab105d2973b277e9         4520  scripts/project_status.py
-efda97be416bc3740914e529d310e43a77ff51ecdad9d42163b6134647bb8aeb        14803  scripts/quick_audit.py
+61fea591fa4568ecadf5abd713cf4c57e4ec0b6ef0908f510590447e4db52bf6        16195  scripts/quick_audit.py
 58f9be5721283f0f663b315a8836d5e687456948b6bf5316b63249d4d6ff2358          566  scripts/reconcile_execution.py
 f700241fa9914f3a1d116f2bdd0e840fd5ba0777bfafc143a557d61883a08a1a         8159  scripts/regime_classifier.py
 ae876bab3978fcb82c9b2ebfbd4b514d62de17511e8dac60f45cf416ef3364ee         3209  scripts/regime_risk_scaler.py
@@ -1134,7 +1166,7 @@ bab463ae101485b8d8eed2f937357c63332d522248128922376425cc63502ecb          319  u
 d480ee708068dbc94e803ba6da8a2e3318d2daabc89cff5aebfffca6d5511f97        58034  ui/package-lock.json
 76e6e62fcf15a93c76f6f484acbb38aad9fe5388794d1c0581859b140adcf659          451  ui/package.json
 83d681d0bcc6af169cb5f38694c364f775f74ee4d867434a059f3942db10f871        16800  ui/src/App.css
-ab749ee3b1aa53287165ba3c1508d23ff3ed014ebd6fb38901cfc8625385a6ce        79332  ui/src/App.tsx
+5ae791a76b8e2d0c82a7b007e245b0eb4be6ceab9641a22f8c05e8343d6830f9        80924  ui/src/App.tsx
 7b50e87aea9f82442f456429a13ead8f31d42bd4308e71c604a527338775e12b          223  ui/src/main.tsx
 cccb312a83e8fcb994ed1c8e62702bbeafdf976fda8005450dc6dca4bbbebc10          368  ui/tsconfig.json
 71ad9c58d517fb5fe6119904c4c9878e97c0c4a7d8f2d0be8b32180086c4fd05          199  ui/vite.config.ts
