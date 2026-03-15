@@ -1186,6 +1186,55 @@ def opz_paper_summary(profile: str = "paper", window_days: int = 60, asof_date: 
     }
 
 
+@app.get("/opz/paper/equity_history")
+def opz_paper_equity_history(profile: str = "paper", limit: int = 60) -> Dict[str, Any]:
+    """
+    Ultimi N snapshot equity ordinati per data ASC (per sparkline).
+
+    Response:
+      ok              bool
+      profile         str
+      n_points        int
+      latest_equity   float | null
+      initial_equity  float | null
+      points          list[{date: str, equity: float}]
+    """
+    n = max(1, min(int(limit), 500))
+    init_execution_schema()
+    con = _connect()
+    try:
+        rows = con.execute(
+            """
+            SELECT asof_date, equity
+            FROM paper_equity_snapshots
+            WHERE profile = ?
+              AND equity IS NOT NULL
+            ORDER BY asof_date DESC
+            LIMIT ?
+            """,
+            (profile, n),
+        ).fetchall()
+    finally:
+        con.close()
+
+    # Reverse → ASC per sparkline left-to-right
+    points = [
+        {"date": str(r[0]), "equity": float(r[1])}
+        for r in reversed(rows)
+    ]
+    latest_equity = points[-1]["equity"] if points else None
+    initial_equity = points[0]["equity"] if points else None
+
+    return {
+        "ok": True,
+        "profile": profile,
+        "n_points": len(points),
+        "latest_equity": latest_equity,
+        "initial_equity": initial_equity,
+        "points": points,
+    }
+
+
 @app.post("/opz/paper/equity_snapshot")
 def opz_paper_equity_snapshot(req: EquitySnapshotRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")

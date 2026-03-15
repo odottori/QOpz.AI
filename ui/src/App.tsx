@@ -212,6 +212,12 @@ type RegimeCurrentResponse = {
   regime_pct: { NORMAL: number; CAUTION: number; SHOCK: number };
   last_scan_ts: string | null; n_recent: number; source: string;
 };
+type EquityPoint = { date: string; equity: number };
+type EquityHistoryResponse = {
+  ok: boolean; profile: string; n_points: number;
+  latest_equity: number | null; initial_equity: number | null;
+  points: EquityPoint[];
+};
 type IbkrAccountPosition = {
   symbol: string; sec_type: string; expiry: string | null; strike: number | null;
   right: string | null; quantity: number; avg_cost: number;
@@ -311,6 +317,64 @@ function shortToken(token: string | null): string {
 
 function GateBadge({ pass }: { pass: boolean }) {
   return <span className={`gate-badge ${pass ? "ok" : "ko"}`}>{pass ? "PASS" : "FAIL"}</span>;
+}
+
+// ── ROC10: pure-SVG equity sparkline ──────────────────────────────────────
+function EqSparkline({ points, w = 260, h = 52 }: {
+  points: EquityPoint[]; w?: number; h?: number;
+}) {
+  if (points.length < 2) {
+    return (
+      <svg width={w} height={h} style={{ display: "block" }}>
+        <text x={w / 2} y={h / 2} textAnchor="middle" fill="#444" fontSize={11}>
+          {points.length === 0 ? "Nessun dato equity" : "Solo 1 punto — aggiungi snapshot"}
+        </text>
+      </svg>
+    );
+  }
+
+  const vals = points.map((p) => p.equity);
+  const minV = Math.min(...vals);
+  const maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+  const pad = 4;
+  const iw = w - pad * 2;
+  const ih = h - pad * 2;
+
+  const xs = points.map((_, i) => pad + (i / (points.length - 1)) * iw);
+  const ys = vals.map((v) => pad + ih - ((v - minV) / range) * ih);
+
+  const polyline = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+  // Fill area under curve
+  const areaPath =
+    `M${xs[0].toFixed(1)},${(h - pad).toFixed(1)} ` +
+    xs.map((x, i) => `L${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ") +
+    ` L${xs[xs.length - 1].toFixed(1)},${(h - pad).toFixed(1)} Z`;
+
+  const pnl = vals[vals.length - 1] - vals[0];
+  const lineColor = pnl >= 0 ? "#4ade80" : "#f87171";
+
+  return (
+    <svg width={w} height={h} style={{ display: "block", overflow: "visible" }}>
+      <defs>
+        <linearGradient id="eq-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={lineColor} stopOpacity={0.25} />
+          <stop offset="100%" stopColor={lineColor} stopOpacity={0.02} />
+        </linearGradient>
+      </defs>
+      {/* Gridline at 0% = initial */}
+      <line
+        x1={pad} y1={ys[0].toFixed(1)} x2={w - pad} y2={ys[0].toFixed(1)}
+        stroke="#333" strokeDasharray="3,3" strokeWidth={1}
+      />
+      {/* Area fill */}
+      <path d={areaPath} fill="url(#eq-fill)" />
+      {/* Line */}
+      <polyline points={polyline} fill="none" stroke={lineColor} strokeWidth={1.8} strokeLinejoin="round" />
+      {/* Last point dot */}
+      <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r={3} fill={lineColor} />
+    </svg>
+  );
 }
 
 function parseFiniteInput(raw: string, field: string): { ok: true; value: number } | { ok: false; message: string } {
@@ -422,6 +486,7 @@ export default function App() {
   const [ibkrAccountLoading, setIbkrAccountLoading] = useState<boolean>(false);
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
+  const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -749,6 +814,7 @@ export default function App() {
       setIbkrContext(ic);
       setNarratorTutorial(nt);
       setUniverseProvenance(up);
+      void doFetchEquityHistory();
       if (!universeScannerName && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
@@ -1155,6 +1221,13 @@ export default function App() {
     } catch (e) { /* silenzioso */ }
   }
 
+  async function doFetchEquityHistory() {
+    try {
+      const r = await apiJson<EquityHistoryResponse>(`${API_BASE}/opz/paper/equity_history?profile=paper&limit=60`);
+      setEquityHistory(r);
+    } catch (e) { /* silenzioso */ }
+  }
+
   const goGate = paperSummary?.gates.go_nogo;
   const f6Gate = paperSummary?.gates.f6_t1_acceptance;
   const f6t2Gate = paperSummary?.gates.f6_t2_journal_complete;
@@ -1297,6 +1370,13 @@ export default function App() {
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-fetch equity history on mount + poll every 60s
+  useEffect(() => {
+    void doFetchEquityHistory();
+    const id = window.setInterval(() => void doFetchEquityHistory(), 60_000);
+    return () => window.clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const navItems: Array<{ id: TabKey; label: string }> = [
     { id: "warroom", label: "WAR ROOM" },
     { id: "universe", label: "UNIVERSE SCANNER" },
@@ -1385,7 +1465,26 @@ export default function App() {
                     {activeTab === "warroom" && (
             <div className="panel-grid three">
               <article className="panel">
-                <div className="panel-title">DRAWDOWN CONTROL - 3 LAYER</div>
+                {/* ── ROC10: equity sparkline header ── */}
+                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>EQUITY CURVE</span>
+                  {equityHistory && equityHistory.n_points > 0 && (() => {
+                    const init = equityHistory.initial_equity!;
+                    const last = equityHistory.latest_equity!;
+                    const pnl = last - init;
+                    const pct = (pnl / init) * 100;
+                    return (
+                      <span style={{ color: pnl >= 0 ? "#4ade80" : "#f87171", fontWeight: 700, fontSize: "0.75rem" }}>
+                        €{last.toLocaleString("it-IT", { minimumFractionDigits: 0 })}
+                        {" "}{pnl >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                      </span>
+                    );
+                  })()}
+                </div>
+
+                <EqSparkline points={equityHistory?.points ?? []} w={240} h={56} />
+
+                <div className="panel-title mt10">DRAWDOWN - 3 LAYER</div>
                 <div className="dd-gauge">
                   <div className="dd-track">
                     <div className="dd-fill" style={{ width: `${ddFill}%` }} />
