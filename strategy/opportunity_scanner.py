@@ -43,7 +43,10 @@ DEFAULT_MIN_DTE: int       = 20      # preferred window
 DEFAULT_MAX_DTE: int       = 45
 DEFAULT_MIN_OI: int        = 100     # canonical hard minimum
 PAPER_LIVE_MIN_OI: int     = 500     # stricter for paper/live (Opportunity Scanner doc)
-DEFAULT_MAX_SPREAD_PCT     = 10.0    # % of mid
+DEFAULT_MAX_SPREAD_PCT           = 10.0   # % of mid — absolute cap
+DEFAULT_MAX_SPREAD_COST_PER_DTE  = 0.50   # spread_pct / DTE — DTE-adjusted cap
+# Rationale: 8% spread at 15 DTE = 0.53 $/DTE-unit → rejected (theta già decaduto,
+# fill cost elevato); 8% spread at 45 DTE = 0.18 → accettabile.
 DEFAULT_MIN_VOLUME: int    = 10
 DEFAULT_MIN_IVR            = 20.0    # IVR < 20 → edge null (scoring.py hard filter)
 DELTA_LONG_MIN             = 0.15
@@ -91,6 +94,18 @@ class OptionContract:
         return round((self.ask - self.bid) / self.mid * 100.0, 3)
 
     @property
+    def spread_cost_per_dte(self) -> float:
+        """Costo di fill relativo al DTE residuo: spread_pct / DTE.
+
+        Penalizza contratti con spread elevato E pochi giorni rimasti:
+        stessa % di spread è molto più costosa a 15 DTE che a 45 DTE.
+        Sentinel 9999 propagato da mid=0 o DTE=0.
+        """
+        if self.dte <= 0 or self.mid <= 0.0:
+            return 9999.0
+        return round(self.spread_pct / self.dte, 4)
+
+    @property
     def delta_abs(self) -> float:
         return abs(self.delta)
 
@@ -98,30 +113,32 @@ class OptionContract:
 @dataclass
 class FilterParams:
     """Hard-filter thresholds. Defaults match PROJECT_OPZ_COMPLETE_V2 §12."""
-    min_dte: int          = DEFAULT_MIN_DTE
-    max_dte: int          = DEFAULT_MAX_DTE
-    min_oi: int           = DEFAULT_MIN_OI
-    max_spread_pct: float = DEFAULT_MAX_SPREAD_PCT
-    min_volume: int       = DEFAULT_MIN_VOLUME
-    min_ivr: float        = DEFAULT_MIN_IVR
-    delta_min: float      = DELTA_LONG_MIN
-    delta_max: float      = DELTA_LONG_MAX
+    min_dte: int                  = DEFAULT_MIN_DTE
+    max_dte: int                  = DEFAULT_MAX_DTE
+    min_oi: int                   = DEFAULT_MIN_OI
+    max_spread_pct: float         = DEFAULT_MAX_SPREAD_PCT
+    max_spread_cost_per_dte: float = DEFAULT_MAX_SPREAD_COST_PER_DTE
+    min_volume: int               = DEFAULT_MIN_VOLUME
+    min_ivr: float                = DEFAULT_MIN_IVR
+    delta_min: float              = DELTA_LONG_MIN
+    delta_max: float              = DELTA_LONG_MAX
 
 
 @dataclass
 class FilterRejectStats:
-    total_raw: int  = 0
-    spread_pct: int = 0
-    oi_low: int     = 0
-    dte_out: int    = 0
-    volume_low: int = 0
-    delta_out: int  = 0
-    iv_missing: int = 0
+    total_raw: int       = 0
+    spread_pct: int      = 0
+    spread_cost_dte: int = 0   # spread_pct / DTE > soglia (fill costoso per DTE residuo)
+    oi_low: int          = 0
+    dte_out: int         = 0
+    volume_low: int      = 0
+    delta_out: int       = 0
+    iv_missing: int      = 0
 
     @property
     def total_rejected(self) -> int:
         return (
-            self.spread_pct + self.oi_low + self.dte_out
+            self.spread_pct + self.spread_cost_dte + self.oi_low + self.dte_out
             + self.volume_low + self.delta_out + self.iv_missing
         )
 
@@ -247,9 +264,13 @@ def apply_hard_filters(
         if c.dte < effective_min or c.dte > effective_max:
             stats.dte_out += 1
             continue
-        # Spread too wide
+        # Spread too wide (absolute cap)
         if c.spread_pct > params.max_spread_pct:
             stats.spread_pct += 1
+            continue
+        # Spread troppo costoso per il DTE residuo (DTE-adjusted cap)
+        if c.spread_cost_per_dte > params.max_spread_cost_per_dte:
+            stats.spread_cost_dte += 1
             continue
         # Open interest too low
         if c.open_interest < params.min_oi:

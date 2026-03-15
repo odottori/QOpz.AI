@@ -184,7 +184,8 @@ class TestApplyHardFilters(unittest.TestCase):
 
     def test_dte_at_hard_boundaries_accepted(self):
         # FilterParams deve usare i limiti hard come min/max per testare i boundary
-        params = FilterParams(min_dte=HARD_MIN_DTE, max_dte=HARD_MAX_DTE)
+        # max_spread_cost_per_dte=999 → test isolato su DTE, non su spread
+        params = FilterParams(min_dte=HARD_MIN_DTE, max_dte=HARD_MAX_DTE, max_spread_cost_per_dte=999.0)
         lo = _make_contract(dte=HARD_MIN_DTE)
         hi = _make_contract(dte=HARD_MAX_DTE)
         kept, stats = apply_hard_filters([lo, hi], params)
