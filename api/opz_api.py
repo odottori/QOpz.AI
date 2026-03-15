@@ -1594,6 +1594,60 @@ def opz_opportunity_ev_report(
     }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ROC5 — GET /opz/ibkr/status
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/opz/ibkr/status")
+def opz_ibkr_status(try_connect: bool = False) -> Dict[str, Any]:
+    """
+    Stato della connessione IBKR (TWS/Gateway).
+
+    Query params:
+      try_connect=true  → tenta connessione se non già connessa (timeout 2s)
+      try_connect=false → solo lettura stato corrente (default)
+
+    Response:
+      ok            bool
+      connected     bool
+      host          str
+      port          int | null
+      client_id     int
+      source_system str   — "ibkr_live" | "yfinance"
+      connected_at  str | null  — ISO timestamp UTC
+      ports_probed  list[int]   — porte candidate (ordine priorità)
+      message       str   — descrizione leggibile dello stato
+    """
+    from execution.ibkr_connection import get_manager, IBKR_PORTS
+
+    mgr = get_manager()
+
+    if try_connect and not mgr.is_connected:
+        mgr.try_connect()
+
+    info = mgr.connection_info()
+    connected = info["connected"]
+
+    if connected:
+        message = f"Connesso a TWS/Gateway su porta {info['port']}"
+    elif try_connect:
+        message = "TWS/Gateway non disponibile — fallback yfinance attivo"
+    else:
+        message = "Stato corrente: non connesso (usa try_connect=true per tentare)"
+
+    return {
+        "ok": True,
+        "connected": connected,
+        "host": info["host"],
+        "port": info["port"],
+        "client_id": info["client_id"],
+        "source_system": info["source_system"],
+        "connected_at": info["connected_at"],
+        "ports_probed": IBKR_PORTS,
+        "message": message,
+    }
+
+
 @app.post("/opz/demo_pipeline/auto")
 def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")

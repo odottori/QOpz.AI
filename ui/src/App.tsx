@@ -187,10 +187,16 @@ type ScanFullCandidate = {
 };
 type ScanFullResponse = {
   ok: boolean; batch_id: string; profile: string; regime: string; data_mode: string;
+  events_source: string;  // "ibkr_live" | "yfinance" | "events_map" | "none"
   scan_ts: string; symbols_scanned: number; symbols_with_chain: number;
   filtered_count: number; cache_used: boolean; cache_age_hours: number | null;
   ranking_suspended: boolean; suspension_reason: string | null;
   candidates: ScanFullCandidate[];
+};
+type IbkrStatusResponse = {
+  ok: boolean; connected: boolean; host: string; port: number | null;
+  client_id: number; source_system: string; connected_at: string | null;
+  ports_probed: number[]; message: string;
 };
 type EvReportResponse = {
   ok: boolean; profile: string; window_days: number; generated_at: string;
@@ -383,6 +389,8 @@ export default function App() {
   const [oppScanAccountSize, setOppScanAccountSize] = useState<string>("10000");
   const [selectedScanKey, setSelectedScanKey] = useState<string>("");
   const [evReport, setEvReport] = useState<EvReportResponse | null>(null);
+  const [ibkrStatus, setIbkrStatus] = useState<IbkrStatusResponse | null>(null);
+  const [ibkrChecking, setIbkrChecking] = useState<boolean>(false);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -1079,6 +1087,18 @@ export default function App() {
     } catch (e) { setError(String(e)); }
   }
 
+  async function doCheckIbkr(tryConnect = false) {
+    setIbkrChecking(true);
+    try {
+      const r = await apiJson<IbkrStatusResponse>(
+        `${API_BASE}/opz/ibkr/status?try_connect=${tryConnect}`
+      );
+      setIbkrStatus(r);
+      setMessage(r.message);
+    } catch (e) { setError(String(e)); }
+    finally { setIbkrChecking(false); }
+  }
+
   const goGate = paperSummary?.gates.go_nogo;
   const f6Gate = paperSummary?.gates.f6_t1_acceptance;
   const f6t2Gate = paperSummary?.gates.f6_t2_journal_complete;
@@ -1592,10 +1612,44 @@ export default function App() {
                   <button className="btn btn-ghost" onClick={doLoadEvReport} disabled={busy}>EV REPORT</button>
                 </div>
 
+                {/* ── IBKR connection badge ──────────────────────────────── */}
+                <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "6px" }}>
+                  <span
+                    style={{
+                      padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 600,
+                      background: ibkrStatus?.connected ? "#1a4a1a" : "#3a2a10",
+                      color: ibkrStatus?.connected ? "#4ade80" : "#fbbf24",
+                      border: `1px solid ${ibkrStatus?.connected ? "#4ade80" : "#fbbf24"}`,
+                    }}
+                  >
+                    {ibkrStatus?.connected
+                      ? `IBKR ● :${ibkrStatus.port}`
+                      : ibkrStatus ? "IBKR ○ yfinance" : "IBKR ?"}
+                  </span>
+                  <button
+                    className="btn-small"
+                    disabled={ibkrChecking}
+                    onClick={() => doCheckIbkr(true)}
+                    title="Tenta connessione a TWS/Gateway"
+                  >
+                    {ibkrChecking ? "…" : "⟳ IBKR"}
+                  </button>
+                </div>
+
                 {oppScanResult && (
                   <ul className="activity-list" style={{ marginTop: "8px" }}>
                     <li>Batch: <code>{oppScanResult.batch_id}</code> &nbsp;|&nbsp; {fmtTs(oppScanResult.scan_ts)}</li>
-                    <li>Data mode: <code>{oppScanResult.data_mode}</code></li>
+                    <li>
+                      Data: <code>{oppScanResult.data_mode}</code>
+                      &nbsp;|&nbsp;
+                      Fonte eventi:&nbsp;
+                      <span style={{
+                        color: oppScanResult.events_source === "ibkr_live" ? "#4ade80"
+                          : oppScanResult.events_source === "yfinance" ? "#fbbf24" : "#94a3b8"
+                      }}>
+                        {oppScanResult.events_source}
+                      </span>
+                    </li>
                     <li>Chain: {oppScanResult.symbols_with_chain}/{oppScanResult.symbols_scanned} &nbsp;|&nbsp; Filtrati: {oppScanResult.filtered_count}</li>
                     {oppScanResult.ranking_suspended && (
                       <li className="val-bad">SOSPESO: {oppScanResult.suspension_reason}</li>
