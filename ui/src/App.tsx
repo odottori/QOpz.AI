@@ -524,6 +524,11 @@ export default function App() {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [previewSignature, setPreviewSignature] = useState<string | null>(null);
   const [confirmDecision, setConfirmDecision] = useState<"APPROVE" | "REJECT">("APPROVE");
+  const [confirmArmed, setConfirmArmed] = useState<boolean>(false);
+  const confirmArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [sysStatusFetchedAt, setSysStatusFetchedAt] = useState<number | null>(null);
+  const [ibkrAccountFetchedAt, setIbkrAccountFetchedAt] = useState<number | null>(null);
+  const [exitCandidatesFetchedAt, setExitCandidatesFetchedAt] = useState<number | null>(null);
   const [aiDrawerOpen, setAiDrawerOpen] = useState<boolean>(false);
   const [narratorTutorial, setNarratorTutorial] = useState<NarratorTutorialResponse | null>(null);
   const [narratorBusy, setNarratorBusy] = useState<boolean>(false);
@@ -887,6 +892,22 @@ export default function App() {
       return;
     }
 
+    // Double-click protection: first click arms, second click sends
+    if (!confirmArmed) {
+      setConfirmArmed(true);
+      setMessage("Clicca CONFIRM di nuovo per inviare l'ordine.");
+      if (confirmArmTimerRef.current) clearTimeout(confirmArmTimerRef.current);
+      confirmArmTimerRef.current = setTimeout(() => {
+        setConfirmArmed(false);
+        setMessage("");
+      }, 5000);
+      return;
+    }
+
+    // Second click — disarm and proceed
+    setConfirmArmed(false);
+    if (confirmArmTimerRef.current) { clearTimeout(confirmArmTimerRef.current); confirmArmTimerRef.current = null; }
+
     setBusy(true);
     setError("");
     setMessage("");
@@ -1214,11 +1235,19 @@ export default function App() {
     finally { setIbkrChecking(false); }
   }
 
+  function _agoLabel(fetchedAt: number | null): string {
+    if (fetchedAt === null) return "—";
+    const s = Math.round((Date.now() - fetchedAt) / 1000);
+    if (s < 60) return `${s}s fa`;
+    return `${Math.floor(s / 60)}m${s % 60}s fa`;
+  }
+
   async function doFetchIbkrAccount() {
     setIbkrAccountLoading(true);
     try {
       const r = await apiJson<IbkrAccountResponse>(`${API_BASE}/opz/ibkr/account`);
       setIbkrAccount(r);
+      setIbkrAccountFetchedAt(Date.now());
     } catch (e) { /* silenzioso: account non critico */ }
     finally { setIbkrAccountLoading(false); }
   }
@@ -1227,6 +1256,7 @@ export default function App() {
     try {
       const r = await apiJson<SystemStatusResponse>(`${API_BASE}/opz/system/status`);
       setSysStatus(r);
+      setSysStatusFetchedAt(Date.now());
     } catch (e) { /* silenzioso */ }
   }
 
@@ -1248,6 +1278,7 @@ export default function App() {
     try {
       const r = await apiJson<ExitCandidatesResponse>(`${API_BASE}/opz/opportunity/exit_candidates?min_score=1&top_n=5`);
       setExitCandidates(r);
+      setExitCandidatesFetchedAt(Date.now());
     } catch (e) { /* silenzioso */ }
   }
 
@@ -1461,6 +1492,7 @@ export default function App() {
   useEffect(() => {
     const cur = urgentExits.length;
     if (cur > prevUrgentCount.current && cur > 0) {
+      // Audio beep
       let ctx: AudioContext | null = null;
       try {
         ctx = new AudioContext();
@@ -1473,6 +1505,11 @@ export default function App() {
         osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.35);
         osc.onended = () => ctx!.close();
       } catch { ctx?.close(); /* browser may block before first user interaction */ }
+      // Visual flash — red overlay 300ms
+      const flash = document.createElement("div");
+      flash.style.cssText = "position:fixed;inset:0;background:rgba(255,48,48,0.28);pointer-events:none;z-index:10000;transition:opacity 0.3s";
+      document.body.appendChild(flash);
+      setTimeout(() => { flash.style.opacity = "0"; setTimeout(() => flash.remove(), 300); }, 300);
     }
     prevUrgentCount.current = cur;
   }, [urgentExits.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1598,10 +1635,13 @@ export default function App() {
               </article>
 
               <article className="panel">
-                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between" }}>
+                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>SYSTEM STATUS</span>
-                  <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "2px 6px" }}
-                    onClick={() => void doFetchSysStatus()}>⟳</button>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: "0.62rem", color: "#555" }}>agg: {_agoLabel(sysStatusFetchedAt)}</span>
+                    <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "2px 6px" }}
+                      onClick={() => void doFetchSysStatus()}>⟳</button>
+                  </span>
                 </div>
 
                 {/* Signal grid */}
@@ -1739,13 +1779,16 @@ export default function App() {
                       </span>
                     )}
                   </span>
-                  <span style={{
-                    fontSize: "0.7rem", padding: "2px 8px", borderRadius: 4,
-                    background: ibkrAccount?.connected ? "#1a4a1a" : "#2a2a2a",
-                    color: ibkrAccount?.connected ? "#4ade80" : "#666",
-                    border: `1px solid ${ibkrAccount?.connected ? "#4ade80" : "#444"}`,
-                  }}>
-                    {ibkrAccount?.connected ? `LIVE · ${ibkrAccount.account_id ?? "—"}` : "NOT CONNECTED"}
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: "0.62rem", color: "#555" }}>agg: {_agoLabel(ibkrAccountFetchedAt)}</span>
+                    <span style={{
+                      fontSize: "0.7rem", padding: "2px 8px", borderRadius: 4,
+                      background: ibkrAccount?.connected ? "#1a4a1a" : "#2a2a2a",
+                      color: ibkrAccount?.connected ? "#4ade80" : "#666",
+                      border: `1px solid ${ibkrAccount?.connected ? "#4ade80" : "#444"}`,
+                    }}>
+                      {ibkrAccount?.connected ? `LIVE · ${ibkrAccount.account_id ?? "—"}` : "NOT CONNECTED"}
+                    </span>
                   </span>
                 </div>
 
@@ -1836,10 +1879,9 @@ export default function App() {
                 {/* ── ROC14: Exit Candidates ──────────────────────────── */}
                 <div className="panel-title mt10" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>EXIT CANDIDATES</span>
-                  <span style={{ fontSize: "0.65rem", color: "#666" }}>
-                    {exitCandidates
-                      ? `${exitCandidates.n_flagged}/${exitCandidates.n_total} flagged`
-                      : "—"}
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.62rem", color: "#555" }}>
+                    {exitCandidates ? `${exitCandidates.n_flagged}/${exitCandidates.n_total} flagged` : "—"}
+                    <span>agg: {_agoLabel(exitCandidatesFetchedAt)}</span>
                   </span>
                 </div>
 
@@ -1944,7 +1986,12 @@ export default function App() {
                   <select value={confirmDecision} onChange={(e) => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}> 
                     <option value="APPROVE">APPROVE</option><option value="REJECT">REJECT</option>
                   </select>
-                  <button className="btn btn-danger" onClick={doConfirm} disabled={busy || !preview || payloadJsonError || previewDirty}>CONFIRM</button>
+                  <button
+                    className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
+                    onClick={doConfirm}
+                    disabled={busy || !preview || payloadJsonError || previewDirty}
+                    title={confirmArmed ? "Clicca ancora per inviare l'ordine" : "Prima conferma — secondo click invia"}
+                  >{confirmArmed ? "⚠ CONFERMA ORDINE?" : "CONFIRM"}</button>
                 </div>
                 <pre className="console">{preview ? JSON.stringify(preview, null, 2) : "Nessuna anteprima."}</pre>
               </article>
