@@ -1437,8 +1437,9 @@ export default function App() {
   useEffect(() => {
     const cur = urgentExits.length;
     if (cur > prevUrgentCount.current && cur > 0) {
+      let ctx: AudioContext | null = null;
       try {
-        const ctx = new AudioContext();
+        ctx = new AudioContext();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain); gain.connect(ctx.destination);
@@ -1446,8 +1447,8 @@ export default function App() {
         gain.gain.setValueAtTime(0.25, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
         osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.35);
-        osc.onended = () => ctx.close();
-      } catch { /* browser may block before first user interaction */ }
+        osc.onended = () => ctx!.close();
+      } catch { ctx?.close(); /* browser may block before first user interaction */ }
     }
     prevUrgentCount.current = cur;
   }, [urgentExits.length]); // eslint-disable-line react-hooks/exhaustive-deps

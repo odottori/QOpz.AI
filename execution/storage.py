@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import os
 import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from .state_machine import normalize_state
 
@@ -78,13 +81,13 @@ def init_execution_schema() -> None:
 
         try:
             con.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS outcome VARCHAR")
-        except Exception:  # column already exists — safe to ignore
-            pass
+        except Exception as _exc:  # column already exists — safe to ignore
+            logger.debug("ALTER TABLE skip: %s", _exc)
         for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
             try:
                 con.execute(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {_col}")
-            except Exception:  # column already exists — safe to ignore
-                pass
+            except Exception as _exc:  # column already exists — safe to ignore
+                logger.debug("ALTER TABLE skip: %s", _exc)
 
         con.execute(
             """
@@ -109,8 +112,8 @@ def init_execution_schema() -> None:
         for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
             try:
                 con.execute(f"ALTER TABLE order_events ADD COLUMN IF NOT EXISTS {_col}")
-            except Exception:  # column already exists — safe to ignore
-                pass
+            except Exception as _exc:  # column already exists — safe to ignore
+                logger.debug("ALTER TABLE skip: %s", _exc)
 
         con.execute(
             """
@@ -132,8 +135,8 @@ def init_execution_schema() -> None:
         for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
             try:
                 con.execute(f"ALTER TABLE paper_equity_snapshots ADD COLUMN IF NOT EXISTS {_col}")
-            except Exception:  # column already exists — safe to ignore
-                pass
+            except Exception as _exc:  # column already exists — safe to ignore
+                logger.debug("ALTER TABLE skip: %s", _exc)
 
         con.execute(
             """
@@ -169,13 +172,13 @@ def init_execution_schema() -> None:
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS score_at_entry DOUBLE")
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS kelly_fraction DOUBLE")
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS exit_reason VARCHAR")
-        except Exception:  # column already exists — safe to ignore
-            pass
+        except Exception as _exc:  # column already exists — safe to ignore
+            logger.debug("ALTER TABLE skip: %s", _exc)
         for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
             try:
                 con.execute(f"ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS {_col}")
-            except Exception:  # column already exists — safe to ignore
-                pass
+            except Exception as _exc:  # column already exists — safe to ignore
+                logger.debug("ALTER TABLE skip: %s", _exc)
 
         con.execute(
             """
@@ -197,8 +200,8 @@ def init_execution_schema() -> None:
         for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
             try:
                 con.execute(f"ALTER TABLE compliance_events ADD COLUMN IF NOT EXISTS {_col}")
-            except Exception:  # column already exists — safe to ignore
-                pass
+            except Exception as _exc:  # column already exists — safe to ignore
+                logger.debug("ALTER TABLE skip: %s", _exc)
 
         con.execute(
             """
@@ -227,8 +230,8 @@ def init_execution_schema() -> None:
         for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
             try:
                 con.execute(f"ALTER TABLE operator_opportunity_decisions ADD COLUMN IF NOT EXISTS {_col}")
-            except Exception:  # column already exists — safe to ignore
-                pass
+            except Exception as _exc:  # column already exists — safe to ignore
+                logger.debug("ALTER TABLE skip: %s", _exc)
 
         con.execute(
             """
