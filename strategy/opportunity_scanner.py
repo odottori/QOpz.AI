@@ -1301,14 +1301,20 @@ def scan_opportunities(
         if not strategy:
             continue
 
-        # ── Events check (ROC2) ──────────────────────────────────────────
+        # ── Events check (ROC2 + ROC4) ───────────────────────────────────
         ev_flag: Optional[str] = None
         if events_map is not None and sym in events_map:
             ev = events_map[sym]
         else:
             try:
-                from scripts.events_calendar import check_events as _check_events
-                ev = _check_events(sym)
+                # ROC4: usa IBKR se connesso, yfinance altrimenti
+                from execution.ibkr_connection import get_manager as _get_ibkr_manager
+                _ibkr = _get_ibkr_manager()
+                if _ibkr.is_connected:
+                    ev = _ibkr.get_events_for_symbol(sym)
+                else:
+                    from scripts.events_calendar import check_events as _check_events
+                    ev = _check_events(sym)
             except Exception:
                 ev = None
 
