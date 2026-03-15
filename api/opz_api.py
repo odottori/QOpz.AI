@@ -1200,7 +1200,6 @@ def opz_paper_equity_history(profile: str = "paper", limit: int = 60) -> Dict[st
       points          list[{date: str, equity: float}]
     """
     n = max(1, min(int(limit), 500))
-    init_execution_schema()
     con = _connect()
     try:
         rows = con.execute(
@@ -1670,11 +1669,12 @@ def opz_ibkr_status(try_connect: bool = False) -> Dict[str, Any]:
     from execution.ibkr_connection import get_manager, IBKR_PORTS
 
     mgr = get_manager()
-
-    if try_connect and not mgr.is_connected:
-        mgr.try_connect()
-
+    # Ottieni info prima (legge is_connected una sola volta)
     info = mgr.connection_info()
+    if try_connect and not info["connected"]:
+        mgr.try_connect()
+        info = mgr.connection_info()
+
     connected = info["connected"]
 
     if connected:
@@ -1701,6 +1701,21 @@ def opz_ibkr_status(try_connect: bool = False) -> Dict[str, Any]:
 # ROC6 — GET /opz/ibkr/account
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _empty_account_response(connected: bool, message: str) -> Dict[str, Any]:
+    """Risposta account vuota riutilizzata per 'non connesso' e 'fetch fallito'."""
+    return {
+        "ok": True,
+        "connected": connected,
+        "source_system": "ibkr_live" if connected else "yfinance",
+        "account_id": None,
+        "net_liquidation": None,
+        "realized_pnl": None,
+        "unrealized_pnl": None,
+        "buying_power": None,
+        "positions": [],
+        "message": message,
+    }
+
 @app.get("/opz/ibkr/account")
 def opz_ibkr_account() -> Dict[str, Any]:
     """
@@ -1726,18 +1741,7 @@ def opz_ibkr_account() -> Dict[str, Any]:
     mgr = get_manager()
 
     if not mgr.is_connected:
-        return {
-            "ok": True,
-            "connected": False,
-            "source_system": "yfinance",
-            "account_id": None,
-            "net_liquidation": None,
-            "realized_pnl": None,
-            "unrealized_pnl": None,
-            "buying_power": None,
-            "positions": [],
-            "message": "Non connesso a TWS/Gateway — chiama prima /opz/ibkr/status?try_connect=true",
-        }
+        return _empty_account_response(False, "Non connesso a TWS/Gateway — chiama prima /opz/ibkr/status?try_connect=true")
 
     try:
         ib = mgr._ib
@@ -1804,18 +1808,7 @@ def opz_ibkr_account() -> Dict[str, Any]:
 
     except Exception as exc:
         logger.warning("IBKR account fetch failed: %s", exc)
-        return {
-            "ok": True,
-            "connected": True,
-            "source_system": "ibkr_live",
-            "account_id": None,
-            "net_liquidation": None,
-            "realized_pnl": None,
-            "unrealized_pnl": None,
-            "buying_power": None,
-            "positions": [],
-            "message": f"Connesso ma fetch account fallito: {exc}",
-        }
+        return _empty_account_response(True, f"Connesso ma fetch account fallito: {exc}")
 
 
 @app.get("/opz/regime/current")
@@ -1867,14 +1860,7 @@ def opz_regime_current(window: int = 20) -> Dict[str, Any]:
                     # last_scan_ts = most recent (first row after DESC order)
                     ts_raw = rows[0][1]
                     if ts_raw is not None:
-                        try:
-                            from datetime import datetime, timezone
-                            if hasattr(ts_raw, "isoformat"):
-                                last_scan_ts = ts_raw.isoformat()
-                            else:
-                                last_scan_ts = str(ts_raw)
-                        except Exception:
-                            last_scan_ts = str(ts_raw)
+                        last_scan_ts = ts_raw.isoformat() if hasattr(ts_raw, "isoformat") else str(ts_raw)
                 else:
                     # Fallback: paper_trades
                     rows2 = con.execute(
@@ -1967,31 +1953,15 @@ def opz_system_status() -> Dict[str, Any]:
     except Exception:
         pass
 
-    # ── Execution config ──────────────────────────────────────────────────────
+    # ── Execution config (ROOT-anchored paths) ────────────────────────────────
     execution_config_ready = (
-        Path("config/dev.toml").exists()
-        or Path("config/paper.toml").exists()
-        or Path("config/live.toml").exists()
+        (ROOT / "config" / "dev.toml").exists()
+        or (ROOT / "config" / "paper.toml").exists()
+        or (ROOT / "config" / "live.toml").exists()
     )
 
-    # ── n_closed_trades (DuckDB) ──────────────────────────────────────────────
+    # ── n_closed_trades + regime — singola connessione DuckDB ─────────────────
     n_closed_trades = 0
-    try:
-        import duckdb
-        import execution.storage as _st
-        db_path = str(_st.EXEC_DB_PATH)
-        if Path(db_path).exists():
-            con = duckdb.connect(db_path, read_only=True)
-            row = con.execute("SELECT COUNT(*) FROM paper_trades WHERE exit_ts_utc IS NOT NULL").fetchone()
-            con.close()
-            n_closed_trades = int(row[0]) if row else 0
-    except Exception:
-        pass
-
-    # ── Kelly gate ────────────────────────────────────────────────────────────
-    kelly_enabled = (data_mode == "VENDOR_REAL_CHAIN") and (n_closed_trades >= 50)
-
-    # ── Regime (last record) ──────────────────────────────────────────────────
     regime = "UNKNOWN"
     try:
         import duckdb
@@ -2000,17 +1970,25 @@ def opz_system_status() -> Dict[str, Any]:
         if Path(db_path).exists():
             con = duckdb.connect(db_path, read_only=True)
             try:
-                row = con.execute(
+                row_n = con.execute(
+                    "SELECT COUNT(*) FROM paper_trades WHERE exit_ts_utc IS NOT NULL"
+                ).fetchone()
+                n_closed_trades = int(row_n[0]) if row_n else 0
+
+                row_r = con.execute(
                     "SELECT regime FROM paper_trades WHERE regime IS NOT NULL ORDER BY entry_ts_utc DESC LIMIT 1"
                 ).fetchone()
-                if row:
-                    regime = str(row[0])
+                if row_r:
+                    regime = str(row_r[0])
             except Exception:
                 pass
             finally:
                 con.close()
     except Exception:
         pass
+
+    # ── Kelly gate ────────────────────────────────────────────────────────────
+    kelly_enabled = (data_mode == "VENDOR_REAL_CHAIN") and (n_closed_trades >= 50)
 
     # ── Semafori operativi ────────────────────────────────────────────────────
     signals: list[dict] = [

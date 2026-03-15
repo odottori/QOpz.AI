@@ -25,6 +25,7 @@ Uso tipico (auto-detect silenzioso all'avvio):
 from __future__ import annotations
 
 import logging
+import re
 import socket
 import threading
 from dataclasses import dataclass, field
@@ -226,8 +227,6 @@ class IBKRConnectionManager:
         Se non connesso o fetch fallisce → fallback a yfinance (check_events).
         Mai propaga eccezioni.
         """
-        from scripts.events_calendar import check_events as _yf_check_events
-
         if not self.is_connected:
             return self._yfinance_fallback(symbol)
 
@@ -298,12 +297,8 @@ class IBKRConnectionManager:
             restrict_long_gamma=restrict_lg,
         )
 
-    def _parse_earnings_from_xml(self, xml: str, today: date) -> Optional[date]:
-        """Estrae prossima earnings date dall'XML CalendarReport IBKR."""
-        import re
-        # IBKR CalendarReport: <Event type="Earnings" ...><ActualDate>YYYYMMDD</ActualDate>
-        # oppure <EstimatedDate>YYYYMMDD</EstimatedDate>
-        pattern = r'<Event\s[^>]*type="Earnings"[^>]*>.*?<(?:Actual|Estimated)Date>(\d{8})</(?:Actual|Estimated)Date>'
+    def _parse_date_from_xml(self, xml: str, pattern: str, today: date) -> Optional[date]:
+        """Helper condiviso: estrae la prossima data (YYYYMMDD) che corrisponde al pattern."""
         upcoming: list[date] = []
         for m in re.finditer(pattern, xml, re.DOTALL | re.IGNORECASE):
             try:
@@ -314,19 +309,16 @@ class IBKRConnectionManager:
                 continue
         return min(upcoming) if upcoming else None
 
+    def _parse_earnings_from_xml(self, xml: str, today: date) -> Optional[date]:
+        """Estrae prossima earnings date dall'XML CalendarReport IBKR."""
+        # IBKR CalendarReport: <Event type="Earnings" ...><ActualDate>YYYYMMDD</ActualDate>
+        pattern = r'<Event\s[^>]*type="Earnings"[^>]*>.*?<(?:Actual|Estimated)Date>(\d{8})</(?:Actual|Estimated)Date>'
+        return self._parse_date_from_xml(xml, pattern, today)
+
     def _parse_dividend_from_xml(self, xml: str, today: date) -> Optional[date]:
         """Estrae prossima ex-dividend date dall'XML CalendarReport IBKR."""
-        import re
         pattern = r'<Event\s[^>]*type="Dividend"[^>]*>.*?<ExDate>(\d{8})</ExDate>'
-        upcoming: list[date] = []
-        for m in re.finditer(pattern, xml, re.DOTALL | re.IGNORECASE):
-            try:
-                d = datetime.strptime(m.group(1), "%Y%m%d").date()
-                if d >= today:
-                    upcoming.append(d)
-            except ValueError:
-                continue
-        return min(upcoming) if upcoming else None
+        return self._parse_date_from_xml(xml, pattern, today)
 
     def _make_stock_contract(self, symbol: str):
         """Crea contratto Stock ib_insync per il simbolo."""

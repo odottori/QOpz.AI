@@ -815,6 +815,8 @@ export default function App() {
       setNarratorTutorial(nt);
       setUniverseProvenance(up);
       void doFetchEquityHistory();
+      void doFetchSysStatus();
+      void doFetchRegimeCurrent();
       if (!universeScannerName && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }

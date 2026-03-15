@@ -263,35 +263,23 @@ class TestExecutionConfig(unittest.TestCase):
         return next(s for s in body["signals"] if s["name"] == "execution_config")
 
     def test_config_ready_true_when_dev_toml_exists(self):
-        # In questo repo config/dev.toml esiste (cwd = repo root)
+        # execution_config_ready usa ROOT assoluto — sempre True nel repo
         body = _get()
-        # Potrebbe essere True o False a seconda della CWD durante i test
         self.assertIn(body["execution_config_ready"], (True, False))
 
     def test_config_signal_ok_when_ready(self):
-        with tempfile.TemporaryDirectory() as td:
-            cfg = Path(td) / "config" / "dev.toml"
-            cfg.parent.mkdir(parents=True)
-            cfg.touch()
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(td)
-                body = _get()
-                self.assertTrue(body["execution_config_ready"])
-                self.assertEqual(self._ec_signal(body)["status"], "OK")
-            finally:
-                os.chdir(old_cwd)
+        # Mocka Path.exists → True per i path config
+        with patch("pathlib.Path.exists", return_value=True):
+            body = _get()
+        self.assertTrue(body["execution_config_ready"])
+        self.assertEqual(self._ec_signal(body)["status"], "OK")
 
     def test_config_signal_alert_when_missing(self):
-        with tempfile.TemporaryDirectory() as td:
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(td)
-                body = _get()
-                self.assertFalse(body["execution_config_ready"])
-                self.assertEqual(self._ec_signal(body)["status"], "ALERT")
-            finally:
-                os.chdir(old_cwd)
+        # Mocka Path.exists → False per tutti i path (inclusi config)
+        with patch("pathlib.Path.exists", return_value=False):
+            body = _get()
+        self.assertFalse(body["execution_config_ready"])
+        self.assertEqual(self._ec_signal(body)["status"], "ALERT")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
