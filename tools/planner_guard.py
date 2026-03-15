@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,8 +37,20 @@ def _load_json(path: Path) -> Dict[str, Any]:
 
 
 def _dump_json(path: Path, payload: Dict[str, Any]) -> None:
+    """Scrive JSON in modo atomico (write-then-rename) per prevenire corruzione su SIGKILL."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    content = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _normalize_rel_path(path: str) -> str:
