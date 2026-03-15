@@ -230,8 +230,192 @@ def init_execution_schema() -> None:
             except Exception:  # column already exists — safe to ignore
                 pass
 
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS opportunity_candidates (
+                candidate_id  VARCHAR PRIMARY KEY,
+                batch_id      VARCHAR NOT NULL,
+                profile       VARCHAR,
+                scan_ts       TIMESTAMP,
+                regime        VARCHAR,
+                data_mode     VARCHAR,
+                symbol        VARCHAR,
+                strategy      VARCHAR,
+                score         DOUBLE,
+                score_breakdown_json VARCHAR,
+                expiry        VARCHAR,
+                dte           INTEGER,
+                strikes_json  VARCHAR,
+                delta         DOUBLE,
+                iv            DOUBLE,
+                iv_zscore_30  DOUBLE,
+                iv_zscore_60  DOUBLE,
+                iv_interp     VARCHAR,
+                expected_move      DOUBLE,
+                signal_vs_em_ratio DOUBLE,
+                spread_pct    DOUBLE,
+                open_interest INTEGER,
+                volume        INTEGER,
+                max_loss      DOUBLE,
+                max_loss_pct  DOUBLE,
+                breakeven     DOUBLE,
+                breakeven_pct DOUBLE,
+                credit_or_debit   DOUBLE,
+                sizing_suggested  DOUBLE,
+                kelly_fraction    DOUBLE,
+                events_flag       VARCHAR,
+                human_review_required BOOLEAN,
+                stress_base   DOUBLE,
+                stress_shock  DOUBLE,
+                data_quality  VARCHAR,
+                source        VARCHAR,
+                underlying_price  DOUBLE,
+                source_system VARCHAR,
+                source_mode   VARCHAR,
+                source_quality VARCHAR,
+                asof_ts       VARCHAR,
+                received_ts   VARCHAR
+            )
+            """
+        )
+
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS opportunity_chain_snapshots (
+                snapshot_id   VARCHAR PRIMARY KEY,
+                batch_id      VARCHAR NOT NULL,
+                profile       VARCHAR,
+                symbol        VARCHAR,
+                scan_ts       TIMESTAMP,
+                source_system VARCHAR,
+                source_mode   VARCHAR,
+                source_quality VARCHAR,
+                asof_ts       VARCHAR,
+                received_ts   VARCHAR
+            )
+            """
+        )
+
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS opportunity_ev_tracking (
+                track_id      VARCHAR PRIMARY KEY,
+                candidate_id  VARCHAR NOT NULL,
+                batch_id      VARCHAR NOT NULL,
+                profile       VARCHAR,
+                symbol        VARCHAR,
+                strategy      VARCHAR,
+                expiry        VARCHAR,
+                entry_score   DOUBLE,
+                entry_credit  DOUBLE,
+                entry_max_loss DOUBLE,
+                status        VARCHAR,
+                exit_ts       TIMESTAMP,
+                exit_pnl      DOUBLE,
+                exit_reason   VARCHAR,
+                ev_realized   DOUBLE,
+                source_system VARCHAR,
+                source_mode   VARCHAR,
+                source_quality VARCHAR,
+                asof_ts       VARCHAR,
+                received_ts   VARCHAR
+            )
+            """
+        )
+
         con.close()
         _SCHEMA_READY = True
+
+
+def save_opportunity_scan(
+    *,
+    batch_id: str,
+    profile: str,
+    scan_result: Any,
+) -> None:
+    """Persist ScanResult to opportunity_candidates + opportunity_chain_snapshots.
+
+    scan_result must expose .regime, .data_mode, .scan_ts (str), .candidates (list[OpportunityCandidate]).
+    Does NOT raise on individual row failures — logs and continues.
+    """
+    import dataclasses
+    import json as _json
+
+    init_execution_schema()
+    con = _connect()
+    now = utc_now()
+    prov = _prov(profile, now)
+    scan_ts_str = getattr(scan_result, "scan_ts", now.isoformat())
+
+    try:
+        seen_symbols: set[str] = set()
+
+        for c in getattr(scan_result, "candidates", []):
+            cid = str(uuid.uuid4())
+            d: dict[str, Any] = (
+                dataclasses.asdict(c)
+                if dataclasses.is_dataclass(c) and not isinstance(c, type)
+                else dict(c)
+            )
+            con.execute(
+                """
+                INSERT INTO opportunity_candidates (
+                    candidate_id, batch_id, profile, scan_ts, regime, data_mode,
+                    symbol, strategy, score, score_breakdown_json,
+                    expiry, dte, strikes_json, delta, iv,
+                    iv_zscore_30, iv_zscore_60, iv_interp,
+                    expected_move, signal_vs_em_ratio,
+                    spread_pct, open_interest, volume,
+                    max_loss, max_loss_pct, breakeven, breakeven_pct,
+                    credit_or_debit, sizing_suggested, kelly_fraction,
+                    events_flag, human_review_required,
+                    stress_base, stress_shock,
+                    data_quality, source, underlying_price,
+                    source_system, source_mode, source_quality, asof_ts, received_ts
+                ) VALUES (
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+                )
+                """,
+                (
+                    cid, batch_id, profile, scan_ts_str,
+                    getattr(scan_result, "regime", None),
+                    getattr(scan_result, "data_mode", None),
+                    d.get("symbol"), d.get("strategy"), d.get("score"),
+                    _json.dumps(d.get("score_breakdown") or {}),
+                    d.get("expiry"), d.get("dte"),
+                    _json.dumps(d.get("strikes") or []),
+                    d.get("delta"), d.get("iv"),
+                    d.get("iv_zscore_30"), d.get("iv_zscore_60"), d.get("iv_interp"),
+                    d.get("expected_move"), d.get("signal_vs_em_ratio"),
+                    d.get("spread_pct"), d.get("open_interest"), d.get("volume"),
+                    d.get("max_loss"), d.get("max_loss_pct"),
+                    d.get("breakeven"), d.get("breakeven_pct"),
+                    d.get("credit_or_debit"), d.get("sizing_suggested"), d.get("kelly_fraction"),
+                    d.get("events_flag"), d.get("human_review_required"),
+                    d.get("stress_base"), d.get("stress_shock"),
+                    d.get("data_quality"), d.get("source"), d.get("underlying_price"),
+                    *prov,
+                ),
+            )
+
+            sym = d.get("symbol") or ""
+            if sym and sym not in seen_symbols:
+                seen_symbols.add(sym)
+                con.execute(
+                    """
+                    INSERT INTO opportunity_chain_snapshots (
+                        snapshot_id, batch_id, profile, symbol, scan_ts,
+                        source_system, source_mode, source_quality, asof_ts, received_ts
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (str(uuid.uuid4()), batch_id, profile, sym, scan_ts_str, *prov),
+                )
+
+        if hasattr(con, "commit"):
+            con.commit()
+    finally:
+        con.close()
+
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)

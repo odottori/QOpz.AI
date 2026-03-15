@@ -149,6 +149,18 @@ class UniverseScanRequest(BaseModel):
     settings_path: Optional[str] = None
 
 
+class ScanFullRequest(BaseModel):
+    profile: str = Field(default="paper", min_length=1)
+    regime: str = Field(default="NORMAL")
+    symbols: list[str] = Field(default_factory=list)
+    top_n: int = Field(default=5, ge=1, le=50)
+    account_size: float = Field(default=10_000.0, gt=0)
+    min_score: float = Field(default=60.0, ge=0.0, le=100.0)
+    signal_map: Optional[Dict[str, str]] = None
+    signal_pct_map: Optional[Dict[str, float]] = None
+    use_cache: bool = Field(default=True)
+
+
 class DemoPipelineAutoRequest(BaseModel):
     profile: str = Field(default="paper", min_length=1)
     symbols: Optional[list[str]] = None
@@ -1428,6 +1440,77 @@ def opz_universe_scan(req: UniverseScanRequest) -> Dict[str, Any]:
 
 
 
+
+
+@app.post("/opz/opportunity/scan_full")
+def opz_opportunity_scan_full(req: ScanFullRequest) -> Dict[str, Any]:
+    """Full opportunity scan: IV history -> chain fetch -> analytics -> 4-pillar score.
+
+    Returns a ranked list of OpportunityCandidate (score >= min_score).
+    Results are persisted to opportunity_candidates and opportunity_chain_snapshots.
+    Watermark: data_mode field reflects OPZ_DATA_MODE env var.
+    """
+    import dataclasses
+
+    profile = _clean_text(req.profile, "profile")
+    regime = (req.regime or "NORMAL").strip().upper()
+    if regime not in {"NORMAL", "CAUTION", "SHOCK"}:
+        raise HTTPException(status_code=400, detail="invalid regime (expected NORMAL|CAUTION|SHOCK)")
+
+    symbols = [str(s).strip().upper() for s in (req.symbols or []) if str(s).strip()]
+    if not symbols and regime != "SHOCK":
+        raise HTTPException(status_code=400, detail="symbols list is empty")
+
+    from strategy.opportunity_scanner import scan_opportunities
+    from execution.storage import init_execution_schema, save_opportunity_scan
+
+    batch_id = secrets.token_hex(8)
+
+    try:
+        result = scan_opportunities(
+            profile=profile,
+            regime=regime,
+            symbols=symbols or None,
+            top_n=req.top_n,
+            account_size=req.account_size,
+            min_score=req.min_score,
+            signal_map=req.signal_map,
+            signal_pct_map=req.signal_pct_map,
+            use_cache=req.use_cache,
+        )
+    except Exception as exc:
+        logger.exception("SCAN_FULL_ERROR profile=%s regime=%s", profile, regime)
+        raise HTTPException(status_code=502, detail={"stage": "scan", "error": str(exc)}) from exc
+
+    try:
+        init_execution_schema()
+        save_opportunity_scan(batch_id=batch_id, profile=profile, scan_result=result)
+    except Exception as exc:
+        logger.warning("SCAN_SAVE_WARN batch=%s %s", batch_id, exc)
+
+    candidates_out = [
+        dataclasses.asdict(c)
+        if dataclasses.is_dataclass(c) and not isinstance(c, type)
+        else dict(c)
+        for c in result.candidates
+    ]
+
+    return {
+        "ok": True,
+        "batch_id": batch_id,
+        "profile": result.profile,
+        "regime": result.regime,
+        "data_mode": result.data_mode,
+        "scan_ts": result.scan_ts,
+        "symbols_scanned": result.symbols_scanned,
+        "symbols_with_chain": result.symbols_with_chain,
+        "filtered_count": result.filtered_count,
+        "cache_used": result.cache_used,
+        "cache_age_hours": result.cache_age_hours,
+        "ranking_suspended": result.ranking_suspended,
+        "suspension_reason": result.suspension_reason,
+        "candidates": candidates_out,
+    }
 
 
 @app.post("/opz/demo_pipeline/auto")
