@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, time as time_cls, timedelta, timezone
+from datetime import date, datetime, time as time_cls, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -2112,6 +2112,194 @@ def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
         "extract": extract_run.get("payload", {}),
         "dataset": dataset_run.get("payload", {}),
         "scan": scan_out,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ROC13 — Exit Candidates scoring
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Exit score weights
+_EXIT_W_THETA   = 3   # unrealized_pnl >= 70% of max_profit (target reached)
+_EXIT_W_TIME    = 2   # dte_remaining <= 7 (gamma risk)
+_EXIT_W_LOSS    = 4   # unrealized_pnl < -50% of max_profit (loss limit)
+
+_THETA_DECAY_THRESHOLD = 0.70   # fraction of max_profit collected
+_LOSS_LIMIT_THRESHOLD  = 0.50   # fraction of max_profit lost
+_TIME_STOP_DTE         = 7      # remaining calendar days
+
+
+def _parse_expiry(expiry_raw: Any) -> Optional[date]:
+    """Parse YYYYMMDD or YYYY-MM-DD expiry string to date, or None on failure."""
+    if not expiry_raw:
+        return None
+    s = str(expiry_raw).strip()
+    try:
+        return date.fromisoformat(s) if "-" in s else datetime.strptime(s, "%Y%m%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _score_position(pos: dict, today: date | None = None) -> tuple[int, list[str]]:
+    """
+    Compute exit_score for one open option position.
+
+    pos keys used:
+      unrealized_pnl  float   — current unrealized P&L (positive = profitable)
+      avg_cost        float   — average cost per share (credit received for shorts, positive)
+      quantity        float   — number of shares (negative for short)
+      expiry          str     — option expiry YYYYMMDD or YYYY-MM-DD
+
+    Returns: (score: int, reasons: list[str])
+    Score 0 = no exit signal.
+    """
+    if today is None:
+        today = date.today()
+
+    score = 0
+    reasons: list[str] = []
+
+    unrealized = float(pos.get("unrealized_pnl") or 0.0)
+    avg_cost   = float(pos.get("avg_cost")       or 0.0)
+    quantity   = float(pos.get("quantity")        or 0.0)
+
+    # Max profit estimate: premium received = avg_cost * |quantity| * 100
+    # For short options IBKR reports avg_cost as positive (credit received per share)
+    max_profit = abs(avg_cost * quantity * 100) if (avg_cost != 0.0 and quantity != 0.0) else 0.0
+
+    # Theta decay criterion
+    if max_profit > 0.0 and unrealized >= _THETA_DECAY_THRESHOLD * max_profit:
+        score += _EXIT_W_THETA
+        reasons.append(f"theta_decay {unrealized/max_profit:.0%}")
+
+    # Loss limit criterion
+    if max_profit > 0.0 and unrealized < -_LOSS_LIMIT_THRESHOLD * max_profit:
+        score += _EXIT_W_LOSS
+        reasons.append(f"loss_limit {unrealized/max_profit:.0%}")
+
+    # Time stop criterion
+    exp_date = _parse_expiry(pos.get("expiry"))
+    if exp_date is not None:
+        dte_rem = (exp_date - today).days
+        if dte_rem <= _TIME_STOP_DTE:
+            score += _EXIT_W_TIME
+            reasons.append(f"time_stop dte={dte_rem}")
+
+    return score, reasons
+
+
+@app.get("/opz/opportunity/exit_candidates")
+def opz_exit_candidates(top_n: int = 10, min_score: int = 1) -> Dict[str, Any]:
+    """
+    Score open option positions for exit urgency.
+
+    Source precedence:
+      1. IBKR live positions  (if connected)
+      2. paper_trades open    (exit_ts_utc IS NULL — fallback for dev/paper)
+
+    Exit criteria (additive score):
+      +3  theta_decay : unrealized_pnl >= 70% of max_profit
+      +4  loss_limit  : unrealized_pnl < -50% of max_profit
+      +2  time_stop   : dte_remaining <= 7
+
+    Returns top_n candidates with score >= min_score, sorted desc by score.
+    Always ok=True (errors degrade gracefully).
+    """
+    today = date.today()
+    candidates: list[dict] = []
+    source = "none"
+
+    # ── 1. IBKR live positions ────────────────────────────────────────────────
+    try:
+        from execution.ibkr_connection import get_manager
+        mgr = get_manager()
+        if mgr.is_connected:
+            ib = mgr._ib
+            if ib is not None and ib.isConnected():
+                portfolio = ib.portfolio()
+                for item in portfolio:
+                    contract = item.contract
+                    if getattr(contract, "secType", "") not in ("OPT", "FOP"):
+                        continue
+                    pos = {
+                        "symbol":         getattr(contract, "symbol", "?"),
+                        "expiry":         getattr(contract, "lastTradeDateOrContractMonth", None),
+                        "strike":         getattr(contract, "strike", None),
+                        "right":          getattr(contract, "right", None),
+                        "quantity":       item.position,
+                        "avg_cost":       item.averageCost,
+                        "market_price":   item.marketPrice,
+                        "unrealized_pnl": item.unrealizedPNL,
+                        "source":         "ibkr_live",
+                    }
+                    sc, reasons = _score_position(pos, today)
+                    pos["exit_score"] = sc
+                    pos["exit_reasons"] = reasons
+                    candidates.append(pos)
+                source = "ibkr_live"
+    except Exception as exc:
+        logger.debug("exit_candidates IBKR fetch skipped: %s", exc)
+
+    # ── 2. Fallback: paper_trades open positions ──────────────────────────────
+    if not candidates:
+        try:
+            db_path = str(DB_PATH)
+            with duckdb.connect(db_path, read_only=True) as con:
+                rows = con.execute(
+                    """
+                    SELECT symbol, entry_ts_utc, strikes_json, score_at_entry, pnl
+                    FROM   paper_trades
+                    WHERE  exit_ts_utc IS NULL
+                    ORDER  BY entry_ts_utc DESC
+                    LIMIT  100
+                    """
+                ).fetchall()
+            for r in rows:
+                sym         = str(r[0]) if r[0] else "?"
+                strikes_raw = str(r[2]) if r[2] else "{}"
+                pnl         = float(r[4]) if r[4] is not None else 0.0
+                try:
+                    strikes = json.loads(strikes_raw)
+                except (json.JSONDecodeError, TypeError):
+                    strikes = {}
+                expiry = strikes.get("expiry") or strikes.get("exp") or strikes.get("expiry_date")
+                pos = {
+                    "symbol":         sym,
+                    "expiry":         expiry,
+                    "strike":         strikes.get("strike"),
+                    "right":          strikes.get("right"),
+                    "quantity":       -1,             # short = negative qty
+                    "avg_cost":       float(strikes.get("premium", 0.0)),
+                    "market_price":   None,
+                    "unrealized_pnl": pnl,
+                    "source":         "paper_trades",
+                }
+                sc, reasons = _score_position(pos, today)
+                pos["exit_score"] = sc
+                pos["exit_reasons"] = reasons
+                candidates.append(pos)
+            if candidates:
+                source = "paper_trades"
+        except Exception as exc:
+            logger.debug("exit_candidates paper_trades fetch skipped: %s", exc)
+
+    # ── 3. Filter + sort ──────────────────────────────────────────────────────
+    filtered = [c for c in candidates if c["exit_score"] >= min_score]
+    filtered.sort(key=lambda x: x["exit_score"], reverse=True)
+    top = filtered[:top_n]
+
+    return {
+        "ok":         True,
+        "source":     source,
+        "today":      today.isoformat(),
+        "n_total":    len(candidates),
+        "n_flagged":  len(filtered),
+        "candidates": top,
+        "thresholds": {
+            "theta_decay_pct":  _THETA_DECAY_THRESHOLD,
+            "loss_limit_pct":   _LOSS_LIMIT_THRESHOLD,
+            "time_stop_dte":    _TIME_STOP_DTE,
+        },
     }
 
 
