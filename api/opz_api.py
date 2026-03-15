@@ -1501,6 +1501,7 @@ def opz_opportunity_scan_full(req: ScanFullRequest) -> Dict[str, Any]:
         "profile": result.profile,
         "regime": result.regime,
         "data_mode": result.data_mode,
+        "events_source": getattr(result, "events_source", "yfinance"),
         "scan_ts": result.scan_ts,
         "symbols_scanned": result.symbols_scanned,
         "symbols_with_chain": result.symbols_with_chain,

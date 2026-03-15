@@ -842,6 +842,7 @@ class ScanResult:
     candidates: list                       # list[OpportunityCandidate]
     ranking_suspended: bool
     suspension_reason: Optional[str]
+    events_source: str = "yfinance"        # "ibkr_live" | "yfinance" | "events_map" | "none"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1234,6 +1235,7 @@ def scan_opportunities(
             candidates=[],
             ranking_suspended=True,
             suspension_reason="SHOCK regime — no new positions allowed",
+            events_source="none",
         )
 
     if symbols is None or len(symbols) == 0:
@@ -1250,7 +1252,18 @@ def scan_opportunities(
             candidates=[],
             ranking_suspended=False,
             suspension_reason=None,
+            events_source="none",
         )
+
+    # ── Determina events_source prima del loop ────────────────────────────
+    if events_map is not None:
+        _events_source = "events_map"
+    else:
+        try:
+            from execution.ibkr_connection import get_manager as _get_ibkr_mgr
+            _events_source = "ibkr_live" if _get_ibkr_mgr().is_connected else "yfinance"
+        except Exception:
+            _events_source = "yfinance"
 
     candidates: list[OpportunityCandidate] = []
     total_filtered = 0
@@ -1368,4 +1381,5 @@ def scan_opportunities(
         candidates=top_candidates,
         ranking_suspended=False,
         suspension_reason=None,
+        events_source=_events_source,
     )
