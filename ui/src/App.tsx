@@ -198,6 +198,14 @@ type IbkrStatusResponse = {
   client_id: number; source_system: string; connected_at: string | null;
   ports_probed: number[]; message: string;
 };
+type SystemSignal = { name: string; status: "OK" | "WARN" | "ALERT" | "DISABLED"; detail: string };
+type SystemStatusResponse = {
+  ok: boolean; timestamp_utc: string; api_online: boolean;
+  kill_switch_active: boolean; data_mode: string; kelly_enabled: boolean;
+  ibkr_connected: boolean; ibkr_port: number | null; ibkr_source_system: string;
+  ibkr_connected_at: string | null; execution_config_ready: boolean;
+  n_closed_trades: number; regime: string; signals: SystemSignal[];
+};
 type IbkrAccountPosition = {
   symbol: string; sec_type: string; expiry: string | null; strike: number | null;
   right: string | null; quantity: number; avg_cost: number;
@@ -406,6 +414,7 @@ export default function App() {
   const [ibkrChecking, setIbkrChecking] = useState<boolean>(false);
   const [ibkrAccount, setIbkrAccount] = useState<IbkrAccountResponse | null>(null);
   const [ibkrAccountLoading, setIbkrAccountLoading] = useState<boolean>(false);
+  const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -1125,6 +1134,13 @@ export default function App() {
     finally { setIbkrAccountLoading(false); }
   }
 
+  async function doFetchSysStatus() {
+    try {
+      const r = await apiJson<SystemStatusResponse>(`${API_BASE}/opz/system/status`);
+      setSysStatus(r);
+    } catch (e) { /* silenzioso */ }
+  }
+
   const goGate = paperSummary?.gates.go_nogo;
   const f6Gate = paperSummary?.gates.f6_t1_acceptance;
   const f6t2Gate = paperSummary?.gates.f6_t2_journal_complete;
@@ -1253,6 +1269,13 @@ export default function App() {
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-fetch system status on mount + poll every 15s
+  useEffect(() => {
+    void doFetchSysStatus();
+    const id = window.setInterval(() => void doFetchSysStatus(), 15_000);
+    return () => window.clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const navItems: Array<{ id: TabKey; label: string }> = [
     { id: "warroom", label: "WAR ROOM" },
     { id: "universe", label: "UNIVERSE SCANNER" },
@@ -1363,16 +1386,54 @@ export default function App() {
               </article>
 
               <article className="panel">
-                <div className="panel-title">ALERT FEED</div>
-                <ul className="activity-list">
-                  <li>API: {apiOnline ? "ONLINE" : "OFFLINE"}</li>
-                  <li>Execution config: {executionConfigReady ? "VALID" : "INVALID"}</li>
-                  <li>Paper data: {hasPaperData ? "PRESENT" : "MISSING"}</li>
-                  <li>Blocked steps: {blockedCount}</li>
-                  {(lastActions?.paper_trades ?? []).slice(0, 5).map((x, i) => (
-                    <li key={`af-${i}`}><code>{fmtTs(x.ts_utc)}</code> {x.symbol}/{x.strategy} pnl={x.pnl ?? "-"}</li>
-                  ))}
-                </ul>
+                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>SYSTEM STATUS</span>
+                  <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "2px 6px" }}
+                    onClick={() => void doFetchSysStatus()}>⟳</button>
+                </div>
+
+                {/* Signal grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "3px 8px", alignItems: "center", fontSize: "0.72rem", marginTop: 4 }}>
+                  {(sysStatus?.signals ?? []).map((sig) => {
+                    const color = sig.status === "OK" ? "#4ade80"
+                      : sig.status === "ALERT" ? "#f87171"
+                      : sig.status === "DISABLED" ? "#666"
+                      : "#fbbf24"; // WARN
+                    return [
+                      <span key={`sn-${sig.name}`} className="dim" style={{ whiteSpace: "nowrap" }}>{sig.name}</span>,
+                      <span key={`sd-${sig.name}`} style={{ color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sig.detail}</span>,
+                      <span key={`ss-${sig.name}`} style={{ color, fontWeight: 700, textAlign: "right" }}>{sig.status}</span>,
+                    ];
+                  })}
+
+                  {/* Campi aggiuntivi */}
+                  <span className="dim">regime</span>
+                  <span style={{ color: sysStatus?.regime === "SHOCK" ? "#f87171" : sysStatus?.regime === "CAUTION" ? "#fbbf24" : "#4ade80" }}>
+                    {sysStatus?.regime ?? "—"}
+                  </span>
+                  <span />
+
+                  <span className="dim">trades chiusi</span>
+                  <span>{sysStatus?.n_closed_trades ?? "—"}</span>
+                  <span />
+
+                  <span className="dim">api</span>
+                  <span>{apiOnline ? "ONLINE" : "OFFLINE"}</span>
+                  <span style={{ color: apiOnline ? "#4ade80" : "#f87171", fontWeight: 700 }}>{apiOnline ? "OK" : "ALERT"}</span>
+                </div>
+
+                {sysStatus?.kill_switch_active && (
+                  <div style={{ marginTop: 8, padding: "6px 10px", background: "#3a1010", border: "1px solid #f87171", borderRadius: 4, color: "#f87171", fontWeight: 700, fontSize: "0.75rem" }}>
+                    ⚠ KILL SWITCH ATTIVO — Esecuzione bloccata
+                  </div>
+                )}
+
+                {sysStatus?.timestamp_utc && (
+                  <div className="dim" style={{ marginTop: 4, fontSize: "0.65rem" }}>
+                    Agg: {fmtTs(sysStatus.timestamp_utc)}
+                  </div>
+                )}
+
                 <div className="panel-title mt10">AUTOMATION PIPELINE</div>
                 <div className="pipeline-row">
                   <span className="pipe-step done">DATA</span>

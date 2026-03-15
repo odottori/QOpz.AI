@@ -1769,6 +1769,145 @@ def opz_ibkr_account() -> Dict[str, Any]:
         }
 
 
+@app.get("/opz/system/status")
+def opz_system_status() -> Dict[str, Any]:
+    """
+    Snapshot aggregato dello stato operativo del sistema.
+
+    Campi ritornati:
+      ok                     bool   — sempre True
+      timestamp_utc          str    — ISO 8601
+      api_online             bool   — True (se risponde, è online)
+      kill_switch_active     bool   — file ops/kill_switch.trigger presente
+      data_mode              str    — da OPZ_DATA_MODE env (o default)
+      kelly_enabled          bool   — data_mode=VENDOR_REAL_CHAIN + n_closed≥50
+      ibkr_connected         bool   — IBKRConnectionManager.is_connected
+      ibkr_port              int|null
+      ibkr_source_system     str    — "ibkr_live" | "yfinance"
+      ibkr_connected_at      str|null
+      execution_config_ready bool   — config/dev.toml o paper.toml esiste
+      n_closed_trades        int    — da DuckDB paper_trades
+      regime                 str    — ultima riga regime DuckDB o "UNKNOWN"
+      signals                list[dict] — semafori operativi [name, status, detail]
+    """
+    ts_now = datetime.now(timezone.utc).isoformat()
+
+    # ── Kill switch ───────────────────────────────────────────────────────────
+    ks_path = Path("ops/kill_switch.trigger")
+    kill_switch_active = ks_path.exists()
+
+    # ── Data mode ─────────────────────────────────────────────────────────────
+    data_mode = os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
+
+    # ── IBKR ──────────────────────────────────────────────────────────────────
+    ibkr_connected = False
+    ibkr_port: int | None = None
+    ibkr_source_system = "yfinance"
+    ibkr_connected_at: str | None = None
+    try:
+        from execution.ibkr_connection import get_manager as _get_ibkr_mgr
+        _mgr = _get_ibkr_mgr()
+        info = _mgr.connection_info()
+        ibkr_connected = bool(info.get("connected"))
+        ibkr_port = info.get("port")
+        ibkr_source_system = info.get("source_system", "yfinance")
+        ibkr_connected_at = info.get("connected_at")
+    except Exception:
+        pass
+
+    # ── Execution config ──────────────────────────────────────────────────────
+    execution_config_ready = (
+        Path("config/dev.toml").exists()
+        or Path("config/paper.toml").exists()
+        or Path("config/live.toml").exists()
+    )
+
+    # ── n_closed_trades (DuckDB) ──────────────────────────────────────────────
+    n_closed_trades = 0
+    try:
+        import duckdb
+        import execution.storage as _st
+        db_path = str(_st.EXEC_DB_PATH)
+        if Path(db_path).exists():
+            con = duckdb.connect(db_path, read_only=True)
+            row = con.execute("SELECT COUNT(*) FROM paper_trades WHERE exit_ts_utc IS NOT NULL").fetchone()
+            con.close()
+            n_closed_trades = int(row[0]) if row else 0
+    except Exception:
+        pass
+
+    # ── Kelly gate ────────────────────────────────────────────────────────────
+    kelly_enabled = (data_mode == "VENDOR_REAL_CHAIN") and (n_closed_trades >= 50)
+
+    # ── Regime (last record) ──────────────────────────────────────────────────
+    regime = "UNKNOWN"
+    try:
+        import duckdb
+        import execution.storage as _st
+        db_path = str(_st.EXEC_DB_PATH)
+        if Path(db_path).exists():
+            con = duckdb.connect(db_path, read_only=True)
+            try:
+                row = con.execute(
+                    "SELECT regime FROM paper_trades WHERE regime IS NOT NULL ORDER BY entry_ts_utc DESC LIMIT 1"
+                ).fetchone()
+                if row:
+                    regime = str(row[0])
+            except Exception:
+                pass
+            finally:
+                con.close()
+    except Exception:
+        pass
+
+    # ── Semafori operativi ────────────────────────────────────────────────────
+    signals: list[dict] = [
+        {
+            "name": "kill_switch",
+            "status": "ALERT" if kill_switch_active else "OK",
+            "detail": "ATTIVO — esecuzione bloccata" if kill_switch_active else "Inattivo",
+        },
+        {
+            "name": "ibkr",
+            "status": "OK" if ibkr_connected else "WARN",
+            "detail": f"Porta {ibkr_port}" if ibkr_connected else "Fallback yfinance",
+        },
+        {
+            "name": "data_mode",
+            "status": "OK" if data_mode == "VENDOR_REAL_CHAIN" else "WARN",
+            "detail": data_mode,
+        },
+        {
+            "name": "kelly",
+            "status": "OK" if kelly_enabled else "DISABLED",
+            "detail": f"Abilitato (n={n_closed_trades})" if kelly_enabled
+                      else f"Disabilitato (n={n_closed_trades} / data_mode={data_mode})",
+        },
+        {
+            "name": "execution_config",
+            "status": "OK" if execution_config_ready else "ALERT",
+            "detail": "Config trovata" if execution_config_ready else "Nessun config trovato",
+        },
+    ]
+
+    return {
+        "ok": True,
+        "timestamp_utc": ts_now,
+        "api_online": True,
+        "kill_switch_active": kill_switch_active,
+        "data_mode": data_mode,
+        "kelly_enabled": kelly_enabled,
+        "ibkr_connected": ibkr_connected,
+        "ibkr_port": ibkr_port,
+        "ibkr_source_system": ibkr_source_system,
+        "ibkr_connected_at": ibkr_connected_at,
+        "execution_config_ready": execution_config_ready,
+        "n_closed_trades": n_closed_trades,
+        "regime": regime,
+        "signals": signals,
+    }
+
+
 @app.post("/opz/demo_pipeline/auto")
 def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")
