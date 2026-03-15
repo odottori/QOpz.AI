@@ -1384,10 +1384,11 @@ export default function App() {
 
   useEffect(() => {
     if (!message && !error) return;
+    const timeout = error ? 10000 : 5000; // errori visibili 10s, info 5s
     const id = window.setTimeout(() => {
       setMessage("");
       setError("");
-    }, 5000);
+    }, timeout);
     return () => window.clearTimeout(id);
   }, [message, error]);
 
@@ -1631,7 +1632,7 @@ export default function App() {
                 <div className="gate-line"><span>F6-T1 acceptance</span>{f6Gate ? <GateBadge pass={f6Gate.pass} /> : <span className="dim">-</span>}</div>
                 {f6Gate?.reasons.map((r) => <div key={`f6-${r}`} className="reason">- {r}</div>)}
                 <div className="gate-line"><span>F6-T2 completeness</span>{f6t2Gate ? <GateBadge pass={f6t2Gate.pass} /> : <span className="dim">-</span>}</div>
-                {f6t2Gate && <div className="dim">ratio={(f6t2Gate.completeness_ratio * 100).toFixed(2)}%</div>}
+                {f6t2Gate && <div className="dim">completeness: {(f6t2Gate.completeness_ratio * 100).toFixed(0)}%</div>}
               </article>
 
               <article className="panel">
@@ -1665,7 +1666,7 @@ export default function App() {
                   </span>
                   <span />
 
-                  <span className="dim">trades chiusi</span>
+                  <span className="dim">trades completati</span>
                   <span>{sysStatus?.n_closed_trades ?? "—"}</span>
                   <span />
 
@@ -1825,6 +1826,18 @@ export default function App() {
                           ? `${ibkrAccount.unrealized_pnl >= 0 ? "+" : ""}${ibkrAccount.unrealized_pnl.toFixed(2)}`
                           : "—"}
                       </span>
+                      {ibkrAccount.net_liquidation != null && ibkrAccount.net_liquidation > 0 && (() => {
+                        const totalPnl = (ibkrAccount.realized_pnl ?? 0) + (ibkrAccount.unrealized_pnl ?? 0);
+                        const pct = (totalPnl / ibkrAccount.net_liquidation) * 100;
+                        return (
+                          <>
+                            <span className="dim">P&amp;L portafoglio %</span>
+                            <span style={{ color: pct >= 0 ? "#4ade80" : "#f87171", fontWeight: 600 }}>
+                              {pct >= 0 ? "+" : ""}{pct.toFixed(2)}%
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div className="panel-title mt10">
@@ -2270,7 +2283,7 @@ export default function App() {
                           <td>{i + 1}</td>
                           <td>{c.symbol}</td>
                           <td>{c.strategy.replace("_", " ")}</td>
-                          <td className={c.score >= 75 ? "val-good" : "val-warn"}>{c.score.toFixed(1)}</td>
+                          <td className={c.score >= 75 ? "val-good" : "val-warn"}>{c.score.toFixed(1)}/100</td>
                           <td>{c.iv_zscore_30 !== null ? c.iv_zscore_30.toFixed(2) : "-"}</td>
                           <td>{c.expected_move !== null ? `${(c.expected_move * 100).toFixed(1)}%` : "-"}</td>
                           <td>{c.dte}</td>
@@ -2322,7 +2335,7 @@ export default function App() {
                       {selectedScanCandidate.human_review_required && <span className="val-warn" style={{ marginLeft: "8px" }}>⚠ REVIEW</span>}
                     </div>
                     <ul className="activity-list">
-                      <li>Score: <span className={selectedScanCandidate.score >= 75 ? "val-good" : "val-warn"}>{selectedScanCandidate.score.toFixed(2)}</span> &nbsp;|&nbsp; Expiry: {selectedScanCandidate.expiry} &nbsp;|&nbsp; DTE: {selectedScanCandidate.dte}</li>
+                      <li>Score: <span className={selectedScanCandidate.score >= 75 ? "val-good" : "val-warn"}>{selectedScanCandidate.score.toFixed(2)}/100</span> &nbsp;|&nbsp; Expiry: {selectedScanCandidate.expiry} &nbsp;|&nbsp; DTE: {selectedScanCandidate.dte}</li>
                       <li>IV: {(selectedScanCandidate.iv * 100).toFixed(1)}% &nbsp;|&nbsp; Z-30: {selectedScanCandidate.iv_zscore_30?.toFixed(2) ?? "-"} &nbsp;|&nbsp; Z-60: {selectedScanCandidate.iv_zscore_60?.toFixed(2) ?? "-"} &nbsp;|&nbsp; <em>{selectedScanCandidate.iv_interp ?? "-"}</em></li>
                       <li>EM: {selectedScanCandidate.expected_move !== null ? `${(selectedScanCandidate.expected_move * 100).toFixed(2)}%` : "-"} &nbsp;|&nbsp; δ: {selectedScanCandidate.delta.toFixed(2)} &nbsp;|&nbsp; Spread: {selectedScanCandidate.spread_pct.toFixed(2)}%</li>
                       <li>Strikes: [{selectedScanCandidate.strikes.join(", ")}] &nbsp;|&nbsp; Spot: {selectedScanCandidate.underlying_price.toFixed(2)}</li>
