@@ -206,6 +206,12 @@ type SystemStatusResponse = {
   ibkr_connected_at: string | null; execution_config_ready: boolean;
   n_closed_trades: number; regime: string; signals: SystemSignal[];
 };
+type RegimeCurrentResponse = {
+  ok: boolean; regime: string;
+  regime_counts: { NORMAL: number; CAUTION: number; SHOCK: number };
+  regime_pct: { NORMAL: number; CAUTION: number; SHOCK: number };
+  last_scan_ts: string | null; n_recent: number; source: string;
+};
 type IbkrAccountPosition = {
   symbol: string; sec_type: string; expiry: string | null; strike: number | null;
   right: string | null; quantity: number; avg_cost: number;
@@ -415,6 +421,7 @@ export default function App() {
   const [ibkrAccount, setIbkrAccount] = useState<IbkrAccountResponse | null>(null);
   const [ibkrAccountLoading, setIbkrAccountLoading] = useState<boolean>(false);
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
+  const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -1141,6 +1148,13 @@ export default function App() {
     } catch (e) { /* silenzioso */ }
   }
 
+  async function doFetchRegimeCurrent() {
+    try {
+      const r = await apiJson<RegimeCurrentResponse>(`${API_BASE}/opz/regime/current?window=30`);
+      setRegimeCurrent(r);
+    } catch (e) { /* silenzioso */ }
+  }
+
   const goGate = paperSummary?.gates.go_nogo;
   const f6Gate = paperSummary?.gates.f6_t1_acceptance;
   const f6t2Gate = paperSummary?.gates.f6_t2_journal_complete;
@@ -1273,6 +1287,13 @@ export default function App() {
   useEffect(() => {
     void doFetchSysStatus();
     const id = window.setInterval(() => void doFetchSysStatus(), 15_000);
+    return () => window.clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-fetch regime current on mount + poll every 30s
+  useEffect(() => {
+    void doFetchRegimeCurrent();
+    const id = window.setInterval(() => void doFetchRegimeCurrent(), 30_000);
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1431,6 +1452,52 @@ export default function App() {
                 {sysStatus?.timestamp_utc && (
                   <div className="dim" style={{ marginTop: 4, fontSize: "0.65rem" }}>
                     Agg: {fmtTs(sysStatus.timestamp_utc)}
+                  </div>
+                )}
+
+                {/* ── ROC9: Regime distribution bar ──────────────────────── */}
+                <div className="panel-title mt10" style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>REGIME ({regimeCurrent?.n_recent ?? 0} sample)</span>
+                  <span style={{
+                    fontWeight: 700, fontSize: "0.72rem",
+                    color: regimeCurrent?.regime === "SHOCK" ? "#f87171"
+                      : regimeCurrent?.regime === "CAUTION" ? "#fbbf24"
+                      : regimeCurrent?.regime === "NORMAL" ? "#4ade80"
+                      : "#666",
+                  }}>
+                    {regimeCurrent?.regime ?? "—"}
+                  </span>
+                </div>
+
+                {regimeCurrent && regimeCurrent.n_recent > 0 ? (
+                  <>
+                    {/* Stacked bar */}
+                    <div style={{ display: "flex", height: 10, borderRadius: 4, overflow: "hidden", gap: 1, marginTop: 2 }}>
+                      {(["NORMAL", "CAUTION", "SHOCK"] as const).map((lbl) => {
+                        const pct = regimeCurrent.regime_pct[lbl] ?? 0;
+                        const color = lbl === "NORMAL" ? "#4ade80" : lbl === "CAUTION" ? "#fbbf24" : "#f87171";
+                        return pct > 0 ? (
+                          <div key={lbl} style={{ width: `${pct}%`, background: color, transition: "width 0.4s" }} title={`${lbl}: ${pct}%`} />
+                        ) : null;
+                      })}
+                    </div>
+                    {/* Legend */}
+                    <div style={{ display: "flex", gap: 10, fontSize: "0.65rem", marginTop: 3 }}>
+                      {(["NORMAL", "CAUTION", "SHOCK"] as const).map((lbl) => {
+                        const color = lbl === "NORMAL" ? "#4ade80" : lbl === "CAUTION" ? "#fbbf24" : "#f87171";
+                        const pct = regimeCurrent.regime_pct[lbl] ?? 0;
+                        const cnt = regimeCurrent.regime_counts[lbl] ?? 0;
+                        return (
+                          <span key={lbl} style={{ color }}>
+                            {lbl[0]}{lbl.slice(1).toLowerCase()} {pct}% ({cnt})
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <div className="dim" style={{ fontSize: "0.7rem" }}>
+                    {regimeCurrent ? "Nessun dato campione" : "Caricamento…"}
                   </div>
                 )}
 

@@ -1769,6 +1769,109 @@ def opz_ibkr_account() -> Dict[str, Any]:
         }
 
 
+@app.get("/opz/regime/current")
+def opz_regime_current(window: int = 20) -> Dict[str, Any]:
+    """
+    Regime corrente basato sugli ultimi N candidati registrati in DuckDB.
+
+    Parametri:
+      window  int  — quanti record recenti considerare (default 20, max 100)
+
+    Response:
+      ok              bool
+      regime          str   — regime più frequente (NORMAL/CAUTION/SHOCK/UNKNOWN)
+      regime_counts   dict  — {NORMAL: int, CAUTION: int, SHOCK: int}
+      regime_pct      dict  — {NORMAL: float, CAUTION: float, SHOCK: float}
+      last_scan_ts    str|null — ISO timestamp ultimo candidato
+      n_recent        int   — record trovati nella finestra
+      source          str   — "opportunity_candidates" | "paper_trades" | "none"
+    """
+    n = max(1, min(int(window), 100))
+    counts: dict[str, int] = {"NORMAL": 0, "CAUTION": 0, "SHOCK": 0}
+    last_scan_ts: str | None = None
+    source = "none"
+    regime = "UNKNOWN"
+
+    try:
+        import duckdb
+        import execution.storage as _st
+        db_path = str(_st.EXEC_DB_PATH)
+        if Path(db_path).exists():
+            con = duckdb.connect(db_path, read_only=True)
+            try:
+                rows = con.execute(
+                    """
+                    SELECT regime, scan_ts
+                    FROM opportunity_candidates
+                    WHERE regime IS NOT NULL
+                    ORDER BY scan_ts DESC
+                    LIMIT ?
+                    """,
+                    (n,),
+                ).fetchall()
+                if rows:
+                    source = "opportunity_candidates"
+                    for row in rows:
+                        lbl = str(row[0]).strip().upper()
+                        if lbl in counts:
+                            counts[lbl] += 1
+                    # last_scan_ts = most recent (first row after DESC order)
+                    ts_raw = rows[0][1]
+                    if ts_raw is not None:
+                        try:
+                            from datetime import datetime, timezone
+                            if hasattr(ts_raw, "isoformat"):
+                                last_scan_ts = ts_raw.isoformat()
+                            else:
+                                last_scan_ts = str(ts_raw)
+                        except Exception:
+                            last_scan_ts = str(ts_raw)
+                else:
+                    # Fallback: paper_trades
+                    rows2 = con.execute(
+                        """
+                        SELECT regime_at_entry, entry_ts_utc
+                        FROM paper_trades
+                        WHERE regime_at_entry IS NOT NULL
+                        ORDER BY entry_ts_utc DESC
+                        LIMIT ?
+                        """,
+                        (n,),
+                    ).fetchall()
+                    if rows2:
+                        source = "paper_trades"
+                        for row in rows2:
+                            lbl = str(row[0]).strip().upper()
+                            if lbl in counts:
+                                counts[lbl] += 1
+                        ts_raw2 = rows2[0][1]
+                        if ts_raw2 is not None:
+                            last_scan_ts = str(ts_raw2)
+            finally:
+                con.close()
+    except Exception:
+        pass
+
+    total = sum(counts.values())
+    regime_pct = {
+        k: round(v / total * 100, 1) if total > 0 else 0.0
+        for k, v in counts.items()
+    }
+
+    if total > 0:
+        regime = max(counts, key=lambda k: counts[k])
+
+    return {
+        "ok": True,
+        "regime": regime,
+        "regime_counts": counts,
+        "regime_pct": regime_pct,
+        "last_scan_ts": last_scan_ts,
+        "n_recent": total,
+        "source": source,
+    }
+
+
 @app.get("/opz/system/status")
 def opz_system_status() -> Dict[str, Any]:
     """
