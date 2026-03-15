@@ -198,6 +198,19 @@ type IbkrStatusResponse = {
   client_id: number; source_system: string; connected_at: string | null;
   ports_probed: number[]; message: string;
 };
+type IbkrAccountPosition = {
+  symbol: string; sec_type: string; expiry: string | null; strike: number | null;
+  right: string | null; quantity: number; avg_cost: number;
+  market_price: number; market_value: number;
+  unrealized_pnl: number; realized_pnl: number;
+};
+type IbkrAccountResponse = {
+  ok: boolean; connected: boolean; source_system: string;
+  account_id: string | null; net_liquidation: number | null;
+  realized_pnl: number | null; unrealized_pnl: number | null;
+  buying_power: number | null; positions: IbkrAccountPosition[];
+  message: string;
+};
 type EvReportResponse = {
   ok: boolean; profile: string; window_days: number; generated_at: string;
   total_candidates: number; total_tracked: number; data_mode: string;
@@ -391,6 +404,8 @@ export default function App() {
   const [evReport, setEvReport] = useState<EvReportResponse | null>(null);
   const [ibkrStatus, setIbkrStatus] = useState<IbkrStatusResponse | null>(null);
   const [ibkrChecking, setIbkrChecking] = useState<boolean>(false);
+  const [ibkrAccount, setIbkrAccount] = useState<IbkrAccountResponse | null>(null);
+  const [ibkrAccountLoading, setIbkrAccountLoading] = useState<boolean>(false);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -1095,8 +1110,19 @@ export default function App() {
       );
       setIbkrStatus(r);
       setMessage(r.message);
+      // Aggiorna account solo se connesso
+      if (r.connected) void doFetchIbkrAccount();
     } catch (e) { setError(String(e)); }
     finally { setIbkrChecking(false); }
+  }
+
+  async function doFetchIbkrAccount() {
+    setIbkrAccountLoading(true);
+    try {
+      const r = await apiJson<IbkrAccountResponse>(`${API_BASE}/opz/ibkr/account`);
+      setIbkrAccount(r);
+    } catch (e) { /* silenzioso: account non critico */ }
+    finally { setIbkrAccountLoading(false); }
   }
 
   const goGate = paperSummary?.gates.go_nogo;
@@ -1220,6 +1246,13 @@ export default function App() {
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-fetch IBKR account on mount + poll every 60s
+  useEffect(() => {
+    void doFetchIbkrAccount();
+    const id = window.setInterval(() => void doFetchIbkrAccount(), 60_000);
+    return () => window.clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const navItems: Array<{ id: TabKey; label: string }> = [
     { id: "warroom", label: "WAR ROOM" },
     { id: "universe", label: "UNIVERSE SCANNER" },
@@ -1306,7 +1339,7 @@ export default function App() {
           </div>
 
                     {activeTab === "warroom" && (
-            <div className="panel-grid two">
+            <div className="panel-grid three">
               <article className="panel">
                 <div className="panel-title">DRAWDOWN CONTROL - 3 LAYER</div>
                 <div className="dd-gauge">
@@ -1352,6 +1385,105 @@ export default function App() {
                   <span className="pipe-arrow">→</span>
                   <span className="pipe-step wait">KELLY</span>
                 </div>
+              </article>
+
+              {/* ── ROC7: IBKR ACCOUNT panel ──────────────────────────────── */}
+              <article className="panel">
+                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>IBKR ACCOUNT</span>
+                  <span style={{
+                    fontSize: "0.7rem", padding: "2px 8px", borderRadius: 4,
+                    background: ibkrAccount?.connected ? "#1a4a1a" : "#2a2a2a",
+                    color: ibkrAccount?.connected ? "#4ade80" : "#666",
+                    border: `1px solid ${ibkrAccount?.connected ? "#4ade80" : "#444"}`,
+                  }}>
+                    {ibkrAccount?.connected ? `LIVE · ${ibkrAccount.account_id ?? "—"}` : "NOT CONNECTED"}
+                  </span>
+                </div>
+
+                {ibkrAccountLoading && <div className="dim">Caricamento account…</div>}
+
+                {!ibkrAccount && !ibkrAccountLoading && (
+                  <div className="dim">Nessun dato — clicca ⟳ per aggiornare.</div>
+                )}
+
+                {ibkrAccount && (
+                  <>
+                    <div className="form-grid" style={{ marginTop: 8 }}>
+                      <span className="dim">Net Liq</span>
+                      <span style={{ color: "#4ade80", fontWeight: 600 }}>
+                        {ibkrAccount.net_liquidation != null
+                          ? `€${ibkrAccount.net_liquidation.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
+                          : "—"}
+                      </span>
+                      <span className="dim">Buying Power</span>
+                      <span>
+                        {ibkrAccount.buying_power != null
+                          ? `€${ibkrAccount.buying_power.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
+                          : "—"}
+                      </span>
+                      <span className="dim">P&amp;L realizzato</span>
+                      <span style={{ color: (ibkrAccount.realized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
+                        {ibkrAccount.realized_pnl != null
+                          ? `${ibkrAccount.realized_pnl >= 0 ? "+" : ""}${ibkrAccount.realized_pnl.toFixed(2)}`
+                          : "—"}
+                      </span>
+                      <span className="dim">P&amp;L non realizzato</span>
+                      <span style={{ color: (ibkrAccount.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
+                        {ibkrAccount.unrealized_pnl != null
+                          ? `${ibkrAccount.unrealized_pnl >= 0 ? "+" : ""}${ibkrAccount.unrealized_pnl.toFixed(2)}`
+                          : "—"}
+                      </span>
+                    </div>
+
+                    <div className="panel-title mt10">
+                      POSIZIONI APERTE ({ibkrAccount.positions.length})
+                    </div>
+                    {ibkrAccount.positions.length === 0 ? (
+                      <div className="dim">Nessuna posizione aperta.</div>
+                    ) : (
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", fontSize: "0.7rem", borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr style={{ color: "#666", borderBottom: "1px solid #333" }}>
+                              <th style={{ textAlign: "left", padding: "2px 4px" }}>Sym</th>
+                              <th style={{ textAlign: "left", padding: "2px 4px" }}>Exp</th>
+                              <th style={{ textAlign: "right", padding: "2px 4px" }}>Strike</th>
+                              <th style={{ textAlign: "center", padding: "2px 4px" }}>P/C</th>
+                              <th style={{ textAlign: "right", padding: "2px 4px" }}>Qty</th>
+                              <th style={{ textAlign: "right", padding: "2px 4px" }}>MktVal</th>
+                              <th style={{ textAlign: "right", padding: "2px 4px" }}>uPnL</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ibkrAccount.positions.map((pos, i) => (
+                              <tr key={i} style={{ borderBottom: "1px solid #222" }}>
+                                <td style={{ padding: "2px 4px" }}>{pos.symbol}</td>
+                                <td style={{ padding: "2px 4px", color: "#888" }}>{pos.expiry ?? "—"}</td>
+                                <td style={{ padding: "2px 4px", textAlign: "right" }}>{pos.strike ?? "—"}</td>
+                                <td style={{ padding: "2px 4px", textAlign: "center", color: pos.right === "C" ? "#60a5fa" : "#fb923c" }}>{pos.right ?? "—"}</td>
+                                <td style={{ padding: "2px 4px", textAlign: "right", color: (pos.quantity ?? 0) < 0 ? "#f87171" : "#4ade80" }}>{pos.quantity}</td>
+                                <td style={{ padding: "2px 4px", textAlign: "right" }}>{pos.market_value?.toFixed(0) ?? "—"}</td>
+                                <td style={{ padding: "2px 4px", textAlign: "right", color: (pos.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
+                                  {pos.unrealized_pnl != null ? `${pos.unrealized_pnl >= 0 ? "+" : ""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <button
+                  className="btn btn-secondary mt10"
+                  style={{ fontSize: "0.7rem", padding: "3px 8px" }}
+                  disabled={ibkrAccountLoading}
+                  onClick={() => void doFetchIbkrAccount()}
+                >
+                  {ibkrAccountLoading ? "…" : "⟳ ACCOUNT"}
+                </button>
               </article>
             </div>
           )}
