@@ -1071,6 +1071,7 @@ def _build_candidate(
     iv_history: list[float],
     account_size: float = 10_000.0,
     signal_pct: Optional[float] = None,   # technical signal expected move % (decimal)
+    events_flag: Optional[str] = None,    # ROC2: "EARNINGS_2D"|"EARNINGS_7D"|"DIVIDEND_5D"|None
 ) -> Optional[OpportunityCandidate]:
     """
     Build an OpportunityCandidate from ChainFilterResult + ChainAnalytics.
@@ -1127,7 +1128,7 @@ def _build_candidate(
     signal_vs_em: Optional[float] = None
     if signal_pct is not None and em is not None and em > 0.0:
         signal_vs_em = round(signal_pct / em, 3)
-    human_review = (signal_vs_em is not None and signal_vs_em > 2.0)
+    human_review = (signal_vs_em is not None and signal_vs_em > 2.0) or (events_flag == "EARNINGS_7D")
 
     # ── Stress + sizing ───────────────────────────────────────────────────
     stress_base, stress_shock = _stress_estimate(strategy, credit_or_debit, max_loss)
@@ -1168,7 +1169,7 @@ def _build_candidate(
         credit_or_debit=round(credit_or_debit, 2),
         sizing_suggested=sizing,
         kelly_fraction=None,   # Kelly gate not unlocked in dev/paper
-        events_flag=None,      # ROC2 (calendar integration)
+        events_flag=events_flag,
         human_review_required=human_review,
         stress_base=stress_base,
         stress_shock=stress_shock,
@@ -1195,6 +1196,7 @@ def scan_opportunities(
     config: dict[str, Any] | None = None,
     account_size: float = 10_000.0,
     iv_history_map: dict[str, list[float]] | None = None,  # pre-loaded; if None → load from files
+    events_map: dict[str, Any] | None = None,  # ROC2: symbol → EventCheckResult; None → auto-fetch
     min_dte: int = DEFAULT_MIN_DTE,
     max_dte: int = DEFAULT_MAX_DTE,
     min_score: float = 60.0,
@@ -1299,6 +1301,30 @@ def scan_opportunities(
         if not strategy:
             continue
 
+        # ── Events check (ROC2) ──────────────────────────────────────────
+        ev_flag: Optional[str] = None
+        if events_map is not None and sym in events_map:
+            ev = events_map[sym]
+        else:
+            try:
+                from scripts.events_calendar import check_events as _check_events
+                ev = _check_events(sym)
+            except Exception:
+                ev = None
+
+        if ev is not None:
+            if ev.block_trade:
+                # EARNINGS_2D → blocco totale, nessun candidato per questo simbolo
+                continue
+            # EARNINGS_7D → nessuna strategia long-gamma
+            if ev.restrict_long_gamma:
+                from scripts.events_calendar import LONG_GAMMA_STRATEGIES
+                if strategy in LONG_GAMMA_STRATEGIES:
+                    strategy = _STRATEGY_BULL_PUT
+            # Flag per il candidato (earnings ha priorità su dividendo)
+            from scripts.events_calendar import combined_events_flag
+            ev_flag = combined_events_flag(ev)
+
         # ── Build candidate ──────────────────────────────────────────────
         spct = (signal_pct_map or {}).get(sym)
         candidate = _build_candidate(
@@ -1309,6 +1335,7 @@ def scan_opportunities(
             iv_history=iv_hist or [],
             account_size=account_size,
             signal_pct=spct,
+            events_flag=ev_flag,
         )
         if candidate is not None:
             candidates.append(candidate)
