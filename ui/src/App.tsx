@@ -1403,7 +1403,7 @@ export default function App() {
   // Auto-fetch exit candidates on mount + poll every 60s
   useEffect(() => {
     void doFetchExitCandidates();
-    const id = window.setInterval(() => void doFetchExitCandidates(), 60_000);
+    const id = window.setInterval(() => void doFetchExitCandidates(), 30_000); // 30s — urgency-sensitive
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1419,6 +1419,38 @@ export default function App() {
   const releaseView = useMemo(() => parseReleaseMd(releaseMd), [releaseMd]);
   const ddPct = (paperSummary?.max_drawdown ?? 0) * 100;
   const ddFill = Math.max(0, Math.min(100, (ddPct / 20) * 100));
+
+  // ── ROC16: Dynamic AUTOMATION PIPELINE states ─────────────────────────────
+  const pipeHasRegime  = (regimeCurrent?.n_recent ?? 0) > 0;
+  const pipeHasScore   = pipeHasRegime; // scan run implies scoring happened
+  const pipeKellyReady = sysStatus?.kelly_enabled === true;
+  const pipeRegimeStep = pipeHasRegime ? "done" : "wait";
+  const pipeScoreStep  = pipeHasScore  ? "run"  : "wait"; // 'run' = pulsing = active scoring
+  const pipeKellyStep  = pipeKellyReady ? "done" : "wait";
+
+  // ── ROC16: High-urgency exit signal ───────────────────────────────────────
+  const urgentExits = (exitCandidates?.candidates ?? []).filter(c => c.exit_score >= 5);
+  const hasUrgentExit = urgentExits.length > 0;
+
+  // Web Audio beep: triggered once when urgentExits count transitions 0→>0
+  const prevUrgentCount = useRef(0);
+  useEffect(() => {
+    const cur = urgentExits.length;
+    if (cur > prevUrgentCount.current && cur > 0) {
+      try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = "sine"; osc.frequency.value = 660;
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.35);
+        osc.onended = () => ctx.close();
+      } catch { /* browser may block before first user interaction */ }
+    }
+    prevUrgentCount.current = cur;
+  }, [urgentExits.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="terminal-app">
@@ -1636,18 +1668,47 @@ export default function App() {
                   <span className="pipe-arrow">→</span>
                   <span className="pipe-step done">IVR</span>
                   <span className="pipe-arrow">→</span>
-                  <span className="pipe-step done">REGIME</span>
+                  <span className={`pipe-step ${pipeRegimeStep}`}>REGIME</span>
                   <span className="pipe-arrow">→</span>
-                  <span className="pipe-step run">SCORE</span>
+                  <span className={`pipe-step ${pipeScoreStep}`}>SCORE</span>
                   <span className="pipe-arrow">→</span>
-                  <span className="pipe-step wait">KELLY</span>
+                  <span className={`pipe-step ${pipeKellyStep}`} title={pipeKellyReady ? "Kelly abilitato" : "Kelly disabilitato (VENDOR_REAL_CHAIN + N≥50 richiesti)"}>KELLY</span>
+                </div>
+                <div className="dim" style={{ fontSize: "0.65rem", marginTop: 3 }}>
+                  {pipeHasRegime
+                    ? `${regimeCurrent?.n_recent ?? 0} sample · ultimo scan ${regimeCurrent?.last_scan_ts ? new Date(regimeCurrent.last_scan_ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "—"}`
+                    : "In attesa dati regime…"}
+                </div>
+
+                {/* ── ROC16: Quick-nav action strip ───────────────────── */}
+                <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                  <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "3px 8px", flex: 1 }}
+                    onClick={() => setActiveTab("universe" as TabKey)}>
+                    → SCAN
+                  </button>
+                  <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "3px 8px", flex: 1 }}
+                    onClick={() => setActiveTab("pipeline" as TabKey)}>
+                    → PIPELINE
+                  </button>
                 </div>
               </article>
 
               {/* ── ROC7: IBKR ACCOUNT panel ──────────────────────────────── */}
               <article className="panel">
                 <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>IBKR ACCOUNT</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    IBKR ACCOUNT
+                    {hasUrgentExit && (
+                      <span style={{
+                        fontSize: "0.65rem", padding: "1px 6px", borderRadius: 3,
+                        background: "#3a0808", border: "1px solid #f87171",
+                        color: "#f87171", fontWeight: 700,
+                        animation: "pulse-run 0.8s infinite",
+                      }} title={`${urgentExits.length} posizione/i con urgenza alta`}>
+                        🚨 EXIT {urgentExits.length}
+                      </span>
+                    )}
+                  </span>
                   <span style={{
                     fontSize: "0.7rem", padding: "2px 8px", borderRadius: 4,
                     background: ibkrAccount?.connected ? "#1a4a1a" : "#2a2a2a",
@@ -1699,7 +1760,7 @@ export default function App() {
                     {ibkrAccount.positions.length === 0 ? (
                       <div className="dim">Nessuna posizione aperta.</div>
                     ) : (
-                      <div style={{ overflowX: "auto" }}>
+                      <div style={{ overflowX: "auto", maxHeight: 150, overflowY: "auto" }}>
                         <table style={{ width: "100%", fontSize: "0.7rem", borderCollapse: "collapse" }}>
                           <thead>
                             <tr style={{ color: "#666", borderBottom: "1px solid #333" }}>
