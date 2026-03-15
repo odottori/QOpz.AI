@@ -1213,6 +1213,13 @@ export default function App() {
     return () => window.clearInterval(id);
   }, []);
 
+  // Auto-check IBKR status on mount + poll every 30s
+  useEffect(() => {
+    void doCheckIbkr(false);
+    const id = window.setInterval(() => void doCheckIbkr(false), 30_000);
+    return () => window.clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const navItems: Array<{ id: TabKey; label: string }> = [
     { id: "warroom", label: "WAR ROOM" },
     { id: "universe", label: "UNIVERSE SCANNER" },

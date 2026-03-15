@@ -1648,6 +1648,127 @@ def opz_ibkr_status(try_connect: bool = False) -> Dict[str, Any]:
     }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ROC6 — GET /opz/ibkr/account
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/opz/ibkr/account")
+def opz_ibkr_account() -> Dict[str, Any]:
+    """
+    Sommario account IBKR (net liquidation, P&L, posizioni aperte).
+
+    Richiede connessione attiva a TWS/Gateway.
+    Se non connesso → ok=True, connected=False, dati vuoti.
+
+    Response:
+      ok                bool
+      connected         bool
+      source_system     str
+      account_id        str | null
+      net_liquidation   float | null
+      realized_pnl      float | null
+      unrealized_pnl    float | null
+      buying_power      float | null
+      positions         list[PositionItem]
+      message           str
+    """
+    from execution.ibkr_connection import get_manager
+
+    mgr = get_manager()
+
+    if not mgr.is_connected:
+        return {
+            "ok": True,
+            "connected": False,
+            "source_system": "yfinance",
+            "account_id": None,
+            "net_liquidation": None,
+            "realized_pnl": None,
+            "unrealized_pnl": None,
+            "buying_power": None,
+            "positions": [],
+            "message": "Non connesso a TWS/Gateway — chiama prima /opz/ibkr/status?try_connect=true",
+        }
+
+    try:
+        ib = mgr._ib
+        if ib is None or not ib.isConnected():
+            raise RuntimeError("IB instance not available")
+
+        # Account summary: tags IBKR standard
+        tags = [
+            "NetLiquidation", "RealizedPnL", "UnrealizedPnL",
+            "BuyingPower", "AccountCode",
+        ]
+        summary = ib.accountSummary()  # list of AccountValue
+
+        def _get(tag: str) -> str | None:
+            for av in summary:
+                if av.tag == tag:
+                    return av.value
+            return None
+
+        def _float(tag: str) -> float | None:
+            v = _get(tag)
+            try:
+                return float(v) if v is not None else None
+            except (ValueError, TypeError):
+                return None
+
+        account_id = _get("AccountCode")
+        net_liq = _float("NetLiquidation")
+        realized = _float("RealizedPnL")
+        unrealized = _float("UnrealizedPnL")
+        buying_power = _float("BuyingPower")
+
+        # Positions
+        portfolio = ib.portfolio()  # list of PortfolioItem
+        positions_out = []
+        for item in portfolio:
+            contract = item.contract
+            positions_out.append({
+                "symbol":          getattr(contract, "symbol", "?"),
+                "sec_type":        getattr(contract, "secType", "?"),
+                "expiry":          getattr(contract, "lastTradeDateOrContractMonth", None),
+                "strike":          getattr(contract, "strike", None),
+                "right":           getattr(contract, "right", None),
+                "quantity":        item.position,
+                "avg_cost":        item.averageCost,
+                "market_price":    item.marketPrice,
+                "market_value":    item.marketValue,
+                "unrealized_pnl":  item.unrealizedPNL,
+                "realized_pnl":    item.realizedPNL,
+            })
+
+        return {
+            "ok": True,
+            "connected": True,
+            "source_system": "ibkr_live",
+            "account_id": account_id,
+            "net_liquidation": net_liq,
+            "realized_pnl": realized,
+            "unrealized_pnl": unrealized,
+            "buying_power": buying_power,
+            "positions": positions_out,
+            "message": f"Account {account_id} — {len(positions_out)} posizioni aperte",
+        }
+
+    except Exception as exc:
+        logger.warning("IBKR account fetch failed: %s", exc)
+        return {
+            "ok": True,
+            "connected": True,
+            "source_system": "ibkr_live",
+            "account_id": None,
+            "net_liquidation": None,
+            "realized_pnl": None,
+            "unrealized_pnl": None,
+            "buying_power": None,
+            "positions": [],
+            "message": f"Connesso ma fetch account fallito: {exc}",
+        }
+
+
 @app.post("/opz/demo_pipeline/auto")
 def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")

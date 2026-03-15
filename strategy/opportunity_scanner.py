@@ -529,7 +529,16 @@ def _fetch_chain_ibkr(
     """
     broker = config.get("broker", {})
     host = str(broker.get("host", "127.0.0.1"))
-    port = int(broker.get("port", 7496))
+    # Porta: config → IBKRConnectionManager._active_port → default 7496
+    _port_default = 7496
+    try:
+        from execution.ibkr_connection import get_manager as _get_ibkr_mgr
+        _mgr = _get_ibkr_mgr()
+        if _mgr.is_connected and _mgr._active_port:
+            _port_default = _mgr._active_port
+    except Exception:
+        pass
+    port = int(broker.get("port", _port_default))
     timeout_sec = float(config.get("phase0", {}).get("ibkr_timeout_sec", 10))
 
     if not _tcp_reachable(host, port, timeout=min(3.0, timeout_sec)):
