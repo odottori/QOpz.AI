@@ -1251,6 +1251,30 @@ export default function App() {
     } catch (e) { /* silenzioso */ }
   }
 
+  async function doKillSwitch() {
+    const ksActive = sysStatus?.kill_switch_active ?? false;
+    const action = ksActive ? "deactivate" : "activate";
+    const msg = ksActive
+      ? "DISATTIVARE il Kill Switch?\nL'esecuzione ordini verrà ri-abilitata."
+      : "ATTIVARE il Kill Switch?\nTutti gli ordini saranno BLOCCATI immediatamente.";
+    if (!window.confirm(msg)) return;
+    setBusy(true);
+    setError("");
+    try {
+      await apiJson(`${API_BASE}/opz/execution/kill_switch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      setMessage(ksActive ? "Kill switch disattivato." : "🛑 KILL SWITCH ATTIVATO — esecuzione bloccata.");
+      await doFetchSysStatus();
+    } catch (e) {
+      setError(`Kill switch fallito: ${String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const goGate = paperSummary?.gates.go_nogo;
   const f6Gate = paperSummary?.gates.f6_t1_acceptance;
   const f6t2Gate = paperSummary?.gates.f6_t2_journal_complete;
@@ -1468,7 +1492,12 @@ export default function App() {
           <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API LIVE" : "API DOWN"}</span>
           <button className="btn btn-primary" onClick={refreshAll} disabled={busy}>{busy ? "REFRESHING" : "REFRESH"}</button>
           <a className="btn btn-ghost" href="http://localhost:8000/health" target="_blank" rel="noreferrer">API /HEALTH</a>
-          <button className="btn btn-danger" onClick={() => setError("KILL SWITCH armato (simulazione UI).")}>KILL SWITCH</button>
+          <button
+            className={`btn ${(sysStatus?.kill_switch_active) ? "btn-warning" : "btn-danger"}`}
+            onClick={doKillSwitch}
+            disabled={busy}
+            title={(sysStatus?.kill_switch_active) ? "Kill switch ATTIVO — clicca per disattivare" : "Attiva kill switch — blocca tutti gli ordini"}
+          >{(sysStatus?.kill_switch_active) ? "🛑 KS ATTIVO" : "KILL SWITCH"}</button>
         </div>
       </header>
 

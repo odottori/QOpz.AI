@@ -1417,6 +1417,39 @@ def execution_confirm(req: ConfirmRequest) -> Dict[str, Any]:
     return {"ok": True, "event": event}
 
 
+class KillSwitchRequest(BaseModel):
+    action: str = Field(..., description="'activate' oppure 'deactivate'")
+
+
+@app.post("/opz/execution/kill_switch")
+def execution_kill_switch(req: KillSwitchRequest) -> Dict[str, Any]:
+    """Attiva o disattiva il kill switch operativo.
+
+    Activate  → crea ops/kill_switch.trigger (blocca execution_confirm).
+    Deactivate → rimuove ops/kill_switch.trigger (sblocca esecuzione).
+    """
+    if req.action not in {"activate", "deactivate"}:
+        raise HTTPException(status_code=400, detail="action must be 'activate' or 'deactivate'")
+
+    ks_path = ROOT / "ops" / "kill_switch.trigger"
+    ks_path.parent.mkdir(parents=True, exist_ok=True)
+    ts_now = datetime.now(timezone.utc).isoformat()
+
+    if req.action == "activate":
+        ks_path.write_text(
+            json.dumps({"activated_at": ts_now, "source": "operator_ui"}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        logger.warning("KILL SWITCH ATTIVATO via API — %s", ts_now)
+        return {"ok": True, "kill_switch_active": True, "action": "activate", "ts_utc": ts_now}
+    else:
+        removed = ks_path.exists()
+        if removed:
+            ks_path.unlink()
+        logger.warning("Kill switch disattivato via API — %s", ts_now)
+        return {"ok": True, "kill_switch_active": False, "action": "deactivate", "ts_utc": ts_now, "was_active": removed}
+
+
 @app.post("/opz/opportunity/decision")
 def opz_opportunity_decision(req: OpportunityDecisionRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")
