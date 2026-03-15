@@ -171,6 +171,35 @@ type DemoPipelineAutoResponse = {
   scan?: UniverseLatestResponse | null;
 };
 
+// ── ROC3: Opportunity Scanner (scan_full) ────────────────────────────────────
+type ScanScoreBreakdown = { vol_edge: number; liquidity: number; risk_reward: number; regime_align: number };
+type ScanFullCandidate = {
+  symbol: string; strategy: string; score: number; score_breakdown: ScanScoreBreakdown;
+  expiry: string; dte: number; strikes: number[]; delta: number; iv: number;
+  iv_zscore_30: number | null; iv_zscore_60: number | null; iv_interp: string | null;
+  expected_move: number | null; signal_vs_em_ratio: number | null;
+  spread_pct: number; open_interest: number; volume: number;
+  max_loss: number; max_loss_pct: number; breakeven: number; breakeven_pct: number;
+  credit_or_debit: number; sizing_suggested: number; kelly_fraction: number | null;
+  events_flag: string | null; human_review_required: boolean;
+  stress_base: number; stress_shock: number;
+  data_quality: string; source: string; underlying_price: number;
+};
+type ScanFullResponse = {
+  ok: boolean; batch_id: string; profile: string; regime: string; data_mode: string;
+  scan_ts: string; symbols_scanned: number; symbols_with_chain: number;
+  filtered_count: number; cache_used: boolean; cache_age_hours: number | null;
+  ranking_suspended: boolean; suspension_reason: string | null;
+  candidates: ScanFullCandidate[];
+};
+type EvReportResponse = {
+  ok: boolean; profile: string; window_days: number; generated_at: string;
+  total_candidates: number; total_tracked: number; data_mode: string;
+  score_distribution: { below_70: number; score_70_80: number; score_80_plus: number };
+  strategies: Record<string, number>; regimes: Record<string, number>;
+  human_review_required: number; events_flagged: number;
+};
+
 type NarratorTutorialResponse = {
   path: string;
   exists: boolean;
@@ -346,6 +375,14 @@ export default function App() {
   const [oppConfidence, setOppConfidence] = useState<string>("3");
   const [oppNote, setOppNote] = useState<string>("");
   const [selectedOpportunityKey, setSelectedOpportunityKey] = useState<string>("");
+  const [oppScanResult, setOppScanResult] = useState<ScanFullResponse | null>(null);
+  const [oppScanBusy, setOppScanBusy] = useState<boolean>(false);
+  const [oppScanSymbols, setOppScanSymbols] = useState<string>("SPY,QQQ,AAPL,MSFT,NVDA");
+  const [oppScanRegime, setOppScanRegime] = useState<"NORMAL" | "CAUTION" | "SHOCK">("NORMAL");
+  const [oppScanTopN, setOppScanTopN] = useState<string>("5");
+  const [oppScanAccountSize, setOppScanAccountSize] = useState<string>("10000");
+  const [selectedScanKey, setSelectedScanKey] = useState<string>("");
+  const [evReport, setEvReport] = useState<EvReportResponse | null>(null);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -959,7 +996,10 @@ export default function App() {
   }
 
   async function doOpportunityDecision() {
-    const candidate = selectedOpportunity;
+    // Priorità: candidato da scan_full; fallback: candidato da universe items
+    const scanC = oppScanResult?.candidates.find((c) => `${c.symbol}::${c.strategy}::${c.expiry}` === selectedScanKey)
+      ?? oppScanResult?.candidates[0] ?? null;
+    const candidate = scanC ?? selectedOpportunity;
     if (!candidate) {
       setError("Nessun candidato disponibile per validazione Opportunity.");
       setMessage("");
@@ -972,6 +1012,10 @@ export default function App() {
       return;
     }
 
+    const batchId = oppScanResult?.batch_id ?? universeLatest?.batch_id ?? undefined;
+    const regime = oppScanResult?.regime ?? universeLatest?.regime ?? universeRegime;
+    const source = oppScanResult ? "opportunity_scanner" : (universeLatest?.source ?? universeSource);
+
     setBusy(true);
     setError("");
     setMessage("");
@@ -981,20 +1025,20 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile: "paper",
-          batch_id: universeLatest?.batch_id ?? undefined,
+          batch_id: batchId,
           symbol: candidate.symbol,
           strategy: candidate.strategy,
           score: candidate.score,
-          regime: universeLatest?.regime ?? universeRegime,
+          regime,
           scanner_name: universeLatest?.scanner_name ?? selectedScanner?.scanner_name ?? "",
-          source: universeLatest?.source ?? universeSource,
+          source,
           decision: oppDecision,
           confidence: conf.value,
           note: oppNote.trim(),
         }),
       });
       setMessage(
-        `Opportunity logged: ${oppDecision} ${candidate.symbol} (score=${candidate.score.toFixed(3)}, conf=${conf.value}/5).`
+        `Opportunity logged: ${oppDecision} ${candidate.symbol} (score=${candidate.score.toFixed(2)}, conf=${conf.value}/5).`
       );
       await refreshAll();
     } catch (e) {
@@ -1003,6 +1047,36 @@ export default function App() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function doScanFull() {
+    const syms = oppScanSymbols.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+    if (!syms.length) { setError("Inserisci almeno un simbolo per lo scan."); setMessage(""); return; }
+    const topN = parseInt(oppScanTopN) || 5;
+    const acct = parseFloat(oppScanAccountSize);
+    if (!Number.isFinite(acct) || acct <= 0) { setError("Account size non valido."); setMessage(""); return; }
+    setOppScanBusy(true); setError(""); setMessage("");
+    try {
+      const res = await apiJson<ScanFullResponse>(`${API_BASE}/opz/opportunity/scan_full`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile: "paper", regime: oppScanRegime, symbols: syms, top_n: topN, account_size: acct, use_cache: true }),
+      });
+      setOppScanResult(res);
+      if (res.candidates.length > 0) setSelectedScanKey(`${res.candidates[0].symbol}::${res.candidates[0].strategy}::${res.candidates[0].expiry}`);
+      setMessage(res.ranking_suspended
+        ? `Scan sospeso: ${res.suspension_reason ?? "regime SHOCK"}.`
+        : `Scan OK — ${res.candidates.length} candidati (batch ${res.batch_id}).`);
+    } catch (e) { setError(String(e)); setMessage(""); }
+    finally { setOppScanBusy(false); }
+  }
+
+  async function doLoadEvReport() {
+    try {
+      const r = await apiJson<EvReportResponse>(`${API_BASE}/opz/opportunity/ev_report?profile=paper&window_days=30`);
+      setEvReport(r);
+      setMessage(`EV report caricato: ${r.total_candidates} candidati (30gg).`);
+    } catch (e) { setError(String(e)); }
   }
 
   const goGate = paperSummary?.gates.go_nogo;
@@ -1051,6 +1125,9 @@ export default function App() {
   const opportunityTop = universeItems[0] ?? null;
   const selectedOpportunity = universeItems.find((x) => opportunityKeyOf(x) === selectedOpportunityKey) ?? opportunityTop;
   const opportunityReady = universeItems.filter((x) => x.score >= 0.55).length;
+  const scanCandidates: ScanFullCandidate[] = oppScanResult?.candidates ?? [];
+  const selectedScanCandidate: ScanFullCandidate | null =
+    scanCandidates.find((c) => `${c.symbol}::${c.strategy}::${c.expiry}` === selectedScanKey) ?? scanCandidates[0] ?? null;
   const nonOptionsRows = universeSubTab === "opzioni" ? [] : rowsByTab[universeSubTab as Exclude<UniverseSubTab, "opzioni">];
   const sourceBadgeClass = (source: UniverseRowSource): string => (
     source === "mixed" ? "source-mixed" : source === "ocr" ? "source-ocr" : source === "api" ? "source-api" : "source-none"
@@ -1490,62 +1567,161 @@ export default function App() {
           )}
           {activeTab === "opportunity" && (
             <div className="panel-grid two">
+
+              {/* ── LEFT: SCAN OPZ ───────────────────────────────────────── */}
               <article className="panel">
-                <div className="panel-title">OPPORTUNITY QUEUE</div>
-                <ul className="activity-list">
-                  <li>Universe batch: <code>{universeLatest?.batch_id ?? "-"}</code></li>
-                  <li>Scanner: {universeLatest?.scanner_name?.trim() ? universeLatest.scanner_name : "-"}</li>
-                  <li>Source: {universeLatest?.source ?? "-"}</li>
-                  <li>Candidates in shortlist: {universeItems.length}</li>
-                  <li>Candidates ready (score &gt;= 0.55): {opportunityReady}</li>
-                  <li>Hard blockers active: {universeLatest?.filter_fallback ? "CHECK FILTERS" : "NONE"}</li>
-                  <li>Selected candidate: {selectedOpportunity ? `${selectedOpportunity.symbol} / ${selectedOpportunity.strategy}` : "-"}</li>
-                </ul>
-                <table className="data-table shortlist-table">
+                <div className="panel-title">SCAN OPZ</div>
+                <div className="form-grid">
+                  <label>Simboli</label>
+                  <input value={oppScanSymbols} onChange={(e) => setOppScanSymbols(e.target.value)} placeholder="SPY,QQQ,AAPL" />
+                  <label>Regime</label>
+                  <select value={oppScanRegime} onChange={(e) => setOppScanRegime(e.target.value as typeof oppScanRegime)}>
+                    <option value="NORMAL">NORMAL</option>
+                    <option value="CAUTION">CAUTION</option>
+                    <option value="SHOCK">SHOCK</option>
+                  </select>
+                  <label>Top N</label>
+                  <input value={oppScanTopN} onChange={(e) => setOppScanTopN(e.target.value)} style={{ width: "60px" }} />
+                  <label>Account €</label>
+                  <input value={oppScanAccountSize} onChange={(e) => setOppScanAccountSize(e.target.value)} />
+                </div>
+                <div className="actions">
+                  <button className="btn btn-primary" onClick={doScanFull} disabled={oppScanBusy || busy}>
+                    {oppScanBusy ? "SCANNING..." : "RUN SCAN"}
+                  </button>
+                  <button className="btn btn-ghost" onClick={doLoadEvReport} disabled={busy}>EV REPORT</button>
+                </div>
+
+                {oppScanResult && (
+                  <ul className="activity-list" style={{ marginTop: "8px" }}>
+                    <li>Batch: <code>{oppScanResult.batch_id}</code> &nbsp;|&nbsp; {fmtTs(oppScanResult.scan_ts)}</li>
+                    <li>Data mode: <code>{oppScanResult.data_mode}</code></li>
+                    <li>Chain: {oppScanResult.symbols_with_chain}/{oppScanResult.symbols_scanned} &nbsp;|&nbsp; Filtrati: {oppScanResult.filtered_count}</li>
+                    {oppScanResult.ranking_suspended && (
+                      <li className="val-bad">SOSPESO: {oppScanResult.suspension_reason}</li>
+                    )}
+                  </ul>
+                )}
+
+                <table className="data-table shortlist-table" style={{ marginTop: "8px" }}>
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>Symbol</th>
-                      <th>Score</th>
-                      <th>Regime Fit</th>
-                      <th>Status</th>
-                      <th>Action</th>
+                      <th>#</th><th>Symbol</th><th>Strat</th><th>Score</th>
+                      <th>IVZ-30</th><th>EM%</th><th>DTE</th><th>Flag</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {universeItems.map((it) => {
-                      const isSelected = selectedOpportunityKey === opportunityKeyOf(it);
+                    {scanCandidates.map((c, i) => {
+                      const key = `${c.symbol}::${c.strategy}::${c.expiry}`;
+                      const sel = key === selectedScanKey;
                       return (
-                        <tr key={`opp-${it.rank}-${it.symbol}`} className={isSelected ? "row-selected" : ""}>
-                          <td>{it.rank}</td>
-                          <td>{it.symbol}</td>
-                          <td>{it.score.toFixed(3)}</td>
-                          <td>{it.regime_fit.toFixed(3)}</td>
-                          <td>{it.score >= 0.55 ? "READY" : "WATCH"}</td>
+                        <tr key={key} className={sel ? "row-selected" : ""}>
+                          <td>{i + 1}</td>
+                          <td>{c.symbol}</td>
+                          <td>{c.strategy.replace("_", " ")}</td>
+                          <td className={c.score >= 75 ? "val-good" : "val-warn"}>{c.score.toFixed(1)}</td>
+                          <td>{c.iv_zscore_30 !== null ? c.iv_zscore_30.toFixed(2) : "-"}</td>
+                          <td>{c.expected_move !== null ? `${(c.expected_move * 100).toFixed(1)}%` : "-"}</td>
+                          <td>{c.dte}</td>
                           <td>
-                            <button className={`btn ${isSelected ? "btn-primary" : "btn-ghost"}`} onClick={() => setSelectedOpportunityKey(opportunityKeyOf(it))}>
-                              {isSelected ? "SELECTED" : "SELECT"}
+                            {c.events_flag ? <span className="val-bad">{c.events_flag.split("_")[0]}</span>
+                              : c.human_review_required ? <span className="val-warn">REV</span> : "-"}
+                          </td>
+                          <td>
+                            <button className={`btn ${sel ? "btn-primary" : "btn-ghost"}`}
+                              onClick={() => setSelectedScanKey(key)}>
+                              {sel ? "SEL" : "→"}
                             </button>
                           </td>
                         </tr>
                       );
                     })}
-                    {universeItems.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="dim">Nessun candidato. Esegui prima UNIVERSE SCAN.</td>
-                      </tr>
+                    {scanCandidates.length === 0 && (
+                      <tr><td colSpan={9} className="dim">Nessun candidato. Esegui RUN SCAN.</td></tr>
                     )}
                   </tbody>
                 </table>
+
+                {evReport && (
+                  <>
+                    <div className="panel-title mt10">EV REPORT (30gg)</div>
+                    <ul className="activity-list">
+                      <li>Candidati: {evReport.total_candidates} &nbsp;|&nbsp; Tracked: {evReport.total_tracked}</li>
+                      <li>Score &lt;70: {evReport.score_distribution.below_70} &nbsp;|&nbsp; 70-80: {evReport.score_distribution.score_70_80} &nbsp;|&nbsp; 80+: {evReport.score_distribution.score_80_plus}</li>
+                      <li>Human review: {evReport.human_review_required} &nbsp;|&nbsp; Events flag: {evReport.events_flagged}</li>
+                      {Object.entries(evReport.strategies).map(([k, v]) => <li key={k}>{k}: {v}</li>)}
+                      <li className="dim">Mode: {evReport.data_mode}</li>
+                    </ul>
+                  </>
+                )}
+
+                <div className="panel-title mt10">UNIVERSE QUEUE (legacy)</div>
+                <ul className="activity-list">
+                  <li>Batch: <code>{universeLatest?.batch_id ?? "-"}</code></li>
+                  <li>Candidati: {universeItems.length} &nbsp;|&nbsp; Pronti ≥0.55: {opportunityReady}</li>
+                </ul>
               </article>
 
+              {/* ── RIGHT: DETAIL + VALIDAZIONE ──────────────────────────── */}
               <article className="panel">
-                <div className="panel-title">VALIDAZIONE OPERATORE</div>
+                {selectedScanCandidate ? (
+                  <>
+                    <div className="panel-title">
+                      {selectedScanCandidate.symbol} / {selectedScanCandidate.strategy}
+                      {selectedScanCandidate.human_review_required && <span className="val-warn" style={{ marginLeft: "8px" }}>⚠ REVIEW</span>}
+                    </div>
+                    <ul className="activity-list">
+                      <li>Score: <span className={selectedScanCandidate.score >= 75 ? "val-good" : "val-warn"}>{selectedScanCandidate.score.toFixed(2)}</span> &nbsp;|&nbsp; Expiry: {selectedScanCandidate.expiry} &nbsp;|&nbsp; DTE: {selectedScanCandidate.dte}</li>
+                      <li>IV: {(selectedScanCandidate.iv * 100).toFixed(1)}% &nbsp;|&nbsp; Z-30: {selectedScanCandidate.iv_zscore_30?.toFixed(2) ?? "-"} &nbsp;|&nbsp; Z-60: {selectedScanCandidate.iv_zscore_60?.toFixed(2) ?? "-"} &nbsp;|&nbsp; <em>{selectedScanCandidate.iv_interp ?? "-"}</em></li>
+                      <li>EM: {selectedScanCandidate.expected_move !== null ? `${(selectedScanCandidate.expected_move * 100).toFixed(2)}%` : "-"} &nbsp;|&nbsp; δ: {selectedScanCandidate.delta.toFixed(2)} &nbsp;|&nbsp; Spread: {selectedScanCandidate.spread_pct.toFixed(2)}%</li>
+                      <li>Strikes: [{selectedScanCandidate.strikes.join(", ")}] &nbsp;|&nbsp; Spot: {selectedScanCandidate.underlying_price.toFixed(2)}</li>
+                      <li>
+                        Credit/Debit: <span className={selectedScanCandidate.credit_or_debit >= 0 ? "val-good" : "val-bad"}>
+                          {selectedScanCandidate.credit_or_debit >= 0 ? "+" : ""}{selectedScanCandidate.credit_or_debit.toFixed(2)}
+                        </span> &nbsp;|&nbsp; Max Loss: {selectedScanCandidate.max_loss.toFixed(2)} ({selectedScanCandidate.max_loss_pct.toFixed(2)}%)
+                      </li>
+                      <li>Breakeven: {selectedScanCandidate.breakeven.toFixed(2)} ({selectedScanCandidate.breakeven_pct > 0 ? "+" : ""}{selectedScanCandidate.breakeven_pct.toFixed(2)}%)</li>
+                      <li>Sizing: {selectedScanCandidate.sizing_suggested.toFixed(1)}% &nbsp;|&nbsp; OI: {selectedScanCandidate.open_interest} &nbsp;|&nbsp; Vol: {selectedScanCandidate.volume}</li>
+                      <li>Stress base: {selectedScanCandidate.stress_base.toFixed(2)} &nbsp;|&nbsp; Stress shock: {selectedScanCandidate.stress_shock.toFixed(2)}</li>
+                    </ul>
+                    <div className="panel-title mt10">SCORE BREAKDOWN</div>
+                    <ul className="activity-list">
+                      <li>Vol Edge: {selectedScanCandidate.score_breakdown.vol_edge.toFixed(1)} &nbsp;|&nbsp; Liquidità: {selectedScanCandidate.score_breakdown.liquidity.toFixed(1)}</li>
+                      <li>Risk/Reward: {selectedScanCandidate.score_breakdown.risk_reward.toFixed(1)} &nbsp;|&nbsp; Regime Align: {selectedScanCandidate.score_breakdown.regime_align.toFixed(1)}</li>
+                    </ul>
+                    {(selectedScanCandidate.events_flag || selectedScanCandidate.human_review_required) && (
+                      <>
+                        <div className="panel-title mt10">FLAGS</div>
+                        <ul className="activity-list">
+                          {selectedScanCandidate.events_flag && <li className="val-bad">⚑ {selectedScanCandidate.events_flag}</li>}
+                          {selectedScanCandidate.human_review_required && <li className="val-warn">⚠ HUMAN REVIEW REQUIRED</li>}
+                        </ul>
+                      </>
+                    )}
+                    <ul className="activity-list">
+                      <li className="dim">Quality: {selectedScanCandidate.data_quality} &nbsp;|&nbsp; Source: {selectedScanCandidate.source}</li>
+                    </ul>
+                  </>
+                ) : (
+                  <div className="dim" style={{ padding: "12px 0" }}>Esegui RUN SCAN e seleziona un candidato per vedere i dettagli.</div>
+                )}
+
+                <div className="panel-title mt10">VALIDAZIONE OPERATORE</div>
                 <div className="form-grid">
-                  <label>Selected candidate</label>
-                  <input value={selectedOpportunity ? `${selectedOpportunity.symbol} / ${selectedOpportunity.strategy}` : "-"} readOnly />
-                  <label>Candidate score</label>
-                  <input value={selectedOpportunity ? selectedOpportunity.score.toFixed(3) : "-"} readOnly />
+                  <label>Candidato</label>
+                  <input
+                    value={selectedScanCandidate
+                      ? `${selectedScanCandidate.symbol} / ${selectedScanCandidate.strategy}`
+                      : selectedOpportunity ? `${selectedOpportunity.symbol} / ${selectedOpportunity.strategy}` : "-"}
+                    readOnly
+                  />
+                  <label>Score</label>
+                  <input
+                    value={selectedScanCandidate
+                      ? selectedScanCandidate.score.toFixed(2)
+                      : selectedOpportunity ? selectedOpportunity.score.toFixed(3) : "-"}
+                    readOnly
+                  />
                   <label>Decision</label>
                   <select value={oppDecision} onChange={(e) => setOppDecision(e.target.value as "APPROVE" | "REJECT" | "MODIFY")}>
                     <option value="APPROVE">APPROVE</option>
@@ -1558,50 +1734,59 @@ export default function App() {
                   <input value={oppNote} onChange={(e) => setOppNote(e.target.value)} placeholder="motivo decisione / override" />
                 </div>
                 <div className="actions">
-                  <button className="btn btn-primary" onClick={doOpportunityDecision}>LOG DECISION</button>
+                  <button className="btn btn-primary" onClick={doOpportunityDecision}
+                    disabled={busy || (!selectedScanCandidate && !selectedOpportunity)}>
+                    LOG DECISION
+                  </button>
                   <button
                     className="btn btn-ghost"
+                    disabled={!selectedScanCandidate && !selectedOpportunity}
                     onClick={() => {
-                      if (!selectedOpportunity) return;
-                      setSymbol(selectedOpportunity.symbol);
-                      setStrategy(selectedOpportunity.strategy);
+                      const c = selectedScanCandidate ?? selectedOpportunity;
+                      if (!c) return;
+                      const isFullC = "strikes" in c;
+                      setSymbol(c.symbol);
+                      setStrategy(c.strategy);
                       setPayload(JSON.stringify({
-                        source: "opportunity_queue",
-                        batch_id: universeLatest?.batch_id ?? null,
-                        symbol: selectedOpportunity.symbol,
-                        strategy: selectedOpportunity.strategy,
-                        score: Number(selectedOpportunity.score.toFixed(3)),
-                        regime: universeLatest?.regime ?? universeRegime,
-                        metrics: {
-                          iv_rank: Number(selectedOpportunity.iv_rank.toFixed(3)),
-                          spread_pct: Number(selectedOpportunity.spread_pct.toFixed(4)),
-                          volume: selectedOpportunity.volume,
-                          open_interest: selectedOpportunity.open_interest,
-                          regime_fit: Number(selectedOpportunity.regime_fit.toFixed(3)),
-                          liquidity_score: Number(selectedOpportunity.liquidity_score.toFixed(3)),
+                        source: isFullC ? "opportunity_scanner" : "opportunity_queue",
+                        batch_id: oppScanResult?.batch_id ?? universeLatest?.batch_id ?? null,
+                        symbol: c.symbol, strategy: c.strategy,
+                        score: Number(c.score.toFixed(2)),
+                        regime: oppScanResult?.regime ?? universeLatest?.regime ?? oppScanRegime,
+                        metrics: isFullC ? {
+                          iv_zscore_30: (c as ScanFullCandidate).iv_zscore_30,
+                          expected_move: (c as ScanFullCandidate).expected_move,
+                          max_loss: (c as ScanFullCandidate).max_loss,
+                          max_loss_pct: (c as ScanFullCandidate).max_loss_pct,
+                          breakeven: (c as ScanFullCandidate).breakeven,
+                          strikes: (c as ScanFullCandidate).strikes,
+                          events_flag: (c as ScanFullCandidate).events_flag,
+                        } : {
+                          iv_rank: (c as UniverseScanItem).iv_rank,
+                          spread_pct: (c as UniverseScanItem).spread_pct,
                         },
                       }, null, 2));
-                      setPreview(null);
-                      setPreviewSignature(null);
+                      setPreview(null); setPreviewSignature(null);
                       setActiveTab("pipeline");
-                      setMessage(`Candidate loaded into pipeline: ${selectedOpportunity.symbol}/${selectedOpportunity.strategy}`);
+                      setMessage(`Candidato caricato in pipeline: ${c.symbol}/${c.strategy}`);
                       setError("");
                     }}
-                    disabled={!selectedOpportunity}
                   >
                     LOAD TO PIPELINE
                   </button>
                 </div>
+
                 <div className="panel-title mt10">LOG (PERSISTENTE)</div>
                 <ul className="activity-list">
                   {(lastActions?.opportunity_decisions ?? []).map((x, i) => (
                     <li key={`opplog-${i}`}>
-                      <code>{fmtTs(x.ts_utc)}</code> {x.symbol} {x.decision} conf={x.confidence}/5 score={x.score === null ? "-" : x.score.toFixed(3)}
+                      <code>{fmtTs(x.ts_utc)}</code> {x.symbol} {x.decision} conf={x.confidence}/5 score={x.score === null ? "-" : x.score.toFixed(2)}
                     </li>
                   ))}
-                  {((lastActions?.opportunity_decisions?.length ?? 0) === 0) && <li className="dim">Nessuna decisione opportunity persistita.</li>}
+                  {((lastActions?.opportunity_decisions?.length ?? 0) === 0) && <li className="dim">Nessuna decisione opportunity.</li>}
                 </ul>
               </article>
+
             </div>
           )}
 

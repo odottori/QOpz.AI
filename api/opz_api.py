@@ -1513,6 +1513,86 @@ def opz_opportunity_scan_full(req: ScanFullRequest) -> Dict[str, Any]:
     }
 
 
+@app.get("/opz/opportunity/ev_report")
+def opz_opportunity_ev_report(
+    profile: str = "paper",
+    window_days: int = 30,
+) -> Dict[str, Any]:
+    """Report EV: statistiche sui candidati salvati negli ultimi window_days.
+
+    Legge opportunity_candidates per profilo/finestra.
+    opportunity_ev_tracking è popolato quando i trade vengono collegati.
+    Watermark DATA_MODE nel risultato.
+    """
+    from execution.storage import init_execution_schema, _connect
+
+    profile = (profile or "paper").strip()
+    if window_days < 1 or window_days > 365:
+        raise HTTPException(status_code=400, detail="window_days deve essere tra 1 e 365")
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=window_days)).isoformat()
+
+    init_execution_schema()
+    con = _connect()
+    try:
+        rows = con.execute(
+            """
+            SELECT score, strategy, regime, human_review_required, events_flag, data_mode
+            FROM opportunity_candidates
+            WHERE profile = ? AND scan_ts >= ?
+            ORDER BY scan_ts DESC
+            """,
+            (profile, cutoff),
+        ).fetchall()
+
+        total     = len(rows)
+        below_70  = sum(1 for r in rows if r[0] is not None and r[0] < 70)
+        s_70_80   = sum(1 for r in rows if r[0] is not None and 70 <= r[0] < 80)
+        s_80_plus = sum(1 for r in rows if r[0] is not None and r[0] >= 80)
+
+        strategies: dict[str, int] = {}
+        regimes:    dict[str, int] = {}
+        human_rev   = 0
+        evts_flag   = 0
+        data_modes: set[str] = set()
+
+        for _score, strategy, regime, human_rev_req, events_flag, data_mode in rows:
+            if strategy:
+                strategies[strategy] = strategies.get(strategy, 0) + 1
+            if regime:
+                regimes[regime] = regimes.get(regime, 0) + 1
+            if human_rev_req:
+                human_rev += 1
+            if events_flag:
+                evts_flag += 1
+            if data_mode:
+                data_modes.add(data_mode)
+
+        tracked_row = con.execute(
+            "SELECT COUNT(*) FROM opportunity_ev_tracking WHERE profile = ?",
+            (profile,),
+        ).fetchone()
+        total_tracked = tracked_row[0] if tracked_row else 0
+
+    finally:
+        con.close()
+
+    return {
+        "ok": True,
+        "profile": profile,
+        "window_days": window_days,
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "data_mode": ", ".join(sorted(data_modes)) if data_modes else os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED"),
+        "total_candidates": total,
+        "total_tracked": total_tracked,
+        "score_distribution": {"below_70": below_70, "score_70_80": s_70_80, "score_80_plus": s_80_plus},
+        "strategies": strategies,
+        "regimes": regimes,
+        "human_review_required": human_rev,
+        "events_flagged": evts_flag,
+    }
+
+
 @app.post("/opz/demo_pipeline/auto")
 def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")
