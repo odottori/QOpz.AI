@@ -133,7 +133,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -609,7 +609,15 @@ def _run_qwen_tts(action: str, text: str) -> dict[str, Any]:
         return out
 
     _stop_fallback_tts_process()
-    safe_text_ps = (text or "").replace("\r", " ").replace("\n", " ").strip()
+    # Single quotes doubled: PowerShell string escape convention.
+    # Prevents injection via text like: hello'; Invoke-Expression 'malicious'
+    safe_text_ps = (
+        (text or "")
+        .replace("\r", " ")
+        .replace("\n", " ")
+        .replace("'", "''")   # PS escape: '' = literal single quote inside '...'
+        .strip()
+    )
     fallback_play_cmd = os.environ.get("QWEN_TTS_FALLBACK_PLAY_CMD", "").strip()
 
     try:
@@ -1378,6 +1386,13 @@ def execution_preview(req: PreviewRequest) -> PreviewResponse:
 
 @app.post("/opz/execution/confirm")
 def execution_confirm(req: ConfirmRequest) -> Dict[str, Any]:
+    # Kill switch check — must be the first gate (invariante CLAUDE.md)
+    if Path("ops/kill_switch.trigger").exists():
+        raise HTTPException(
+            status_code=503,
+            detail={"stage": "execution_confirm", "reason": "KILL SWITCH ATTIVO — esecuzione bloccata"},
+        )
+
     operator = _clean_text(req.operator, "operator")
     if req.decision not in {"APPROVE", "REJECT"}:
         raise HTTPException(status_code=400, detail="invalid decision")
