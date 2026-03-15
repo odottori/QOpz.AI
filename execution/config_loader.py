@@ -9,9 +9,16 @@ Normalization rules (backward compatible):
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
+
+# IBKR client_id valid range (TWS/Gateway API spec)
+_IBKR_CLIENT_ID_MIN = 0
+_IBKR_CLIENT_ID_MAX = 32767
 
 try:
     import tomllib  # py3.11+
@@ -57,6 +64,14 @@ def _normalize_broker(cfg: Dict[str, Any]) -> None:
         snake_i = int(snake)
     except (ValueError, TypeError):
         snake_i = snake
+
+    # Bounds check — IBKR TWS/Gateway accepts client_id in [0, 32767]
+    for _val, _name in ((camel_i, "clientId"), (snake_i, "client_id")):
+        if isinstance(_val, int) and not (_IBKR_CLIENT_ID_MIN <= _val <= _IBKR_CLIENT_ID_MAX):
+            logger.warning(
+                "config broker.%s=%s fuori range IBKR [%d, %d] — connessione potrebbe fallire silenziosamente",
+                _name, _val, _IBKR_CLIENT_ID_MIN, _IBKR_CLIENT_ID_MAX,
+            )
 
     broker["clientId"] = camel_i
     broker["client_id"] = snake_i
