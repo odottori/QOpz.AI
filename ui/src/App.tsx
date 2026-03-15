@@ -231,6 +231,18 @@ type IbkrAccountResponse = {
   buying_power: number | null; positions: IbkrAccountPosition[];
   message: string;
 };
+type ExitCandidate = {
+  symbol: string; expiry: string | null; strike: number | null; right: string | null;
+  quantity: number; avg_cost: number; market_price: number | null;
+  unrealized_pnl: number | null; exit_score: number; exit_reasons: string[];
+  source: string;
+};
+type ExitCandidatesResponse = {
+  ok: boolean; source: string; today: string;
+  n_total: number; n_flagged: number;
+  candidates: ExitCandidate[];
+  thresholds: { theta_decay_pct: number; loss_limit_pct: number; time_stop_dte: number };
+};
 type EvReportResponse = {
   ok: boolean; profile: string; window_days: number; generated_at: string;
   total_candidates: number; total_tracked: number; data_mode: string;
@@ -487,6 +499,7 @@ export default function App() {
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
+  const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -817,6 +830,7 @@ export default function App() {
       void doFetchEquityHistory();
       void doFetchSysStatus();
       void doFetchRegimeCurrent();
+      void doFetchExitCandidates();
       if (!universeScannerName && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
@@ -1230,6 +1244,13 @@ export default function App() {
     } catch (e) { /* silenzioso */ }
   }
 
+  async function doFetchExitCandidates() {
+    try {
+      const r = await apiJson<ExitCandidatesResponse>(`${API_BASE}/opz/opportunity/exit_candidates?min_score=1&top_n=5`);
+      setExitCandidates(r);
+    } catch (e) { /* silenzioso */ }
+  }
+
   const goGate = paperSummary?.gates.go_nogo;
   const f6Gate = paperSummary?.gates.f6_t1_acceptance;
   const f6t2Gate = paperSummary?.gates.f6_t2_journal_complete;
@@ -1376,6 +1397,13 @@ export default function App() {
   useEffect(() => {
     void doFetchEquityHistory();
     const id = window.setInterval(() => void doFetchEquityHistory(), 60_000);
+    return () => window.clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-fetch exit candidates on mount + poll every 60s
+  useEffect(() => {
+    void doFetchExitCandidates();
+    const id = window.setInterval(() => void doFetchExitCandidates(), 60_000);
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1713,6 +1741,69 @@ export default function App() {
                 >
                   {ibkrAccountLoading ? "…" : "⟳ ACCOUNT"}
                 </button>
+
+                {/* ── ROC14: Exit Candidates ──────────────────────────── */}
+                <div className="panel-title mt10" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>EXIT CANDIDATES</span>
+                  <span style={{ fontSize: "0.65rem", color: "#666" }}>
+                    {exitCandidates
+                      ? `${exitCandidates.n_flagged}/${exitCandidates.n_total} flagged`
+                      : "—"}
+                  </span>
+                </div>
+
+                {!exitCandidates && (
+                  <div className="dim" style={{ fontSize: "0.7rem" }}>Caricamento…</div>
+                )}
+
+                {exitCandidates && exitCandidates.candidates.length === 0 && (
+                  <div className="dim" style={{ fontSize: "0.7rem" }}>
+                    Nessuna posizione con segnale di uscita.
+                  </div>
+                )}
+
+                {exitCandidates && exitCandidates.candidates.map((c, i) => {
+                  const score = c.exit_score;
+                  const color = score >= 5 ? "#f87171" : score >= 3 ? "#fbbf24" : "#60a5fa";
+                  const dot   = score >= 5 ? "🔴" : score >= 3 ? "🟡" : "🔵";
+                  const pnlColor = (c.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171";
+                  return (
+                    <div key={i} style={{
+                      marginTop: 6, padding: "6px 8px",
+                      background: "#1a1a1a", borderRadius: 4,
+                      borderLeft: `3px solid ${color}`,
+                      fontSize: "0.72rem",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontWeight: 700 }}>
+                          {dot} {c.symbol} {c.strike ?? "—"}{c.right ?? ""}
+                        </span>
+                        <span style={{ color, fontWeight: 700 }}>score {score}</span>
+                      </div>
+                      <div style={{ color: "#888", marginTop: 2 }}>
+                        exp {c.expiry ?? "—"}
+                        {c.unrealized_pnl != null && (
+                          <span style={{ color: pnlColor, marginLeft: 8 }}>
+                            uPnL {c.unrealized_pnl >= 0 ? "+" : ""}{c.unrealized_pnl.toFixed(0)}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ color: "#666", marginTop: 2, fontStyle: "italic" }}>
+                        {c.exit_reasons.join(" · ")}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {exitCandidates && (
+                  <button
+                    className="btn btn-secondary mt10"
+                    style={{ fontSize: "0.7rem", padding: "3px 8px" }}
+                    onClick={() => void doFetchExitCandidates()}
+                  >
+                    ⟳ EXIT SCAN
+                  </button>
+                )}
               </article>
             </div>
           )}
