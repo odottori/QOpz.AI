@@ -10,10 +10,10 @@ import subprocess
 import sys
 import threading
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import date, datetime, time as time_cls, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 import logging
 
@@ -38,6 +38,70 @@ from execution.universe import (
     run_universe_scan_from_ibkr_settings,
     UniverseDataUnavailableError,
 )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Response TypedDicts — ROC6-14 endpoints
+# Forniscono type-checking statico (mypy/pyright) senza overhead a runtime.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _Signal(TypedDict):
+    name: str
+    status: str   # "OK" | "WARN" | "ALERT" | "DISABLED"
+    detail: str
+
+class IbkrStatusOut(TypedDict):
+    ok: bool; connected: bool; host: str; port: Optional[int]
+    client_id: Optional[int]; source_system: str
+    connected_at: Optional[str]; ports_probed: List[int]; message: str
+
+class IbkrAccountPositionOut(TypedDict):
+    symbol: str; sec_type: str; expiry: Optional[str]
+    strike: Optional[float]; right: Optional[str]
+    quantity: float; avg_cost: float; market_price: float
+    market_value: float; unrealized_pnl: float; realized_pnl: float
+
+class IbkrAccountOut(TypedDict):
+    ok: bool; connected: bool; source_system: str
+    account_id: Optional[str]; net_liquidation: Optional[float]
+    realized_pnl: Optional[float]; unrealized_pnl: Optional[float]
+    buying_power: Optional[float]; positions: List[IbkrAccountPositionOut]
+    message: str
+
+class RegimeCurrentOut(TypedDict):
+    ok: bool; regime: str; n_recent: int
+    regime_counts: Dict[str, int]; regime_pct: Dict[str, float]
+    last_scan_ts: Optional[str]; source: str
+
+class SystemStatusOut(TypedDict):
+    ok: bool; timestamp_utc: str; api_online: bool
+    kill_switch_active: bool; data_mode: str; kelly_enabled: bool
+    ibkr_connected: bool; ibkr_port: Optional[int]
+    ibkr_source_system: str; ibkr_connected_at: Optional[str]
+    execution_config_ready: bool; n_closed_trades: int
+    regime: str; signals: List[_Signal]
+
+class EquityPointOut(TypedDict):
+    date: str; equity: float
+
+class EquityHistoryOut(TypedDict):
+    ok: bool; profile: str; n_points: int
+    latest_equity: Optional[float]; initial_equity: Optional[float]
+    points: List[EquityPointOut]
+
+class ExitCandidateOut(TypedDict):
+    symbol: str; expiry: Optional[str]; strike: Optional[float]
+    right: Optional[str]; quantity: float; avg_cost: float
+    market_price: Optional[float]; unrealized_pnl: Optional[float]
+    exit_score: int; exit_reasons: List[str]; source: str
+
+class _ExitThresholds(TypedDict):
+    theta_decay_pct: float; loss_limit_pct: float; time_stop_dte: int
+
+class ExitCandidatesOut(TypedDict):
+    ok: bool; source: str; today: str
+    n_total: int; n_flagged: int
+    candidates: List[ExitCandidateOut]; thresholds: _ExitThresholds
+
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = ROOT / ".qoaistate.json"
@@ -1187,7 +1251,7 @@ def opz_paper_summary(profile: str = "paper", window_days: int = 60, asof_date: 
 
 
 @app.get("/opz/paper/equity_history")
-def opz_paper_equity_history(profile: str = "paper", limit: int = 60) -> Dict[str, Any]:
+def opz_paper_equity_history(profile: str = "paper", limit: int = 60) -> EquityHistoryOut:
     """
     Ultimi N snapshot equity ordinati per data ASC (per sparkline).
 
@@ -1647,7 +1711,7 @@ def opz_opportunity_ev_report(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/opz/ibkr/status")
-def opz_ibkr_status(try_connect: bool = False) -> Dict[str, Any]:
+def opz_ibkr_status(try_connect: bool = False) -> IbkrStatusOut:
     """
     Stato della connessione IBKR (TWS/Gateway).
 
@@ -1698,6 +1762,36 @@ def opz_ibkr_status(try_connect: bool = False) -> Dict[str, Any]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DB helper — context manager per connessioni read-only DuckDB
+# ─────────────────────────────────────────────────────────────────────────────
+
+@contextmanager
+def _db_connect_ro():
+    """
+    Context manager per connessioni DuckDB read-only.
+
+    Uso:
+        with _db_connect_ro() as con:
+            rows = con.execute("SELECT ...").fetchall()
+
+    Nota: apre/chiude una connessione per ogni request — accettabile per
+    traffico basso (dev/paper). Per produzione ad alto traffico sostituire
+    con un connection pool (duckdb >= 1.1 supporta ConnectionPool).
+    Solleva FileNotFoundError se il DB non esiste ancora.
+    """
+    import duckdb
+    import execution.storage as _st
+    db_path = str(_st.EXEC_DB_PATH)
+    if not Path(db_path).exists():
+        raise FileNotFoundError(f"DB non trovato: {db_path}")
+    con = duckdb.connect(db_path, read_only=True)
+    try:
+        yield con
+    finally:
+        con.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ROC6 — GET /opz/ibkr/account
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1717,7 +1811,7 @@ def _empty_account_response(connected: bool, message: str) -> Dict[str, Any]:
     }
 
 @app.get("/opz/ibkr/account")
-def opz_ibkr_account() -> Dict[str, Any]:
+def opz_ibkr_account() -> IbkrAccountOut:
     """
     Sommario account IBKR (net liquidation, P&L, posizioni aperte).
 
@@ -1812,7 +1906,7 @@ def opz_ibkr_account() -> Dict[str, Any]:
 
 
 @app.get("/opz/regime/current")
-def opz_regime_current(window: int = 20) -> Dict[str, Any]:
+def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
     """
     Regime corrente basato sugli ultimi N candidati registrati in DuckDB.
 
@@ -1835,57 +1929,50 @@ def opz_regime_current(window: int = 20) -> Dict[str, Any]:
     regime = "UNKNOWN"
 
     try:
-        import duckdb
-        import execution.storage as _st
-        db_path = str(_st.EXEC_DB_PATH)
-        if Path(db_path).exists():
-            con = duckdb.connect(db_path, read_only=True)
-            try:
-                rows = con.execute(
+        with _db_connect_ro() as con:
+            rows = con.execute(
+                """
+                SELECT regime, scan_ts
+                FROM opportunity_candidates
+                WHERE regime IS NOT NULL
+                ORDER BY scan_ts DESC
+                LIMIT ?
+                """,
+                (n,),
+            ).fetchall()
+            if rows:
+                source = "opportunity_candidates"
+                for row in rows:
+                    lbl = str(row[0]).strip().upper()
+                    if lbl in counts:
+                        counts[lbl] += 1
+                # last_scan_ts = most recent (first row after DESC order)
+                ts_raw = rows[0][1]
+                if ts_raw is not None:
+                    last_scan_ts = ts_raw.isoformat() if hasattr(ts_raw, "isoformat") else str(ts_raw)
+            else:
+                # Fallback: paper_trades
+                rows2 = con.execute(
                     """
-                    SELECT regime, scan_ts
-                    FROM opportunity_candidates
-                    WHERE regime IS NOT NULL
-                    ORDER BY scan_ts DESC
+                    SELECT regime_at_entry, entry_ts_utc
+                    FROM paper_trades
+                    WHERE regime_at_entry IS NOT NULL
+                    ORDER BY entry_ts_utc DESC
                     LIMIT ?
                     """,
                     (n,),
                 ).fetchall()
-                if rows:
-                    source = "opportunity_candidates"
-                    for row in rows:
+                if rows2:
+                    source = "paper_trades"
+                    for row in rows2:
                         lbl = str(row[0]).strip().upper()
                         if lbl in counts:
                             counts[lbl] += 1
-                    # last_scan_ts = most recent (first row after DESC order)
-                    ts_raw = rows[0][1]
-                    if ts_raw is not None:
-                        last_scan_ts = ts_raw.isoformat() if hasattr(ts_raw, "isoformat") else str(ts_raw)
-                else:
-                    # Fallback: paper_trades
-                    rows2 = con.execute(
-                        """
-                        SELECT regime_at_entry, entry_ts_utc
-                        FROM paper_trades
-                        WHERE regime_at_entry IS NOT NULL
-                        ORDER BY entry_ts_utc DESC
-                        LIMIT ?
-                        """,
-                        (n,),
-                    ).fetchall()
-                    if rows2:
-                        source = "paper_trades"
-                        for row in rows2:
-                            lbl = str(row[0]).strip().upper()
-                            if lbl in counts:
-                                counts[lbl] += 1
-                        ts_raw2 = rows2[0][1]
-                        if ts_raw2 is not None:
-                            last_scan_ts = str(ts_raw2)
-            finally:
-                con.close()
-    except Exception:
-        pass
+                    ts_raw2 = rows2[0][1]
+                    if ts_raw2 is not None:
+                        last_scan_ts = str(ts_raw2)
+    except Exception as _exc:
+        logger.debug("opz_regime_current: DB unavailable — %s", _exc)
 
     total = sum(counts.values())
     regime_pct = {
@@ -1908,7 +1995,7 @@ def opz_regime_current(window: int = 20) -> Dict[str, Any]:
 
 
 @app.get("/opz/system/status")
-def opz_system_status() -> Dict[str, Any]:
+def opz_system_status() -> SystemStatusOut:
     """
     Snapshot aggregato dello stato operativo del sistema.
 
@@ -1950,8 +2037,8 @@ def opz_system_status() -> Dict[str, Any]:
         ibkr_port = info.get("port")
         ibkr_source_system = info.get("source_system", "yfinance")
         ibkr_connected_at = info.get("connected_at")
-    except Exception:
-        pass
+    except Exception as _exc:
+        logger.debug("opz_system_status: IBKR manager unavailable — %s", _exc)
 
     # ── Execution config (ROOT-anchored paths) ────────────────────────────────
     execution_config_ready = (
@@ -1964,28 +2051,19 @@ def opz_system_status() -> Dict[str, Any]:
     n_closed_trades = 0
     regime = "UNKNOWN"
     try:
-        import duckdb
-        import execution.storage as _st
-        db_path = str(_st.EXEC_DB_PATH)
-        if Path(db_path).exists():
-            con = duckdb.connect(db_path, read_only=True)
-            try:
-                row_n = con.execute(
-                    "SELECT COUNT(*) FROM paper_trades WHERE exit_ts_utc IS NOT NULL"
-                ).fetchone()
-                n_closed_trades = int(row_n[0]) if row_n else 0
+        with _db_connect_ro() as con:
+            row_n = con.execute(
+                "SELECT COUNT(*) FROM paper_trades WHERE exit_ts_utc IS NOT NULL"
+            ).fetchone()
+            n_closed_trades = int(row_n[0]) if row_n else 0
 
-                row_r = con.execute(
-                    "SELECT regime FROM paper_trades WHERE regime IS NOT NULL ORDER BY entry_ts_utc DESC LIMIT 1"
-                ).fetchone()
-                if row_r:
-                    regime = str(row_r[0])
-            except Exception:
-                pass
-            finally:
-                con.close()
-    except Exception:
-        pass
+            row_r = con.execute(
+                "SELECT regime FROM paper_trades WHERE regime IS NOT NULL ORDER BY entry_ts_utc DESC LIMIT 1"
+            ).fetchone()
+            if row_r:
+                regime = str(row_r[0])
+    except Exception as _exc:
+        logger.debug("opz_system_status: DB unavailable — %s", _exc)
 
     # ── Kelly gate ────────────────────────────────────────────────────────────
     kelly_enabled = (data_mode == "VENDOR_REAL_CHAIN") and (n_closed_trades >= 50)
@@ -2189,7 +2267,7 @@ def _score_position(pos: dict, today: date | None = None) -> tuple[int, list[str
 
 
 @app.get("/opz/opportunity/exit_candidates")
-def opz_exit_candidates(top_n: int = 10, min_score: int = 1) -> Dict[str, Any]:
+def opz_exit_candidates(top_n: int = 10, min_score: int = 1) -> ExitCandidatesOut:
     """
     Score open option positions for exit urgency.
 
@@ -2243,8 +2321,7 @@ def opz_exit_candidates(top_n: int = 10, min_score: int = 1) -> Dict[str, Any]:
     # ── 2. Fallback: paper_trades open positions ──────────────────────────────
     if not candidates:
         try:
-            db_path = str(DB_PATH)
-            with duckdb.connect(db_path, read_only=True) as con:
+            with _db_connect_ro() as con:
                 rows = con.execute(
                     """
                     SELECT symbol, entry_ts_utc, strikes_json, score_at_entry, pnl
