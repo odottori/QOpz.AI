@@ -9,7 +9,7 @@
 
 param(
     [string]$PublicIp = "",
-    [string]$SshKeyPath = "C:\Users\odottori\.ssh\ssh-key-2026-03-16.key",
+    [string]$SshKeyPath = "C:\Users\odott\.ssh\qopz_vm_key",
     [string]$RemoteUser = "ubuntu",
     [string]$RemoteDir = "~/qopz"
 )
@@ -70,7 +70,7 @@ if (Test-Path $stagingDir) { Remove-Item $stagingDir -Recurse -Force }
 New-Item -ItemType Directory -Path $stagingDir | Out-Null
 
 $robocopyExcludes = @("/XD", ".venv", "__pycache__", ".git", ".tmp_test", ".zip", "node_modules") +
-                   @("/XF", "*.pyc", "*.duckdb", "*.log")
+                   @("/XF", "*.pyc", "*.duckdb", "*.log", "schema_applied.ok")
 
 $robocopyArgs = @($ProjectRoot, $stagingDir, "/E", "/NFL", "/NDL", "/NJH", "/NJS") + $robocopyExcludes
 $rc = Start-Process robocopy -ArgumentList $robocopyArgs -Wait -PassThru -WindowStyle Hidden

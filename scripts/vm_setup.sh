@@ -112,6 +112,14 @@ log "  → MkDocs + Material theme"
 sudo -u "${APP_USER}" ${PIP} install mkdocs mkdocs-material -q
 ok "  MkDocs OK"
 
+# ── 5b. Directory operative runtime ─────────────────────────────────────────
+log "5b · Creazione directory runtime (db, ops, logs, reports)..."
+for d in db ops logs reports; do
+    mkdir -p "${APP_DIR}/${d}"
+    chown "${APP_USER}:${APP_USER}" "${APP_DIR}/${d}"
+done
+ok "Directory runtime pronte"
+
 # ── 6. Build documentazione ──────────────────────────────────────────────────
 log "6/9 · Build documentazione MkDocs..."
 if [ -f "${APP_DIR}/mkdocs.yml" ]; then
