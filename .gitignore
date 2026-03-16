@@ -34,6 +34,9 @@ Thumbs.db
 
 # Local-only (do not commit)
 baseline/
+docs/*.xml
+docs/test_*.xml
+docs/alt_*.xml
 PATCH_NOTES*.md
 PROMPT*.md
 PROMPT*.txt
