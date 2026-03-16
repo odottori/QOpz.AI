@@ -107,7 +107,7 @@ while true; do
     if launch_vm; then
         ok "Launch avviato con successo"
     else
-        warn "Launch fallito (Out of Capacity?) - riprovo tra 60s..."
-        sleep 60
+        warn "Launch fallito (Out of Capacity?) - riprovo tra 20s..."
+        sleep 20
     fi
 done
