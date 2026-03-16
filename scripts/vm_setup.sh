@@ -25,9 +25,11 @@ APP_USER="${APP_USER:-ubuntu}"
 APP_DIR="/home/${APP_USER}/qopz"
 VENV_DIR="${APP_DIR}/.venv"
 PYTHON_BIN="python3.11"
-FASTAPI_PORT=8765
+FASTAPI_PORT=8765        # public (nginx → uvicorn)
+FASTAPI_INTERNAL=18765  # uvicorn binds 127.0.0.1 only
 DOCS_PORT=8080
 MKDOCS_SITE_DIR="${APP_DIR}/docs_site"
+TOKEN_FILE="/etc/qopz-api.env"
 
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
@@ -57,7 +59,8 @@ apt-get install -y -qq \
     curl \
     htop \
     unzip \
-    rsync
+    rsync \
+    nginx
 
 PYTHON_VERSION=$(python3.11 --version 2>&1)
 ok "Installato: ${PYTHON_VERSION}"
@@ -73,6 +76,44 @@ ufw allow ${DOCS_PORT}/tcp comment "MkDocs docs"
 ufw --force enable
 ok "UFW attivo: SSH(22), FastAPI(${FASTAPI_PORT}), Docs(${DOCS_PORT})"
 ufw status numbered
+
+# ── 3b. Token API + nginx ────────────────────────────────────────────────────
+log "3b · Generazione token API e configurazione nginx..."
+
+# Genera token casuale 32 byte hex
+API_TOKEN=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+echo "OPZ_API_TOKEN=${API_TOKEN}" > "${TOKEN_FILE}"
+chmod 600 "${TOKEN_FILE}"
+chown root:root "${TOKEN_FILE}"
+ok "Token API generato → ${TOKEN_FILE}"
+
+# nginx: reverse proxy su porta pubblica ${FASTAPI_PORT} → uvicorn interno ${FASTAPI_INTERNAL}
+cat > /etc/nginx/sites-available/qopz << NGINX_EOF
+limit_req_zone \$binary_remote_addr zone=qopz_api:10m rate=30r/m;
+
+server {
+    listen ${FASTAPI_PORT};
+    server_name _;
+
+    client_max_body_size 1m;
+
+    location / {
+        limit_req zone=qopz_api burst=10 nodelay;
+        proxy_pass         http://127.0.0.1:${FASTAPI_INTERNAL};
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+}
+NGINX_EOF
+
+# Disabilita default site, abilita qopz
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/qopz /etc/nginx/sites-enabled/qopz
+nginx -t && systemctl enable nginx && systemctl restart nginx
+ok "nginx configurato: :${FASTAPI_PORT} → 127.0.0.1:${FASTAPI_INTERNAL} (rate 30r/min)"
 
 # ── 4. Virtual environment ───────────────────────────────────────────────────
 log "4/9 · Creazione virtual environment..."
@@ -135,7 +176,7 @@ log "7/9 · Systemd service: qopz-api..."
 cat > /etc/systemd/system/qopz-api.service << EOF
 [Unit]
 Description=QOpz.AI FastAPI Backend
-After=network.target
+After=network.target nginx.service
 StartLimitIntervalSec=0
 
 [Service]
@@ -146,9 +187,10 @@ User=${APP_USER}
 WorkingDirectory=${APP_DIR}
 Environment="PATH=${VENV_DIR}/bin"
 Environment="PYTHONPATH=${APP_DIR}"
+EnvironmentFile=${TOKEN_FILE}
 ExecStart=${VENV_DIR}/bin/uvicorn api.opz_api:app \\
-    --host 0.0.0.0 \\
-    --port ${FASTAPI_PORT} \\
+    --host 127.0.0.1 \\
+    --port ${FASTAPI_INTERNAL} \\
     --workers 1 \\
     --log-level info
 StandardOutput=journal
@@ -210,6 +252,10 @@ echo -e "${GREEN}║${NC}  FastAPI       : ${CYAN}http://${PUBLIC_IP}:${FASTAPI_
 echo -e "${GREEN}║${NC}  Docs          : ${CYAN}http://${PUBLIC_IP}:${DOCS_PORT}${NC}"
 echo -e "${GREEN}║${NC}  App dir       : ${APP_DIR}"
 echo -e "${GREEN}║${NC}  Venv          : ${VENV_DIR}"
+echo -e "${GREEN}║${NC}  Token file    : ${TOKEN_FILE}"
+echo -e "${GREEN}╠══════════════════════════════════════════════════════════╣${NC}"
+echo -e "${GREEN}║  API TOKEN (conserva in luogo sicuro!):                  ║${NC}"
+echo -e "${YELLOW}║  ${API_TOKEN}  ${GREEN}║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════════════╣${NC}"
 echo -e "${GREEN}║  Comandi utili:                                          ║${NC}"
 echo -e "${GREEN}║${NC}  systemctl start qopz-api      → avvia FastAPI"
