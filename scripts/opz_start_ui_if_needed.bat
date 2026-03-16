@@ -2,7 +2,7 @@
 setlocal
 cd /d %~dp0\..\ui
 
-set "PORT=5173"
+set "PORT=8173"
 if "%OPZ_AGENT_OWNER%"=="" set "OPZ_AGENT_OWNER=assistant"
 if "%OPZ_FORCE_KILL_PORTS%"=="" set "OPZ_FORCE_KILL_PORTS=1"
 

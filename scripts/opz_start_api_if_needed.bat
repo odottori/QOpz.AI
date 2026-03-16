@@ -6,7 +6,7 @@ set "OPZ_ROOT=%cd%\"
 set "OPZ_PY=py"
 if exist "%OPZ_ROOT%.venv\Scripts\python.exe" set "OPZ_PY=%OPZ_ROOT%.venv\Scripts\python.exe"
 
-set "PORT=8000"
+set "PORT=8765"
 if "%OPZ_AGENT_OWNER%"=="" set "OPZ_AGENT_OWNER=assistant"
 if "%OPZ_FORCE_KILL_PORTS%"=="" set "OPZ_FORCE_KILL_PORTS=1"
 

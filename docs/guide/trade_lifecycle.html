@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QOpz.AI — Il Viaggio di un Trade</title>
+<style>
+  :root {
+    --bg:       #0d0d14;
+    --card:     #13131f;
+    --card2:    #1a1a2a;
+    --border:   #2a2a40;
+    --orange:   #ff6d00;
+    --orange2:  #ff8f00;
+    --green:    #00c853;
+    --yellow:   #ffd740;
+    --red:      #ff1744;
+    --blue:     #448aff;
+    --teal:     #00bcd4;
+    --text:     #e8e8f0;
+    --muted:    #8888aa;
+    --radius:   12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(13,13,20,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .header-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--orange);
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .progress-wrap {
+    flex: 1;
+    max-width: 480px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--orange), var(--orange2));
+    border-radius: 2px;
+    transition: width 0.5s cubic-bezier(.4,0,.2,1);
+  }
+  .step-counter {
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 60px;
+    text-align: right;
+  }
+  .step-counter span { color: var(--text); font-weight: 600; }
+
+  /* ── TOC panel (right) ── */
+  .toc-panel {
+    position: fixed;
+    right: 0;
+    top: 56px;
+    bottom: 64px;
+    width: 190px;
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 50;
+  }
+  .toc-header {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .toc-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12px;
+    border-left: 2px solid transparent;
+    transition: all 0.18s;
+    user-select: none;
+  }
+  .toc-item:hover { color: var(--text); background: var(--card2); }
+  .toc-item.active {
+    color: var(--orange);
+    border-left-color: var(--orange);
+    background: rgba(255,109,0,0.09);
+    font-weight: 600;
+  }
+  .toc-item.done { color: #44445a; }
+  .toc-item.done:hover { color: var(--muted); }
+  .toc-num {
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 14px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .toc-icon { font-size: 13px; flex-shrink: 0; }
+  .toc-name { line-height: 1.3; }
+  @media (max-width: 860px) {
+    .toc-panel { display: none; }
+  }
+
+  /* ── Stage viewport ── */
+  .stage {
+    padding-top: 72px;
+    padding-bottom: 80px;
+    padding-right: 200px;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  @media (max-width: 860px) {
+    .stage { padding-right: 0; }
+  }
+
+  .step {
+    display: none;
+    width: 100%;
+    max-width: 1000px;
+    padding: 24px 24px 0;
+    animation: fadeSlide 0.45s cubic-bezier(.4,0,.2,1);
+  }
+  .step.active { display: block; }
+
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Step card ── */
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .step-icon {
+    font-size: 44px;
+    line-height: 1;
+    filter: drop-shadow(0 0 12px currentColor);
+  }
+  .step-meta { flex: 1; }
+  .step-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 4px;
+  }
+  .step-title {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--text);
+  }
+  .step-subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .step-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 680px) {
+    .step-body { grid-template-columns: 1fr; }
+  }
+
+  /* ── Left panel (description + numbers) ── */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .description {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #c8c8e0;
+    margin-bottom: 18px;
+  }
+
+  /* data pills */
+  .data-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .data-item {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .data-item.full { grid-column: span 2; }
+  .data-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .data-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .data-value.ok    { color: var(--green); }
+  .data-value.warn  { color: var(--yellow); }
+  .data-value.bad   { color: var(--red); }
+  .data-value.blue  { color: var(--blue); }
+  .data-value.teal  { color: var(--teal); }
+  .data-value.orange{ color: var(--orange); }
+  .data-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* check list */
+  .check-list { list-style: none; }
+  .check-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 14px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+  }
+  .check-list li .check-icon { font-size: 16px; flex-shrink: 0; }
+  .check-list li .check-name { flex: 1; }
+  .check-list li .check-val  { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .check-list li.pass { border-color: rgba(0,200,83,0.3); }
+  .check-list li.fail { border-color: rgba(255,23,68,0.3); }
+
+  /* ── Right panel (operator screen mock) ── */
+  .screen {
+    background: #0a0a12;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0;
+    overflow: hidden;
+    font-family: 'Roboto Mono', 'Consolas', monospace;
+  }
+  .screen-bar {
+    background: var(--card2);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .screen-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .screen-dot.r { background: #ff5f57; }
+  .screen-dot.y { background: #ffbd2e; }
+  .screen-dot.g { background: #28c840; }
+  .screen-title {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 4px;
+    font-family: inherit;
+  }
+  .screen-body {
+    padding: 16px;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: #9090b0;
+  }
+  .screen-body .hl   { color: var(--orange); }
+  .screen-body .hlg  { color: var(--green); }
+  .screen-body .hlb  { color: var(--blue); }
+  .screen-body .hlt  { color: var(--teal); }
+  .screen-body .hly  { color: var(--yellow); }
+  .screen-body .hlr  { color: var(--red); }
+  .screen-body .dim  { color: #505068; }
+  .screen-body .row  {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid #1a1a28;
+  }
+  .screen-body .row:last-child { border-bottom: none; }
+  .screen-body .section {
+    background: #131320;
+    border: 1px solid #222238;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 8px 0;
+  }
+  .screen-body .badge {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .badge.normal  { background: rgba(0,200,83,.2);   color: var(--green); }
+  .badge.caution { background: rgba(255,215,64,.2);  color: var(--yellow); }
+  .badge.shock   { background: rgba(255,23,68,.2);   color: var(--red); }
+  .badge.pass    { background: rgba(0,200,83,.15);   color: var(--green); }
+  .badge.orange  { background: rgba(255,109,0,.2);   color: var(--orange); }
+  .badge.blue    { background: rgba(68,138,255,.2);  color: var(--blue); }
+
+  .confirm-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    background: linear-gradient(135deg, var(--orange), var(--orange2));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 11px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    text-align: center;
+    font-family: inherit;
+  }
+
+  /* ── Footer nav ── */
+  footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(13,13,20,0.97);
+    border-top: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    z-index: 100;
+  }
+  .dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .dot.active { background: var(--orange); transform: scale(1.4); }
+  .dot.done   { background: #444468; }
+
+  .nav-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .nav-btn:hover { background: var(--card2); border-color: var(--orange); color: var(--orange); }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .nav-btn.primary {
+    background: linear-gradient(135deg, var(--orange), var(--orange2));
+    border-color: transparent;
+    color: white;
+  }
+  .nav-btn.primary:hover { filter: brightness(1.1); color: white; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">QOpz.AI — Il Viaggio di un Trade</div>
+  <div class="progress-wrap"><div class="progress-bar" id="pbar" style="width:10%"></div></div>
+  <div class="step-counter">Step <span id="scur">1</span> / <span id="stot">10</span></div>
+</header>
+
+<div class="stage">
+
+  <!-- STEP 1 -->
+  <div class="step active" data-step="1">
+    <div class="step-header">
+      <div class="step-icon">📡</div>
+      <div class="step-meta">
+        <div class="step-label">Step 1 — Ricezione dati</div>
+        <div class="step-title">Il dato arriva dal provider</div>
+        <div class="step-subtitle">14:32:07 UTC — ingest pipeline attiva</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Cosa succede</div>
+        <div class="description">
+          Il provider di dati invia la catena completa di opzioni su SPY. Ogni secondo arrivano prezzi aggiornati: bid, ask, volume, open interest per ogni strike e scadenza disponibile.<br><br>
+          Il sistema registra il timestamp di produzione del dato (<strong>asof_ts</strong>) e quello di ricezione (<strong>received_ts</strong>). La differenza tra i due — la latenza — è il primo controllo di qualità.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Sottostante</div>
+            <div class="data-value orange">SPY</div>
+            <div class="data-sub">S&P 500 ETF</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">DATA_MODE</div>
+            <div class="data-value ok" style="font-size:13px;padding-top:4px">VENDOR_REAL</div>
+            <div class="data-sub">catena reale</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Strike ricevuti</div>
+            <div class="data-value blue">847</div>
+            <div class="data-sub">tutti i mesi</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Latenza dati</div>
+            <div class="data-value ok">0.8s</div>
+            <div class="data-sub">asof→received</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">ingest_pipeline.log</div>
+        </div>
+        <div class="screen-body">
+<span class="dim">[14:32:07.012]</span> <span class="hlg">INFO</span>  feed connected<br>
+<span class="dim">[14:32:07.015]</span> <span class="hlb">RECV</span>  SPY chain — 847 strikes<br>
+<span class="dim">[14:32:07.016]</span> <span class="hlt">META</span>  asof_ts = 14:32:06.204<br>
+<span class="dim">[14:32:07.016]</span> <span class="hlt">META</span>  received_ts = 14:32:07.012<br>
+<span class="dim">[14:32:07.017]</span> <span class="hlt">META</span>  latency = <span class="hlg">0.808s</span> ✓<br>
+<span class="dim">[14:32:07.018]</span> <span class="hlt">META</span>  DATA_MODE = <span class="hlg">VENDOR_REAL_CHAIN</span><br>
+<span class="dim">[14:32:07.019]</span> <span class="hlg">INFO</span>  source_system = tradier<br>
+<span class="dim">[14:32:07.019]</span> <span class="hlg">INFO</span>  source_quality = A+<br>
+          <div class="section">
+            <div class="row"><span>Record inseriti DuckDB</span><span class="hlg">847</span></div>
+            <div class="row"><span>run_id</span><span class="hlt">a3f8-c291</span></div>
+            <div class="row"><span>Watermark Kelly</span><span class="hlg">ABILITATO</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step" data-step="2">
+    <div class="step-header">
+      <div class="step-icon">🔍</div>
+      <div class="step-meta">
+        <div class="step-label">Step 2 — Lettura parametri</div>
+        <div class="step-title">I numeri dell'opportunità</div>
+        <div class="step-subtitle">SPY Put Spread — scadenza 20 aprile</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Parametri chiave estratti</div>
+        <div class="description">
+          Tra gli 847 strike, il motore identifica una combinazione interessante: un put spread su SPY con strike 490/485. Estrae tutti i parametri necessari per la valutazione.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Strike venduto</div>
+            <div class="data-value orange">490 P</div>
+            <div class="data-sub">put 20-apr</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Strike comprato</div>
+            <div class="data-value blue">485 P</div>
+            <div class="data-sub">protezione</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">IVR</div>
+            <div class="data-value ok">42</div>
+            <div class="data-sub">IV rank (0–100)</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">DTE</div>
+            <div class="data-value ok">35</div>
+            <div class="data-sub">giorni scadenza</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">IV corrente</div>
+            <div class="data-value teal">22.3%</div>
+            <div class="data-sub">volatilità implicita</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Delta short</div>
+            <div class="data-value blue">–0.18</div>
+            <div class="data-sub">esposizione dir.</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Spread bid/ask</div>
+            <div class="data-value ok">4.0%</div>
+            <div class="data-sub">del prezzo mid</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Open Interest</div>
+            <div class="data-value ok">1 240</div>
+            <div class="data-sub">contratti aperti</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">scanner — SPY 490/485 Put Spread</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row"><span class="dim">sottostante</span><span class="hl">SPY</span></div>
+            <div class="row"><span class="dim">prezzo SPY ora</span><span>$511.42</span></div>
+            <div class="row"><span class="dim">strike 490 — distanza</span><span class="hlg">4.2% OTM</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">bid / ask 490P</span><span>$1.02 / $1.10</span></div>
+            <div class="row"><span class="dim">bid / ask 485P</span><span>$0.20 / $0.24</span></div>
+            <div class="row"><span class="dim">credito netto (mid)</span><span class="hlg">$0.87</span></div>
+            <div class="row"><span class="dim">max perdita</span><span class="hlr">$4.13</span></div>
+          </div>
+<span class="dim"># Probabilità stimata (delta-based)</span><br>
+<span class="hlg">P(profit) ≈ 78%</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step" data-step="3">
+    <div class="step-header">
+      <div class="step-icon">🚦</div>
+      <div class="step-meta">
+        <div class="step-label">Step 3 — Filtri duri</div>
+        <div class="step-title">Sei soglie, nessuna eccezione</div>
+        <div class="step-subtitle">Tutto deve passare — o si scarta senza discussioni</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Risultato filtri</div>
+        <div class="description">
+          I sei filtri duri vengono applicati in sequenza. Basta un singolo FAIL per eliminare l'opportunità. Questa volta passano tutti e sei.
+        </div>
+        <ul class="check-list">
+          <li class="pass">
+            <span class="check-icon">✅</span>
+            <span class="check-name">Spread bid/ask ≤ 10%</span>
+            <span class="check-val">4.0% &lt; 10%</span>
+          </li>
+          <li class="pass">
+            <span class="check-icon">✅</span>
+            <span class="check-name">Costo spread / DTE ≤ 0.50</span>
+            <span class="check-val">0.11 &lt; 0.50</span>
+          </li>
+          <li class="pass">
+            <span class="check-icon">✅</span>
+            <span class="check-name">Open interest ≥ 100</span>
+            <span class="check-val">1 240 ✓</span>
+          </li>
+          <li class="pass">
+            <span class="check-icon">✅</span>
+            <span class="check-name">DTE in [14 – 60]</span>
+            <span class="check-val">35 giorni</span>
+          </li>
+          <li class="pass">
+            <span class="check-icon">✅</span>
+            <span class="check-name">IVR ≥ 20</span>
+            <span class="check-val">IVR = 42</span>
+          </li>
+          <li class="pass">
+            <span class="check-icon">✅</span>
+            <span class="check-name">Margine ≤ 30% capitale</span>
+            <span class="check-val">$413 = 18%</span>
+          </li>
+        </ul>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">hard_filter_engine.py</div>
+        </div>
+        <div class="screen-body">
+<span class="dim">[14:32:07.024]</span> checking SPY 490/485P<br>
+<br>
+<span class="dim">  spread_pct      =</span> <span class="hlg">4.00%</span>  <span class="dim">(≤10% ✓)</span><br>
+<span class="dim">  cost_per_dte    =</span> <span class="hlg">0.11</span>   <span class="dim">(≤0.50 ✓)</span><br>
+<span class="dim">  open_interest   =</span> <span class="hlg">1240</span>   <span class="dim">(≥100 ✓)</span><br>
+<span class="dim">  dte             =</span> <span class="hlg">35</span>     <span class="dim">(14–60 ✓)</span><br>
+<span class="dim">  ivr             =</span> <span class="hlg">42</span>     <span class="dim">(≥20 ✓)</span><br>
+<span class="dim">  margin_pct      =</span> <span class="hlg">18.0%</span>  <span class="dim">(≤30% ✓)</span><br>
+<br>
+<span class="hlg">RESULT: PASS 6/6 → procede allo scoring</span><br>
+          <div class="section">
+            <div class="row"><span class="dim">Candidati ricevuti</span><span>847</span></div>
+            <div class="row"><span class="dim">Eliminati dai filtri</span><span class="hlr">761</span></div>
+            <div class="row"><span class="dim">Ammessi allo scoring</span><span class="hlg">86</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step" data-step="4">
+    <div class="step-header">
+      <div class="step-icon">⭐</div>
+      <div class="step-meta">
+        <div class="step-label">Step 4 — Scoring</div>
+        <div class="step-title">Quattro pilastri, un punteggio</div>
+        <div class="step-subtitle">Non basta "passare i filtri" — occorre anche essere buoni</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Valutazione 4 pilastri</div>
+        <div class="description">
+          Ogni pilastro vale fino a 10 punti. Il punteggio finale è la media pesata. Solo le opportunità sopra 6.5 vengono presentate all'operatore.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">P1 — Qualità volatilità</div>
+            <div class="data-value ok">8.4</div>
+            <div class="data-sub">IVR=42, premio elevato</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">P2 — Qualità spread</div>
+            <div class="data-value ok">7.9</div>
+            <div class="data-sub">OI alto, spread stretto</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">P3 — Posizione delta</div>
+            <div class="data-value warn">6.8</div>
+            <div class="data-sub">delta –0.18, ok</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">P4 — Allineamento regime</div>
+            <div class="data-value ok">8.2</div>
+            <div class="data-sub">NORMAL, piena operatività</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">Punteggio finale</div>
+            <div class="data-value ok" style="font-size:28px">7.8 / 10</div>
+            <div class="data-sub">soglia minima 6.5 — SUPERA ✓ — rank #3 su 86 candidati</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">scoring_engine.py — SPY 490/485P</div>
+        </div>
+        <div class="screen-body">
+<span class="dim">pillar_1_vol_quality</span>:<br>
+<span class="dim">  ivr=42  →  score =</span> <span class="hlg">8.4</span><br>
+<span class="dim">  weight = 0.30</span><br>
+<br>
+<span class="dim">pillar_2_spread_quality</span>:<br>
+<span class="dim">  oi=1240, spread=4%  →  score =</span> <span class="hlg">7.9</span><br>
+<span class="dim">  weight = 0.25</span><br>
+<br>
+<span class="dim">pillar_3_delta_position</span>:<br>
+<span class="dim">  delta=-0.18  →  score =</span> <span class="hly">6.8</span><br>
+<span class="dim">  weight = 0.20</span><br>
+<br>
+<span class="dim">pillar_4_regime_align</span>:<br>
+<span class="dim">  regime=NORMAL  →  score =</span> <span class="hlg">8.2</span><br>
+<span class="dim">  weight = 0.25</span><br>
+<br>
+<span class="hlg">FINAL = 7.82  →  RANK #3 / 86</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step" data-step="5">
+    <div class="step-header">
+      <div class="step-icon">🌡️</div>
+      <div class="step-meta">
+        <div class="step-label">Step 5 — Regime check</div>
+        <div class="step-title">In che mercato siamo oggi?</div>
+        <div class="step-subtitle">L'HMM classifica il contesto prima di ogni decisione</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Stato del mercato — 14:32:07</div>
+        <div class="description">
+          L'algoritmo HMM (Hidden Markov Model) analizza volatilità realizzata, volatilità implicita, struttura dei prezzi e microstructura. Il regime corrente è <strong style="color:var(--green)">NORMAL</strong>: piena operatività, sizing al 100%.
+        </div>
+        <div class="data-grid">
+          <div class="data-item full">
+            <div class="data-label">Regime corrente</div>
+            <div class="data-value ok" style="font-size:28px">NORMAL</div>
+            <div class="data-sub">tutti i trade ammessi — sizing 100%</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Confidenza HMM</div>
+            <div class="data-value ok">87%</div>
+            <div class="data-sub">classificazione robusta</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">VIX corrente</div>
+            <div class="data-value ok">18.4</div>
+            <div class="data-sub">sotto soglia allerta</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Vol. realizzata 10g</div>
+            <div class="data-value ok">14.2%</div>
+            <div class="data-sub">mercato ordinato</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Sizing consentito</div>
+            <div class="data-value ok">100%</div>
+            <div class="data-sub">vs 50% CAUTION / 0% SHOCK</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">WAR ROOM — Pannello 2 · Regime</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row">
+              <span>Regime di mercato</span>
+              <span class="badge normal">● NORMAL</span>
+            </div>
+            <div class="row"><span class="dim">HMM confidence</span><span class="hlg">87.3%</span></div>
+            <div class="row"><span class="dim">Aggiornato</span><span>14:30:00</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">VIX</span><span class="hlg">18.4</span></div>
+            <div class="row"><span class="dim">RVol 10d</span><span class="hlg">14.2%</span></div>
+            <div class="row"><span class="dim">IVol / RVol</span><span class="hlg">1.57 ✓</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span>Connessione broker</span><span class="badge pass">✓ LIVE</span></div>
+            <div class="row"><span>Pipeline dati</span><span class="badge pass">✓ OK</span></div>
+            <div class="row"><span>Gate sistema</span><span class="badge pass">✓ VERDE</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step" data-step="6">
+    <div class="step-header">
+      <div class="step-icon">📋</div>
+      <div class="step-meta">
+        <div class="step-label">Step 6 — WAR ROOM</div>
+        <div class="step-title">L'opportunità arriva sull'interfaccia</div>
+        <div class="step-subtitle">Tutto il lavoro di calcolo si traduce in una proposta chiara</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Proposta presentata all'operatore</div>
+        <div class="description">
+          Il sistema ha fatto il lavoro sporco: 847 candidati, 761 scartati, 86 valutati, 1 proposto come #3 di giornata. Adesso tocca all'operatore guardare, capire e decidere. Il sistema aspetta.
+        </div>
+        <div class="data-grid">
+          <div class="data-item full">
+            <div class="data-label">Operazione proposta</div>
+            <div class="data-value orange" style="font-size:16px">SPY Put Spread 490/485</div>
+            <div class="data-sub">scadenza 20 aprile · 35 giorni</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Premio incassato</div>
+            <div class="data-value ok">$0.87</div>
+            <div class="data-sub">per contratto</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Max perdita</div>
+            <div class="data-value bad">$4.13</div>
+            <div class="data-sub">definita, non stimata</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Contratti suggeriti</div>
+            <div class="data-value orange">1</div>
+            <div class="data-sub">sizing Kelly: 1 lotto</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Margine richiesto</div>
+            <div class="data-value warn">$413</div>
+            <div class="data-sub">18% del capitale</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">WAR ROOM — Pannello 3 · Opportunità</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row"><span class="hl">SPY 490/485 Put Spread</span><span class="badge orange">RANK #3</span></div>
+            <div class="row"><span class="dim">Score</span><span class="hlg">7.82 / 10</span></div>
+            <div class="row"><span class="dim">Regime</span><span class="badge normal">NORMAL</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">Credito</span><span class="hlg">+$0.87 / contratto</span></div>
+            <div class="row"><span class="dim">Max loss</span><span class="hlr">−$4.13 / contratto</span></div>
+            <div class="row"><span class="dim">P(profit)</span><span class="hlg">~78%</span></div>
+            <div class="row"><span class="dim">DTE</span><span>35 giorni</span></div>
+            <div class="row"><span class="dim">IVR</span><span class="hlg">42</span></div>
+          </div>
+          <button class="confirm-btn">✅ &nbsp;CONFERMA ORDINE &nbsp;(doppio click)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="step" data-step="7">
+    <div class="step-header">
+      <div class="step-icon">✅</div>
+      <div class="step-meta">
+        <div class="step-label">Step 7 — Conferma operatore</div>
+        <div class="step-title">L'operatore decide. Il sistema esegue.</div>
+        <div class="step-subtitle">Nessun ordine parte senza doppio click esplicito</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Il momento della decisione</div>
+        <div class="description">
+          L'operatore ha letto la proposta, verificato i parametri, controllato il contesto di mercato. Fa doppio click su "Conferma". Il sistema genera un <strong>preview token univoco</strong> e prepara l'ordine combo nativo IBKR — le due gambe vengono inviate come un'unica istruzione, non come due ordini separati.
+        </div>
+        <div class="data-grid">
+          <div class="data-item full">
+            <div class="data-label">Azione operatore</div>
+            <div class="data-value ok" style="font-size:16px">Doppio click confermato</div>
+            <div class="data-sub">14:32:31.447 UTC</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">Preview token generato</div>
+            <div class="data-value teal" style="font-size:14px">tkn_8b2f-a391-cc44</div>
+            <div class="data-sub">valido 90 secondi, uso singolo</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Tipo ordine</div>
+            <div class="data-value blue">LIMIT</div>
+            <div class="data-sub">combo IBKR nativo</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Prezzo limite</div>
+            <div class="data-value ok">$0.85</div>
+            <div class="data-sub">credit netto minimo</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">api/opz_api.py — /confirm</div>
+        </div>
+        <div class="screen-body">
+<span class="dim">[14:32:31]</span> <span class="hlg">POST</span> /confirm<br>
+<span class="dim">  token:    </span><span class="hlt">tkn_8b2f-a391-cc44</span><br>
+<span class="dim">  symbol:   </span><span class="hl">SPY</span><br>
+<span class="dim">  strategy: </span>put_spread<br>
+<span class="dim">  short:    </span>490P  qty=1  sell<br>
+<span class="dim">  long:     </span>485P  qty=1  buy<br>
+<span class="dim">  net_credit: </span><span class="hlg">0.85 min</span><br>
+<br>
+<span class="dim">[14:32:31]</span> kill_switch = <span class="hlg">OFF</span> ✓<br>
+<span class="dim">[14:32:31]</span> regime = <span class="hlg">NORMAL</span> ✓<br>
+<span class="dim">[14:32:31]</span> token valid ✓<br>
+<span class="dim">[14:32:31]</span> <span class="hlg">→ routing to IBKR combo order</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 8 -->
+  <div class="step" data-step="8">
+    <div class="step-header">
+      <div class="step-icon">📈</div>
+      <div class="step-meta">
+        <div class="step-label">Step 8 — Trade aperto</div>
+        <div class="step-title">Eseguito. Monitoraggio attivo.</div>
+        <div class="step-subtitle">L'ordine è sul mercato — inizia la fase di gestione</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Esecuzione e registrazione</div>
+        <div class="description">
+          Il broker esegue le due gambe come un combo unico. Il riempimento avviene a $0.89 — meglio del minimo richiesto. Tutto viene registrato nell'event trail: ogni transizione è una riga in <strong>order_events</strong>.
+        </div>
+        <div class="data-grid">
+          <div class="data-item full">
+            <div class="data-label">Esecuzione</div>
+            <div class="data-value ok">$0.89 incassato</div>
+            <div class="data-sub">14:32:45 UTC — meglio del limite $0.85</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Premio totale</div>
+            <div class="data-value ok">$89.00</div>
+            <div class="data-sub">1 contratto × 100</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Margine bloccato</div>
+            <div class="data-value warn">$411.00</div>
+            <div class="data-sub">max loss netta</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">P&L attuale</div>
+            <div class="data-value ok">+$89</div>
+            <div class="data-sub">valore pieno — giorno 0</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Break-even SPY</div>
+            <div class="data-value blue">$489.11</div>
+            <div class="data-sub">4.4% sotto il prezzo ora</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">order_events — event trail</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row"><span class="dim">event</span><span class="hlg">FILLED</span></div>
+            <div class="row"><span class="dim">trade_id</span><span class="hlt">trd_c7a2-9041</span></div>
+            <div class="row"><span class="dim">filled_at</span><span>14:32:45.112</span></div>
+            <div class="row"><span class="dim">fill_price</span><span class="hlg">$0.89 (netto)</span></div>
+            <div class="row"><span class="dim">short_fill</span><span>490P @ $1.11</span></div>
+            <div class="row"><span class="dim">long_fill</span><span>485P @ $0.22</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">stato posizione</span><span class="badge pass">APERTA</span></div>
+            <div class="row"><span class="dim">DTE rimanenti</span><span class="hl">35</span></div>
+            <div class="row"><span class="dim">theta giornaliero</span><span class="hlg">~$2.54/g</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 9 -->
+  <div class="step" data-step="9">
+    <div class="step-header">
+      <div class="step-icon">🎯</div>
+      <div class="step-meta">
+        <div class="step-label">Step 9 — Monitoring (18 giorni dopo)</div>
+        <div class="step-title">Exit candidate rilevato</div>
+        <div class="step-subtitle">Il theta ha lavorato — 72% del profitto massimo raggiunto</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Stato posizione — giorno 18/35</div>
+        <div class="description">
+          SPY è rimasto sopra 490. Il theta decay ha ridotto il valore dell'opzione venduta da $0.89 a $0.25. Il sistema segnala che la posizione ha raggiunto il <strong style="color:var(--green)">72% del profitto massimo</strong>: è il momento di chiudere e liberare margine.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Valore attuale spread</div>
+            <div class="data-value warn">$0.25</div>
+            <div class="data-sub">da $0.89 iniziali</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">P&L attuale</div>
+            <div class="data-value ok">+$64</div>
+            <div class="data-sub">+72% del massimo</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">DTE rimasti</div>
+            <div class="data-value warn">17</div>
+            <div class="data-sub">metà vita percorsa</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">SPY ora</div>
+            <div class="data-value ok">$513.80</div>
+            <div class="data-sub">+2.4% da apertura</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">Trigger exit</div>
+            <div class="data-value ok" style="font-size:16px">Theta ≥ 70% ✅</div>
+            <div class="data-sub">rischio residuo non vale il premio restante</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">WAR ROOM — Pannello 3 · Exit Candidates 🚨</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row">
+              <span class="hl">SPY 490/485 PS</span>
+              <span class="badge orange">EXIT</span>
+            </div>
+            <div class="row"><span class="dim">theta decay</span><span class="hlg">72% ✓</span></div>
+            <div class="row"><span class="dim">loss trigger</span><span class="dim">NO</span></div>
+            <div class="row"><span class="dim">time stop</span><span class="dim">NO (17d rimasti)</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">P&L aperto</span><span class="hlg">+$64.00 (+72%)</span></div>
+            <div class="row"><span class="dim">valore riacquisto</span><span>~$0.25</span></div>
+            <div class="row"><span class="dim">rischio residuo</span><span class="hly">17 giorni</span></div>
+          </div>
+<span class="hly">⚡ Raccomandazione: chiudere ora</span><br>
+<span class="dim">  libera $411 di margine</span><br>
+          <button class="confirm-btn">🎯 &nbsp;CHIUDI POSIZIONE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 10 -->
+  <div class="step" data-step="10">
+    <div class="step-header">
+      <div class="step-icon">🏁</div>
+      <div class="step-meta">
+        <div class="step-label">Step 10 — Trade chiuso</div>
+        <div class="step-title">Missione completata.</div>
+        <div class="step-subtitle">Dal dato grezzo al profitto incassato — il ciclo è completo</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Riepilogo finale</div>
+        <div class="description">
+          L'operatore conferma la chiusura. Il sistema riacquista lo spread a $0.23 (meglio del $0.25 stimato). Il trade viene registrato come chiuso nell'event trail. Il margine è libero per la prossima opportunità.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Aperto il</div>
+            <div class="data-value orange" style="font-size:14px">16 mar 14:32</div>
+            <div class="data-sub">credito $0.89</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Chiuso il</div>
+            <div class="data-value ok" style="font-size:14px">3 apr 10:15</div>
+            <div class="data-sub">riacquisto $0.23</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">P&L realizzato</div>
+            <div class="data-value ok" style="font-size:32px">+$66.00</div>
+            <div class="data-sub">+74.2% del massimo — 18 giorni di detenzione su 35 disponibili</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Margine liberato</div>
+            <div class="data-value ok">$411</div>
+            <div class="data-sub">disponibile subito</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Durata trade</div>
+            <div class="data-value blue">18 giorni</div>
+            <div class="data-sub">su 35 DTE iniziali</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">order_events — CLOSED</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row"><span class="dim">event</span><span class="hlg">CLOSED</span></div>
+            <div class="row"><span class="dim">trade_id</span><span class="hlt">trd_c7a2-9041</span></div>
+            <div class="row"><span class="dim">closed_at</span><span>03-apr 10:15:22</span></div>
+            <div class="row"><span class="dim">close_price</span><span class="hlg">$0.23 (netto)</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">P&L realizzato</span><span class="hlg">+$66.00</span></div>
+            <div class="row"><span class="dim">ROI margine</span><span class="hlg">+16.1%</span></div>
+            <div class="row"><span class="dim">durata</span><span>18 giorni</span></div>
+            <div class="row"><span class="dim">stato finale</span><span class="badge pass">WIN ✓</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">trade N. chiusi</span><span class="hlg">12</span></div>
+            <div class="row"><span class="dim">Kelly gate (≥50)</span><span class="hly">38 rimasti</span></div>
+            <div class="row"><span class="dim">DATA_MODE</span><span class="hlg">VENDOR_REAL_CHAIN</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /stage -->
+
+<footer>
+  <button class="nav-btn" id="btnPrev" onclick="navigate(-1)" disabled>← Indietro</button>
+  <div class="dots" id="dots"></div>
+  <button class="nav-btn primary" id="btnNext" onclick="navigate(1)">Avanti →</button>
+</footer>
+
+<!-- ── TOC panel ── -->
+<nav class="toc-panel" id="tocPanel">
+  <div class="toc-header">I Passi del Trade</div>
+  <div class="toc-item active" data-step="1" onclick="goTo(1)">
+    <span class="toc-num">1</span><span class="toc-icon">📡</span>
+    <span class="toc-name">Dato in arrivo</span>
+  </div>
+  <div class="toc-item" data-step="2" onclick="goTo(2)">
+    <span class="toc-num">2</span><span class="toc-icon">🔍</span>
+    <span class="toc-name">I numeri</span>
+  </div>
+  <div class="toc-item" data-step="3" onclick="goTo(3)">
+    <span class="toc-num">3</span><span class="toc-icon">🚦</span>
+    <span class="toc-name">Filtri duri</span>
+  </div>
+  <div class="toc-item" data-step="4" onclick="goTo(4)">
+    <span class="toc-num">4</span><span class="toc-icon">⭐</span>
+    <span class="toc-name">Scoring</span>
+  </div>
+  <div class="toc-item" data-step="5" onclick="goTo(5)">
+    <span class="toc-num">5</span><span class="toc-icon">🌡️</span>
+    <span class="toc-name">Regime</span>
+  </div>
+  <div class="toc-item" data-step="6" onclick="goTo(6)">
+    <span class="toc-num">6</span><span class="toc-icon">📋</span>
+    <span class="toc-name">WAR ROOM</span>
+  </div>
+  <div class="toc-item" data-step="7" onclick="goTo(7)">
+    <span class="toc-num">7</span><span class="toc-icon">✅</span>
+    <span class="toc-name">Conferma</span>
+  </div>
+  <div class="toc-item" data-step="8" onclick="goTo(8)">
+    <span class="toc-num">8</span><span class="toc-icon">📈</span>
+    <span class="toc-name">Trade aperto</span>
+  </div>
+  <div class="toc-item" data-step="9" onclick="goTo(9)">
+    <span class="toc-num">9</span><span class="toc-icon">🎯</span>
+    <span class="toc-name">Exit candidate</span>
+  </div>
+  <div class="toc-item" data-step="10" onclick="goTo(10)">
+    <span class="toc-num">10</span><span class="toc-icon">🏁</span>
+    <span class="toc-name">Trade chiuso</span>
+  </div>
+</nav>
+
+<script>
+  const TOTAL = 10;
+  let current = 1;
+
+  function goTo(n) {
+    document.querySelector(`.step[data-step="${current}"]`).classList.remove("active");
+    current = n;
+    document.querySelector(`.step[data-step="${current}"]`).classList.add("active");
+
+    // progress
+    document.getElementById("pbar").style.width = (current / TOTAL * 100) + "%";
+    document.getElementById("scur").textContent = current;
+
+    // nav buttons
+    document.getElementById("btnPrev").disabled = (current === 1);
+    const btn = document.getElementById("btnNext");
+    if (current === TOTAL) {
+      btn.textContent = "↩ Ricomincia";
+    } else {
+      btn.textContent = "Avanti →";
+    }
+
+    // dots
+    document.querySelectorAll(".dot").forEach((d, i) => {
+      d.classList.remove("active","done");
+      if (i + 1 === current) d.classList.add("active");
+      else if (i + 1 < current) d.classList.add("done");
+    });
+
+    // toc
+    document.querySelectorAll(".toc-item").forEach(item => {
+      const s = parseInt(item.dataset.step);
+      item.classList.remove("active","done");
+      if (s === current) item.classList.add("active");
+      else if (s < current) item.classList.add("done");
+    });
+
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  function navigate(dir) {
+    const next = current + dir;
+    if (next < 1) return;
+    if (next > TOTAL) { goTo(1); return; }
+    goTo(next);
+  }
+
+  // Build dots
+  const dotsEl = document.getElementById("dots");
+  for (let i = 1; i <= TOTAL; i++) {
+    const d = document.createElement("div");
+    d.className = "dot" + (i === 1 ? " active" : "");
+    d.title = "Step " + i;
+    d.onclick = () => goTo(i);
+    dotsEl.appendChild(d);
+  }
+
+  // Keyboard navigation
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); navigate(1); }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); navigate(-1); }
+  });
+</script>
+
+</body>
+</html>

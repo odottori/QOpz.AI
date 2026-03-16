@@ -1,0 +1,50 @@
+site_name: QOpz.AI — Guida Operativa
+site_description: Dalla filosofia al trade — tutto quello che devi sapere su QOpz.AI
+site_author: QOpz.AI Team
+docs_dir: docs/guide
+
+theme:
+  name: material
+  language: it
+  palette:
+    - scheme: slate
+      primary: deep orange
+      accent: orange
+  font:
+    text: Inter
+    code: Roboto Mono
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+    - content.tooltips
+
+nav:
+  - Prefazione: index.md
+  - 'Cap. 0 — Il Perché': 00_perche.md
+  - 'Cap. 1 — I Dati': 02_dati.md
+  - 'Cap. 2 — I Filtri': 03_filtri.md
+  - 'Cap. 3 — Il Regime': 04_regime.md
+  - 'Cap. 4 — Le Protezioni': 05_protezioni.md
+  - 'Cap. 5 — La WAR ROOM': 06_war_room.md
+  - 'Appendice A — I Dati nel dettaglio': appendice_a_dati.md
+  - 'Il Viaggio di un Trade': trade_lifecycle.md
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+extra:
+  generator: false

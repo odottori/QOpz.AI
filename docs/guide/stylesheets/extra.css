@@ -1,0 +1,129 @@
+/* ── Separatore nav: linea sopra "Il Viaggio di un Trade" ── */
+.md-nav__item:has(a[href*="trade_lifecycle"]) {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ── Toggle button ───────────────────────────────────────── */
+#sidebar-toggle {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 9999;
+  background: var(--md-primary-fg-color);
+  border: none;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: background 0.2s;
+}
+#sidebar-toggle:hover { background: var(--md-primary-fg-color--dark); }
+#sidebar-toggle svg { fill: white; width: 20px; height: 20px; }
+
+/* ── Print button ────────────────────────────────────────── */
+#print-btn {
+  position: fixed;
+  top: 14px;
+  left: 58px;
+  z-index: 9999;
+  background: var(--md-primary-fg-color);
+  border: none;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: background 0.2s;
+}
+#print-btn:hover { background: var(--md-primary-fg-color--dark); }
+#print-btn svg { fill: white; width: 20px; height: 20px; }
+
+/* ── Print-all button ────────────────────────────────────── */
+#print-all-btn {
+  position: fixed;
+  top: 14px;
+  left: 102px;
+  z-index: 9999;
+  background: var(--md-primary-fg-color);
+  border: none;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: background 0.2s;
+}
+#print-all-btn:hover { background: var(--md-primary-fg-color--dark); }
+#print-all-btn svg { fill: white; width: 20px; height: 20px; }
+
+/* ── Sidebar sinistra: nasconde e libera spazio ──────────── */
+.md-sidebar--primary {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+body.sidebar-hidden .md-sidebar--primary {
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+  /* rimane nel DOM con la sua larghezza originale
+     così la sidebar destra NON si sposta */
+}
+
+/* Solo il contenuto centrale si allarga */
+body.sidebar-hidden .md-content {
+  margin-left: calc(0px - var(--md-sidebar-width, 242px)) !important;
+  transition: margin-left 0.25s ease;
+}
+
+/* Sidebar destra: posizione fixed, non risente del layout */
+.md-sidebar--secondary {
+  position: fixed !important;
+  right: 0;
+  top: var(--md-header-height, 48px);
+}
+
+/* ── Stampa PDF ──────────────────────────────────────────── */
+@media print {
+  #sidebar-toggle, #print-btn, #print-all-btn,
+  .md-sidebar, .md-header, .md-footer,
+  .md-search, .md-tabs { display: none !important; }
+
+  .md-content {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .md-main__inner { margin: 0 !important; }
+
+  body { font-size: 11pt; color: #000 !important; background: #fff !important; }
+
+  h1, h2, h3 { color: #000 !important; page-break-after: avoid; }
+
+  p, li { line-height: 1.6; }
+
+  blockquote {
+    border-left: 3px solid #ccc;
+    padding-left: 1em;
+    color: #444 !important;
+  }
+
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 6px 10px; }
+
+  a { color: #000 !important; text-decoration: none; }
+
+  .md-typeset code { background: #f4f4f4 !important; color: #000 !important; }
+}

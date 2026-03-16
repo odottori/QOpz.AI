@@ -34,7 +34,12 @@ Thumbs.db
 
 # Local-only (do not commit)
 baseline/
-PATCH_NOTES_*.md
+PATCH_NOTES*.md
+PROMPT*.md
+PROMPT*.txt
+
+# MkDocs build output
+site/
 
 aaa.txt
 

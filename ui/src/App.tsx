@@ -296,7 +296,7 @@ type TabKey = "warroom" | "pipeline" | "universe" | "opportunity" | "trades" | "
 type UniverseSubTab = "titoli" | "indici" | "opzioni" | "ciclo" | "palinsesto";
 type MarkdownTable = { headers: string[]; rows: string[][] };
 type ReleaseMdView = { before: string; table: MarkdownTable | null; after: string };
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:8765";
 
 function fmtPct(v: number | null): string {
   if (v === null) return "-";
@@ -1529,7 +1529,7 @@ export default function App() {
           <span className="clock">{clockText}</span>
           <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API LIVE" : "API DOWN"}</span>
           <button className="btn btn-primary" onClick={refreshAll} disabled={busy}>{busy ? "REFRESHING" : "REFRESH"}</button>
-          <a className="btn btn-ghost" href="http://localhost:8000/health" target="_blank" rel="noreferrer">API /HEALTH</a>
+          <a className="btn btn-ghost" href="http://localhost:8765/health" target="_blank" rel="noreferrer">API /HEALTH</a>
           <button
             className={`btn ${(sysStatus?.kill_switch_active) ? "btn-warning" : "btn-danger"}`}
             onClick={doKillSwitch}
