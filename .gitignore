@@ -44,8 +44,6 @@ PROMPT*.txt
 # MkDocs build output
 site/
 
-aaa.txt
-
 # UI
 ui/node_modules/
 ui/dist/
