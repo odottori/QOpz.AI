@@ -15,7 +15,7 @@ $VCN_NAME  = "qopz-vcn"
 $SUB_NAME  = "qopz-subnet"
 $VCN_CIDR  = "10.0.0.0/16"
 $SUB_CIDR  = "10.0.0.0/24"
-$MAX_TRIES = 500
+$MAX_TRIES = 4320   # ~24h a 20s/tentativo
 $DELAY_SEC = 20
 
 $OCI = "C:\Program Files (x86)\Oracle\oci_cli\oci.exe"
