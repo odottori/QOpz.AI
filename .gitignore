@@ -20,6 +20,10 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+*.lnk
+
+# Generated demo / provider data
+data/providers/*.json
 
 # Archives
 *.zip

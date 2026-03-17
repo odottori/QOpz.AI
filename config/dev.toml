@@ -6,8 +6,8 @@
 
 [phase0]
 requirements_lock = "requirements.lock"
-ibkr_timeout_sec  = 10       # seconds to wait for IBKR API connection (validator check)
-md_timeout_sec    = 10       # seconds to wait for market-data response
+ibkr_timeout_sec  = 30       # seconds to wait for IBKR API connection (validator check)
+md_timeout_sec    = 30       # seconds to wait for market-data response
 md_symbol         = "SPY"    # reference symbol used in phase-0 market-data check
 md_exchange       = "SMART"
 md_currency       = "USD"
@@ -26,8 +26,8 @@ mode = "synthetic"  # DATA_MODE watermark: synthetic surface calibrated data
 [broker]
 # TWS/IBG paper account — port 7497 = paper, 7496 = live (see IBKR Gateway settings)
 host      = "127.0.0.1"
-port      = 7497        # DEV uses paper port; no real money at risk
-client_id = 7           # must be unique per connected client (change if conflict)
+port      = 7496        # TWS live socket (7496=live, 7497=paper)
+client_id = 12          # must be unique per connected client (change if conflict)
 
 [ops]
 log_dir          = "logs"

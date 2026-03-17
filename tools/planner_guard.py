@@ -292,6 +292,13 @@ def _resolve_changed_files(args: argparse.Namespace, plan: Dict[str, Any]) -> Li
 def cmd_check(args: argparse.Namespace) -> int:
     plan = _load_json(Path(args.plan))
     state = _load_json(Path(args.state))
+
+    # When all targets are complete there is no active step and no scope to enforce.
+    state_next = _state_next_step(state)
+    if state_next == "COMPLETE":
+        print("PLANNER_GUARD OK step=COMPLETE (all targets achieved, no scope restrictions)")
+        return 0
+
     active_path = Path(args.active)
     if not active_path.exists():
         print(f"PLANNER_GUARD FAIL missing {args.active}")

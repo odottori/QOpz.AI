@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -21,16 +23,26 @@ class TestPlannerGuardSmoke(unittest.TestCase):
         self.assertIn('PLANNER_GUARD STATUS', out)
 
     def test_planner_guard_check_fails_without_lock(self) -> None:
+        """Guard must fail when active_step.json is absent and next_step is not COMPLETE."""
         script = ROOT / 'tools' / 'planner_guard.py'
         active = ROOT / 'tests' / '.tmp_missing_active_step.json'
         if active.exists():
             active.unlink()
+        # Use a temporary state file with a real in-progress next_step so the
+        # COMPLETE short-circuit is not triggered.
+        with tempfile.NamedTemporaryFile(
+            mode='w', suffix='.json', delete=False, encoding='utf-8'
+        ) as tf:
+            json.dump({'next_step': 'F1-T5', 'steps_completed': []}, tf)
+            tmp_state = tf.name
         proc = subprocess.run(
             [
                 sys.executable,
                 str(script),
                 '--active',
                 str(active),
+                '--state',
+                tmp_state,
                 'check',
                 '--check-target',
                 'index',
@@ -39,6 +51,7 @@ class TestPlannerGuardSmoke(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+        Path(tmp_state).unlink(missing_ok=True)
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn('missing', ((proc.stdout or '') + (proc.stderr or '')).lower())
 

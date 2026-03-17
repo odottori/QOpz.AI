@@ -2,12 +2,12 @@
 # Profili: dev, paper, live
 
 # Storage
-duckdb>=1.4.0
+duckdb>=1.4.4
 pyarrow>=14.0
 
 # Data / numerics
-numpy>=1.26
-pandas>=2.1
+numpy>=2.0
+pandas>=2.1,<3.0
 scipy>=1.12
 
 # Machine learning — regime detection
