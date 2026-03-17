@@ -15,7 +15,7 @@ compute_expected_move(contracts, underlying)  -> EM tuple
 
 Profiles
 --------
-dev   : CSV fallback from data/providers/chain_{symbol}.csv (synthetic)
+dev   : CSV fallback from data/providers/synt_chain_{symbol}.csv (synthetic)
 paper : IBKR TWS paper account (port 7496), falls back to CSV on error
 live  : IBKR TWS live account (port 7497), falls back to CSV on error
 """
@@ -460,7 +460,7 @@ def _fetch_chain_csv(
     max_dte: int = HARD_MAX_DTE,
 ) -> tuple[list[OptionContract], float]:
     """
-    Load chain from data/providers/chain_{SYMBOL}.csv.
+    Load chain from data/providers/synt_chain_{SYMBOL}.csv.
 
     CSV schema (required columns):
         symbol, expiry, strike, right, bid, ask, delta, gamma, theta, vega,
@@ -469,7 +469,7 @@ def _fetch_chain_csv(
 
     Returns (contracts, underlying_price). underlying_price = median of rows.
     """
-    path = CHAIN_CSV_DIR / f"chain_{symbol.upper()}.csv"
+    path = CHAIN_CSV_DIR / f"synt_chain_{symbol.upper()}.csv"
     if not path.exists():
         return [], 0.0
 

@@ -367,7 +367,7 @@ class TestCombinedEventsFlag(unittest.TestCase):
 class TestScanOpportunitiesEventsIntegration(unittest.TestCase):
     """
     Usa events_map pre-caricato per evitare chiamate yfinance/rete.
-    Chain sempre da chain_TEST.csv.
+    Chain sempre da synt_chain_TEST.csv.
     IV history inline deterministico.
     """
 

@@ -11,7 +11,7 @@ class TestF6T2ProviderRouter(unittest.TestCase):
     def setUp(self):
         self.providers_dir = Path("data/providers")
         self.providers_dir.mkdir(parents=True, exist_ok=True)
-        self.external_csv = self.providers_dir / "external_delayed_quotes.csv"
+        self.external_csv = self.providers_dir / "synt_external_delayed_quotes.csv"
         self.external_csv.write_text(
             "symbol,asset_type,last,bid,ask,iv,open_interest,volume,delta,observed_at_utc\n"
             "SPY,etf,601.0,600.8,601.2,0.24,11000000,9000000,0.30,2026-03-05T10:00:00Z\n"

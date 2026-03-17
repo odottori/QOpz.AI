@@ -555,7 +555,7 @@ class TestCacheRoundtrip(unittest.TestCase):
 
 class TestFetchAndFilterChainDev(unittest.TestCase):
     """
-    Tests that use the real chain_TEST.csv fixture at data/providers/chain_TEST.csv.
+    Tests that use the real synt_chain_TEST.csv fixture at data/providers/synt_chain_TEST.csv.
     Profile=dev → CSV path always, no IBKR, no cache write.
     """
 
@@ -659,7 +659,7 @@ class TestFetchThenAnalytics(unittest.TestCase):
     def test_pipeline_produces_expected_move(self):
         result = fetch_and_filter_chain("TEST", profile="dev", use_cache=False)
         if not result.contracts_kept:
-            self.skipTest("No contracts passed filters — check chain_TEST.csv fixture")
+            self.skipTest("No contracts passed filters — check synt_chain_TEST.csv fixture")
         analytics = compute_chain_analytics(result)
         # Expected move should be set if ATM pair exists in filtered contracts
         # (may be None if both ATM call and put don't survive filters)

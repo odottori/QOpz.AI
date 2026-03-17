@@ -16,7 +16,7 @@ Test suite per scan_opportunities() e funzioni di supporto:
     - IV history passata via iv_history_map
     - DATA_MODE watermark nel risultato
 
-Nessun IBKR, nessuna rete, solo CSV fixture (chain_TEST.csv).
+Nessun IBKR, nessuna rete, solo CSV fixture (synt_chain_TEST.csv).
 """
 from __future__ import annotations
 

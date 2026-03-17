@@ -9,7 +9,7 @@ from ._row_utils import normalize_symbols, to_universe_row, utcnow_iso
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_EXTERNAL_DELAYED_CSV = ROOT / "data" / "providers" / "external_delayed_quotes.csv"
+DEFAULT_EXTERNAL_DELAYED_CSV = ROOT / "data" / "providers" / "synt_external_delayed_quotes.csv"
 
 
 class ExternalDelayedCsvProvider:
