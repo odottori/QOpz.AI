@@ -22,8 +22,9 @@ venv/
 Thumbs.db
 *.lnk
 
-# Generated demo / provider data
+# Generated demo / provider data (synthetic: prefix synt_*)
 data/providers/*.json
+data/providers/synt_*
 
 # Archives
 *.zip
