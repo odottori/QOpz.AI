@@ -1,0 +1,44 @@
+# ── Virtual env & cache ───────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# ── Runtime data (montati come volumi) ────────────────────────────────────────
+db/
+logs/
+ops/
+reports/
+
+# ── Frontend (deploy separato su Vercel) ──────────────────────────────────────
+ui/
+
+# ── Test & dev ────────────────────────────────────────────────────────────────
+tests/
+scripts/
+tools/
+docs/
+planner/
+samples/
+.quarantine/
+.canonici/
+
+# ── Git & temp ────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.tmp/
+.tmp_test/
+
+# ── Windows artifacts ─────────────────────────────────────────────────────────
+*.bat
+*.ps1
+
+# ── Docs & config vari ───────────────────────────────────────────────────────
+*.md
+AGENTS.md
+CLAUDE.md
+*.lock
+validator.py

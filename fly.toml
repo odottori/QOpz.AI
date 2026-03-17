@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# QOpz.AI — Fly.io deployment config
+# Region: fra (Frankfurt) — vicino a IBKR EU
+# API: FastAPI + uvicorn su porta 8765
+# Volume: qopz_data montato su /app/db (DuckDB persistente)
+# ─────────────────────────────────────────────────────────────────────────────
+
+app            = "qopz-ai"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  OPZ_PROFILE = "dev"
+  # OPZ_API_TOKEN — impostare via: fly secrets set OPZ_API_TOKEN=<token>
+
+[http_service]
+  internal_port       = 8765
+  force_https         = true
+  auto_stop_machines  = false   # API sempre attiva, non va in sleep
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type       = "requests"
+    soft_limit = 20
+    hard_limit = 30
+
+[[vm]]
+  memory   = "512mb"   # minimo per numpy/scikit-learn/xgboost
+  cpu_kind = "shared"
+  cpus     = 1
+
+[mounts]
+  source      = "qopz_data"   # fly volumes create qopz_data --region fra
+  destination = "/app/db"
+  initial_size = "1gb"

@@ -30,6 +30,7 @@ Thumbs.db
 !.canonici/**
 !.qoaistate.json
 !.step_index.json
+!.dockerignore
 !.gitattributes
 
 # Local-only (do not commit)
