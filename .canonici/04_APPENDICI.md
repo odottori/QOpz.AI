@@ -77,7 +77,7 @@ In caso di regime switch verso **SHOCK**:
   - hedge overlay se necessario
   - gestione/chiusura secondo risk cap e regole operative (no “set-and-forget”)
 
-## Addendum v.T.11.4 — STARTER-LITE checklist (8 item)
+## Addendum v.T.11.4 — MICRO checklist (8 item)
 1. Market data pipeline (underlying real) + calendari + logging
 2. Regime classifier base (no HMM), con anti-leakage guard attivo
 3. Strategia unica: Bull Put (IWM) con regole entry/exit semplici
@@ -94,11 +94,11 @@ Metodo di stima: applicare gli scenari VIX storici definiti in T5.3 al P&L corre
 
 Nota: il budget hedge è una conseguenza del vincolo su Y, non una % fissa del credito.
 
-## Addendum v.T.11.4.1 — Esecuzione (STARTER-LITE)
-Per STARTER-LITE l’esecuzione può essere semplificata:
+## Addendum v.T.11.4.1 — Esecuzione (MICRO)
+Nel tier MICRO l’esecuzione può essere semplificata:
 - ordine singolo (limit) con regole di aggressività controllata, oppure
 - ladder aggressiva (pochi step) se spread/riempimento lo richiedono.
-TWAP/VWAP è riservato al tier OPERATIONAL ed è subordinato a validazione live (paper IBKR non è indicativo dei fill parziali).
+TWAP/VWAP è riservato al tier MEDIUM/ADVANCED ed è subordinato a validazione live (paper IBKR non è indicativo dei fill parziali).
 
 ## Addendum v.T.11.7 — Validator CLI (template report)
 
@@ -117,9 +117,9 @@ Template minimo `phase0_validation_<run_id>.json`:
 ```
 SHA256 file `.sha256` = hash del JSON.
 
-## Addendum v.T.11.7 — STARTER/STARTER-LITE: NO Kelly, sizing adattivo
+## Addendum v.T.11.7 — MICRO/SMALL: NO Kelly, sizing adattivo
 - Pre-50 trade chiusi: usare Adaptive Fixed Fractional (regime-based), non Kelly.
-- Kelly disponibile solo in OPERATIONAL con vendor data + reconciliation + N≥50.
+- Kelly disponibile solo in MEDIUM/ADVANCED con vendor data + reconciliation + N≥50.
 
 ## Addendum v.T.11.7 — Correlation Breakdown: azione suggerita
 Se `CORRELATION_BREAKDOWN` attivo:
@@ -133,8 +133,8 @@ Se `CORRELATION_BREAKDOWN` attivo:
 Nota: `00_MASTER.md` è il documento normativo; le presenti Appendici forniscono dettagli implementativi.
 
 
-Nota: per STARTER-LITE il protocollo aggiornato è definito in 00_MASTER.md (v.T.11.7+). 
-TWAP/VWAP è riservato al tier OPERATIONAL salvo diversa specifica futura.
+Nota: per il tier MICRO il protocollo aggiornato è definito in 00_MASTER.md (v.T.11.7+). 
+TWAP/VWAP è riservato al tier MEDIUM/ADVANCED salvo diversa specifica futura.
 
 
 Metodo stima: applicare scenari VIX da T5.3 al P&L del portafoglio corrente tramite simulazione storica (historical shock replay).
@@ -185,9 +185,36 @@ Metodo stima: applicare scenari VIX da T5.3 al P&L del portafoglio corrente tram
 | Tier | Strategie | Target | Max posizioni |
 |---|---|---:|---:|
 | MICRO (€1.000–€2.000) | Vertical Spread, Bull Put (IWM) | 0.8–1.5%/mese | 1–2 |
-| SMALL (€2.000–€5.000) | Iron Condor, Bull Put, Wheel | 1.2–2.5%/mese | 2–3 |
+| SMALL (€2.000–€5.000) | Iron Condor (IWM), Bull Put, Wheel | 1.2–2.5%/mese | 2–3 |
 | MEDIUM (€5.000–€15.000) | Iron Condor (SPY/QQQ), PMCC, Calendar | 1.5–3.0%/mese | 3–5 |
 | ADVANCED (€15.000+) | Multi-sottostante, Ratio Spread | 2.0–4.0%/mese | 4–8 |
+
+### Tier Feature Matrix
+> Il `capital_tier` (determinato dal capitale) definisce il tetto massimo disponibile. L'`active_mode` è la modalità operativa scelta dall'operatore (`active_mode ≤ capital_tier`).
+
+#### Stack tecnico per tier
+| Tier | Capitale | Milestone req. | XGBoost | HMM | Corr.Det. | Sizing | Kelly | TWAP/VWAP | Hedge |
+|---|---|---|:---:|:---:|:---:|---|:---:|:---:|:---:|
+| **MICRO** | €1.000–€2.000 | R2_PAPER_OPERATOR | ✅ | ❌ | ❌ | adaptive_fixed_fractional | ❌ | ❌ | ❌ |
+| **SMALL** | €2.000–€5.000 | R2_PAPER_OPERATOR | ✅ | ⚠️ post-qual | ❌ | adaptive_fixed_fractional_to_kelly | ⚠️ N≥50 | ❌ | ❌ |
+| **MEDIUM** | €5.000–€15.000 | R3_PAPER_HEDGE | ✅ | ✅ | ✅ | kelly_fractional | ✅ | ✅ | ✅ |
+| **ADVANCED** | €15.000+ | R5_LIVE_ENABLE | ✅ | ✅ | ✅ | kelly_fractional | ✅ | ✅ | ✅ |
+
+#### Strategie e UI per tier
+| Tier | Strategie | Sottostanti | UI features |
+|---|---|---|---|
+| **MICRO** | Bull Put (IWM), Vertical Spread | IWM | single_opportunity, score_breakdown, confirm_reject_abort, risk_summary |
+| **SMALL** | Iron Condor (IWM), Bull Put, Wheel (CSP→CC) | IWM, SPY | multi_opportunity_ranking, shap_breakdown, wheel_state_view, confirm_reject_modify_abort |
+| **MEDIUM** | Iron Condor (SPY/QQQ), PMCC, Calendar | SPY, QQQ, IWM | multi_underlying_dashboard, hedge_status_panel, scenario_stress_view, full_transparency_protocol |
+| **ADVANCED** | Multi-sottostante, Ratio Spread, + tutto MEDIUM | SPY, QQQ, IWM, multi | full_dashboard, multi_leg_visualizer, ratio_spread_builder, delta_overlay_panel, queue_position_awareness |
+
+#### Gate di upgrade tier
+| Tier → | Min trade | Sharpe OOS | Max DD | Kelly req. | Data mode |
+|---|---:|---:|---:|:---:|---|
+| **MICRO** | 50 | ≥0.6 | <15% | — | VENDOR_REAL_CHAIN |
+| **SMALL** | 50 | ≥0.7 | <12% | ✅ | VENDOR_REAL_CHAIN |
+| **MEDIUM** | 50 | ≥0.8 | <10% | ✅ | VENDOR_REAL_CHAIN |
+| **ADVANCED** | — | — | — | — | — (tier finale) |
 
 _Generato automaticamente; modificare `config/release_plan_go_nogo.json` e rieseguire `py tools/hf_release_plan_go_nogo.py`._
 <!-- END GO_NOGO_RELEASE_PLAN -->

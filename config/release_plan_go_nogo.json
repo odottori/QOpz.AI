@@ -1,6 +1,6 @@
 {
-  "version": "v1",
-  "generated_ts_utc": "2026-03-03T13:05:42Z",
+  "version": "v2",
+  "generated_ts_utc": "2026-03-17T13:39:29Z",
   "principles": {
     "execution_mode": "HUMAN_CONFIRMED",
     "windows_first": true,
@@ -42,7 +42,7 @@
         5000
       ],
       "strategies": [
-        "Iron Condor",
+        "Iron Condor (IWM)",
         "Bull Put",
         "Wheel"
       ],
@@ -91,6 +91,182 @@
         4,
         8
       ]
+    }
+  },
+  "tier_feature_matrix": {
+    "MICRO": {
+      "capital_range_eur": [
+        1000,
+        2000
+      ],
+      "milestone_prerequisite": "R2_PAPER_OPERATOR",
+      "strategies": [
+        "Bull Put (IWM)",
+        "Vertical Spread"
+      ],
+      "underlyings": [
+        "IWM"
+      ],
+      "ml_stack": {
+        "xgboost": true,
+        "hmm_ensemble": false,
+        "correlation_detector": false,
+        "delta_overlay": false
+      },
+      "sizing_policy": "adaptive_fixed_fractional",
+      "kelly_enabled": false,
+      "max_positions": [
+        1,
+        2
+      ],
+      "execution_mode": "simple_ladder",
+      "twap_vwap": false,
+      "hedge_active": false,
+      "ui_features": [
+        "single_opportunity",
+        "score_breakdown",
+        "confirm_reject_abort",
+        "risk_summary"
+      ],
+      "upgrade_gate": {
+        "min_closed_trades": 50,
+        "oos_sharpe_min": 0.6,
+        "max_dd_pct": 15,
+        "zero_violations": true,
+        "data_mode_required": "VENDOR_REAL_CHAIN"
+      }
+    },
+    "SMALL": {
+      "capital_range_eur": [
+        2000,
+        5000
+      ],
+      "milestone_prerequisite": "R2_PAPER_OPERATOR",
+      "strategies": [
+        "Iron Condor (IWM)",
+        "Bull Put",
+        "Wheel (CSP→CC)"
+      ],
+      "underlyings": [
+        "IWM",
+        "SPY"
+      ],
+      "ml_stack": {
+        "xgboost": true,
+        "hmm_ensemble": "post_qualification",
+        "correlation_detector": false,
+        "delta_overlay": false
+      },
+      "sizing_policy": "adaptive_fixed_fractional_to_kelly",
+      "kelly_enabled": "post_gate_N50",
+      "max_positions": [
+        2,
+        3
+      ],
+      "execution_mode": "ladder",
+      "twap_vwap": false,
+      "hedge_active": false,
+      "ui_features": [
+        "multi_opportunity_ranking",
+        "shap_breakdown",
+        "wheel_state_view",
+        "confirm_reject_modify_abort"
+      ],
+      "upgrade_gate": {
+        "min_closed_trades": 50,
+        "oos_sharpe_min": 0.7,
+        "max_dd_pct": 12,
+        "zero_violations": true,
+        "kelly_active_required": true,
+        "data_mode_required": "VENDOR_REAL_CHAIN"
+      }
+    },
+    "MEDIUM": {
+      "capital_range_eur": [
+        5000,
+        15000
+      ],
+      "milestone_prerequisite": "R3_PAPER_HEDGE",
+      "strategies": [
+        "Iron Condor (SPY/QQQ)",
+        "PMCC",
+        "Calendar"
+      ],
+      "underlyings": [
+        "SPY",
+        "QQQ",
+        "IWM"
+      ],
+      "ml_stack": {
+        "xgboost": true,
+        "hmm_ensemble": true,
+        "correlation_detector": true,
+        "delta_overlay": false
+      },
+      "sizing_policy": "kelly_fractional",
+      "kelly_enabled": true,
+      "max_positions": [
+        3,
+        5
+      ],
+      "execution_mode": "ladder_twap",
+      "twap_vwap": true,
+      "hedge_active": true,
+      "ui_features": [
+        "multi_underlying_dashboard",
+        "hedge_status_panel",
+        "scenario_stress_view",
+        "full_transparency_protocol"
+      ],
+      "upgrade_gate": {
+        "min_closed_trades": 50,
+        "oos_sharpe_min": 0.8,
+        "max_dd_pct": 10,
+        "zero_violations": true,
+        "kelly_active_required": true,
+        "data_mode_required": "VENDOR_REAL_CHAIN"
+      }
+    },
+    "ADVANCED": {
+      "capital_range_eur": [
+        15000,
+        null
+      ],
+      "milestone_prerequisite": "R5_LIVE_ENABLE",
+      "strategies": [
+        "Multi-sottostante",
+        "Ratio Spread",
+        "+ tutto MEDIUM"
+      ],
+      "underlyings": [
+        "SPY",
+        "QQQ",
+        "IWM",
+        "multi"
+      ],
+      "ml_stack": {
+        "xgboost": true,
+        "hmm_ensemble": true,
+        "correlation_detector": true,
+        "delta_overlay": true
+      },
+      "sizing_policy": "kelly_fractional",
+      "kelly_enabled": true,
+      "max_positions": [
+        4,
+        8
+      ],
+      "execution_mode": "twap_vwap_full",
+      "twap_vwap": true,
+      "hedge_active": true,
+      "ui_features": [
+        "full_dashboard",
+        "multi_leg_visualizer",
+        "ratio_spread_builder",
+        "delta_overlay_panel",
+        "queue_position_awareness"
+      ],
+      "upgrade_gate": null
     }
   },
   "modules": [
@@ -215,7 +391,7 @@
     {
       "id": "R2_PAPER_OPERATOR",
       "name": "Paper trading operator-grade (Human-confirmed)",
-      "goal": "Connessione broker paper + ordini combo + console operatore minima (React+FastAPI) con conferma esplicita.",
+      "goal": "Connessione broker paper + ordini combo + console operatore minima (React+FastAPI) con conferma esplicita. Abilita tier MICRO e SMALL.",
       "required_steps": [
         "F3-T1",
         "F3-T2",
@@ -226,7 +402,7 @@
     {
       "id": "R3_PAPER_HEDGE",
       "name": "Paper con Hedge attivo",
-      "goal": "Hedge tattico attivo in SHOCK + DD>=10% e osservabilità completa.",
+      "goal": "Hedge tattico attivo in SHOCK + DD>=10% e osservabilità completa. Abilita tier MEDIUM.",
       "required_steps": [
         "F5-T1",
         "F5-T2",
@@ -246,7 +422,7 @@
     {
       "id": "R5_LIVE_ENABLE",
       "name": "Live enable (sempre human-confirmed)",
-      "goal": "Profilo live con guardrail; stessa UI, stessi gating; switch controllato.",
+      "goal": "Profilo live con guardrail; stessa UI, stessi gating; switch controllato. Abilita tier ADVANCED.",
       "required_steps": [
         "F6-T3"
       ],

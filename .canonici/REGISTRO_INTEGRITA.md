@@ -291,3 +291,14 @@ Nota: queste aggiunte completano i prerequisiti `P0-A1` (required dirs) del vali
 | `.qoaistate.json` | `6d8d9d882b1fâ€¦` | `1eb3350cc151â€¦` | mod | Timeline update: close D2.16; next_step D2.17; last_validation 0/0/10. |
 | `.canonici/MANIFEST.txt` | `` | `4a531b3767daâ€¦` | mod | Manifest refresh for D2.16 build. |
 | `.canonici/REGISTRO_INTEGRITA.md` | `` | `4d58df8426e8â€¦` | mod | Registro entry for D2.16 build. |
+
+---
+
+## [bonifica-ROC30] 2026-03-17 — Unificazione nomenclatura tier MICRO/SMALL/MEDIUM/ADVANCED
+
+| File | Modifica |
+|------|----------|
+| `.canonici/00_MASTER.md` | Bonifica §7 (tabella 4-tier), §8 (roadmap milestones), addendum STARTER-LITE→MICRO, Execution Policy, sizing progression, refs appendici |
+| `.canonici/04_APPENDICI.md` | Rename STARTER-LITE→MICRO nelle sezioni manuali; rigenera blocco auto |
+| `config/release_plan_go_nogo.json` | Aggiunta `tier_feature_matrix` (v2): prerequisite milestone, ML stack, sizing, UI features, upgrade gate per tier |
+| `tools/hf_release_plan_go_nogo.py` | Esteso renderer: tabelle Stack tecnico, Strategie/UI, Gate upgrade |
