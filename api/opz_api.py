@@ -2486,6 +2486,70 @@ class WheelTransitionRequest(BaseModel):
     shares: int = 100
 
 
+@app.get("/opz/tier")
+def opz_tier(profile: str = "dev") -> Dict[str, Any]:
+    """
+    Return capital_tier and active_mode from config/<profile>.toml.
+    Also exposes which strategies and features are enabled for the current tier.
+    """
+    import tomllib
+
+    config_path = ROOT / "config" / f"{profile}.toml"
+    if not config_path.exists():
+        config_path = ROOT / "config" / "dev.toml"
+
+    try:
+        with open(config_path, "rb") as f:
+            cfg = tomllib.load(f)
+    except Exception:
+        cfg = {}
+
+    tier_cfg = cfg.get("tier", {})
+    capital_tier = tier_cfg.get("capital_tier", "MICRO")
+    active_mode  = tier_cfg.get("active_mode",  "MICRO")
+
+    _TIER_ORDER = ["MICRO", "SMALL", "MEDIUM", "ADVANCED"]
+
+    def tier_gte(a: str, b: str) -> bool:
+        """True if tier a >= tier b."""
+        try:
+            return _TIER_ORDER.index(a) >= _TIER_ORDER.index(b)
+        except ValueError:
+            return False
+
+    features = {
+        "bull_put":         True,
+        "iron_condor":      tier_gte(active_mode, "SMALL"),
+        "wheel":            tier_gte(active_mode, "SMALL"),
+        "pmcc_calendar":    tier_gte(active_mode, "MEDIUM"),
+        "hedge_active":     tier_gte(active_mode, "MEDIUM"),
+        "ratio_spread":     tier_gte(active_mode, "ADVANCED"),
+        "delta_overlay":    tier_gte(active_mode, "ADVANCED"),
+        "kelly_enabled":    tier_gte(active_mode, "SMALL"),   # requires also N≥50
+        "twap_vwap":        tier_gte(active_mode, "MEDIUM"),
+        "multi_underlying": tier_gte(active_mode, "ADVANCED"),
+    }
+
+    tier_info = {
+        "MICRO":    {"capital": "€1k–2k", "strategies": ["Bull Put"], "max_positions": 2},
+        "SMALL":    {"capital": "€2k–5k", "strategies": ["Bull Put", "Iron Condor", "Wheel"], "max_positions": 3},
+        "MEDIUM":   {"capital": "€5k–15k", "strategies": ["Bull Put", "Iron Condor", "Wheel", "PMCC", "Calendar"], "max_positions": 5},
+        "ADVANCED": {"capital": "€15k+", "strategies": ["All + Ratio Spread", "Delta Overlay"], "max_positions": 8},
+    }
+
+    next_tier_map = {"MICRO": "SMALL", "SMALL": "MEDIUM", "MEDIUM": "ADVANCED", "ADVANCED": None}
+
+    return {
+        "ok": True,
+        "profile": profile,
+        "capital_tier": capital_tier,
+        "active_mode": active_mode,
+        "features": features,
+        "tier_detail": tier_info.get(active_mode, {}),
+        "next_tier": next_tier_map.get(capital_tier),
+    }
+
+
 @app.get("/opz/wheel/positions")
 def opz_wheel_positions(profile: str = "dev", symbol: Optional[str] = None) -> Dict[str, Any]:
     """List active Wheel positions (excludes CLOSED). Optionally filter by symbol."""

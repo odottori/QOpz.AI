@@ -251,6 +251,21 @@ type EvReportResponse = {
   human_review_required: number; events_flagged: number;
 };
 
+// ── Tier info ─────────────────────────────────────────────────────────────────
+type TierName = "MICRO" | "SMALL" | "MEDIUM" | "ADVANCED";
+type TierFeatures = {
+  bull_put: boolean; iron_condor: boolean; wheel: boolean;
+  pmcc_calendar: boolean; hedge_active: boolean; ratio_spread: boolean;
+  delta_overlay: boolean; kelly_enabled: boolean; twap_vwap: boolean;
+  multi_underlying: boolean;
+};
+type TierDetail = { capital: string; strategies: string[]; max_positions: number; };
+type TierResponse = {
+  ok: boolean; profile: string;
+  capital_tier: TierName; active_mode: TierName;
+  features: TierFeatures; tier_detail: TierDetail; next_tier: TierName | null;
+};
+
 // ── ROC35: Wheel positions ────────────────────────────────────────────────────
 type WheelState = "IDLE" | "OPEN_CSP" | "ASSIGNED" | "OPEN_CC" | "CLOSED";
 type WheelPosition = {
@@ -527,6 +542,7 @@ export default function App() {
   const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
   const [wheelPositions, setWheelPositions] = useState<WheelPositionsResponse | null>(null);
   const [wheelFetchedAt, setWheelFetchedAt] = useState<number | null>(null);
+  const [tierInfo, setTierInfo] = useState<TierResponse | null>(null);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -864,6 +880,7 @@ export default function App() {
       void doFetchRegimeCurrent();
       void doFetchExitCandidates();
       void doFetchWheelPositions();
+      void doFetchTier();
       if (!universeScannerName && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
@@ -1319,6 +1336,13 @@ export default function App() {
     } catch (e) { /* silenzioso */ }
   }
 
+  async function doFetchTier() {
+    try {
+      const r = await apiJson<TierResponse>(`${API_BASE}/opz/tier?profile=paper`);
+      setTierInfo(r);
+    } catch (e) { /* silenzioso */ }
+  }
+
   async function doKillSwitch() {
     const ksActive = sysStatus?.kill_switch_active ?? false;
     const action = ksActive ? "deactivate" : "activate";
@@ -1619,6 +1643,19 @@ export default function App() {
             <div className="metric-box"><div className="metric-label">MAX DD</div><div className="metric-val amber">{fmtPct(paperSummary?.max_drawdown ?? null)}</div></div>
             <div className="metric-box"><div className="metric-label">WIN RATE</div><div className="metric-val">{fmtPct(paperSummary?.win_rate ?? null)}</div></div>
             <div className="metric-box"><div className="metric-label">COMPLIANCE</div><div className="metric-val red">{paperSummary?.compliance_violations ?? "-"}</div></div>
+            {tierInfo && (() => {
+              const tierColor: Record<string, string> = {
+                MICRO: "#60a5fa", SMALL: "#a78bfa", MEDIUM: "#4ade80", ADVANCED: "#f97316",
+              };
+              const col = tierColor[tierInfo.active_mode] ?? "#888";
+              return (
+                <div className="metric-box" style={{ borderLeft: `3px solid ${col}` }}>
+                  <div className="metric-label" style={{ color: col }}>TIER</div>
+                  <div className="metric-val" style={{ color: col, fontSize: "0.9rem" }}>{tierInfo.active_mode}</div>
+                  <div style={{ fontSize: "0.6rem", color: "#555", marginTop: 2 }}>{tierInfo.tier_detail.capital}</div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="tabs">
@@ -1990,23 +2027,53 @@ export default function App() {
               </article>
 
               {/* ── WHEEL POSITIONS ── */}
-              <article className="panel" style={{ gridColumn: "1 / -1" }}>
+              {(() => {
+                const _TIER_ORDER: TierName[] = ["MICRO", "SMALL", "MEDIUM", "ADVANCED"];
+                const activeTier = tierInfo?.active_mode ?? "MICRO";
+                const wheelUnlocked = _TIER_ORDER.indexOf(activeTier) >= _TIER_ORDER.indexOf("SMALL");
+                return (
+              <article className="panel" style={{ gridColumn: "1 / -1", position: "relative" }}>
                 <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>🔄 WHEEL POSITIONS</span>
                   <span style={{ fontSize: "0.65rem", color: "#555", fontWeight: 400 }}>
-                    {wheelFetchedAt ? new Date(wheelFetchedAt).toLocaleTimeString("it-IT") : "—"}
+                    {wheelUnlocked
+                      ? (wheelFetchedAt ? new Date(wheelFetchedAt).toLocaleTimeString("it-IT") : "—")
+                      : <span style={{ color: "#a78bfa" }}>🔒 SMALL tier required</span>
+                    }
                   </span>
                 </div>
 
-                {!wheelPositions && (
+                {!wheelUnlocked && (
+                  <div style={{
+                    padding: "16px 12px",
+                    background: "rgba(167,139,250,0.06)",
+                    border: "1px dashed #a78bfa44",
+                    borderRadius: 6,
+                    fontSize: "0.72rem", color: "#888",
+                    display: "flex", alignItems: "center", gap: 10,
+                  }}>
+                    <span style={{ fontSize: "1.2rem" }}>🔒</span>
+                    <div>
+                      <div style={{ color: "#a78bfa", fontWeight: 700, marginBottom: 2 }}>Wheel disponibile dal tier SMALL (€2k–5k)</div>
+                      <div>Tier attuale: <strong style={{ color: "#60a5fa" }}>{activeTier}</strong> — Iron Condor e Wheel si sbloccano al tier successivo.</div>
+                      {tierInfo?.next_tier && (
+                        <div style={{ marginTop: 4, color: "#555" }}>
+                          Upgrade gate → 50 trade chiusi · Sharpe OOS ≥ 0.6 · 0 violazioni
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {wheelUnlocked && !wheelPositions && (
                   <div className="dim" style={{ fontSize: "0.7rem" }}>Nessun dato — clicca ⟳ per aggiornare.</div>
                 )}
 
-                {wheelPositions && wheelPositions.positions.length === 0 && (
+                {wheelUnlocked && wheelPositions && wheelPositions.positions.length === 0 && (
                   <div className="dim" style={{ fontSize: "0.7rem" }}>Nessuna posizione Wheel attiva.</div>
                 )}
 
-                {wheelPositions && wheelPositions.positions.length > 0 && (
+                {wheelUnlocked && wheelPositions && wheelPositions.positions.length > 0 && (
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
                       <thead>
@@ -2067,14 +2134,18 @@ export default function App() {
                   </div>
                 )}
 
-                <button
-                  className="btn btn-secondary mt10"
-                  style={{ fontSize: "0.7rem", padding: "3px 8px" }}
-                  onClick={() => void doFetchWheelPositions()}
-                >
-                  ⟳ WHEEL REFRESH
-                </button>
+                {wheelUnlocked && (
+                  <button
+                    className="btn btn-secondary mt10"
+                    style={{ fontSize: "0.7rem", padding: "3px 8px" }}
+                    onClick={() => void doFetchWheelPositions()}
+                  >
+                    ⟳ WHEEL REFRESH
+                  </button>
+                )}
               </article>
+                );
+              })()}
             </div>
           )}
 

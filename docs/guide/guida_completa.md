@@ -648,6 +648,9 @@ Esiste una categoria di eventi che nessun sistema può anticipare: il cigno nero
 Per questi casi, QOpz.AI non promette protezione anticipatoria — ma garantisce **contenimento del danno**: il rischio massimo di ogni posizione è sempre definito prima dell'apertura, il regime passa rapidamente a SHOCK bloccando nuovi trade, e il kill switch è sempre disponibile.
 
 Non puoi prevedere tutto. Puoi però fare in modo che l'imprevedibile non ti distrugga.
+
+---
+
 # Capitolo 7 — Tier e strategie
 ## Come cresce il sistema con il tuo capitale
 
