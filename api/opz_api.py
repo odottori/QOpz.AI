@@ -21,7 +21,6 @@ import logging
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("opz_api")
@@ -1065,7 +1064,6 @@ def health() -> Dict[str, str]:
 
 
 _CONSOLE_HTML = Path(__file__).parent / "console_operatore.html"
-_SITE_DIR = Path("/app/site")
 
 
 @app.get("/console", response_class=FileResponse)
@@ -1073,11 +1071,6 @@ def console():
     if not _CONSOLE_HTML.exists():
         raise HTTPException(status_code=404, detail="console not found")
     return FileResponse(_CONSOLE_HTML, media_type="text/html")
-
-
-# MkDocs site mounted at /guide — built during Docker image build
-if _SITE_DIR.exists():
-    app.mount("/guide", StaticFiles(directory=str(_SITE_DIR), html=True), name="guide")
 
 
 @app.get("/opz/state")

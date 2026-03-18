@@ -1,21 +1,24 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# QOpz.AI — docker-compose per test locale
+# QOpz.AI — docker-compose
 # Uso: docker compose up --build
-# API disponibile su http://localhost:8765
+# API:   http://localhost:8765
+# Guide: http://localhost:8766
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8765:8765"
     environment:
       - OPZ_PROFILE=dev
       - OPZ_API_TOKEN=${OPZ_API_TOKEN:-}
     volumes:
-      - ./db:/app/db       # DuckDB persistente
-      - ./logs:/app/logs   # Log operativi
-      - ./ops:/app/ops     # Kill switch
+      - ./db:/app/db
+      - ./logs:/app/logs
+      - ./ops:/app/ops
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
@@ -23,3 +26,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  guide:
+    build:
+      context: .
+      dockerfile: Dockerfile.guide
+    ports:
+      - "8766:80"
+    restart: unless-stopped

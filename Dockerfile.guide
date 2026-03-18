@@ -1,0 +1,25 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# QOpz.AI — Guide Docker Image (multi-stage)
+# Stage 1: build MkDocs site
+# Stage 2: nginx:alpine serve static site
+# Port: 8766
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: build ────────────────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+RUN pip install --no-cache-dir mkdocs-material>=9.5
+
+WORKDIR /build
+COPY docs/    docs/
+COPY mkdocs.yml mkdocs.yml
+RUN mkdocs build --clean -q
+
+# ── Stage 2: serve ────────────────────────────────────────────────────────────
+FROM nginx:alpine
+
+COPY --from=builder /build/site /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
