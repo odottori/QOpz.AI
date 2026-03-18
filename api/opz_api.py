@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from contextlib import asynccontextmanager, contextmanager
 from datetime import date, datetime, time as time_cls, timedelta, timezone
 from pathlib import Path
@@ -2501,11 +2502,10 @@ def opz_wheel_new(req: WheelNewRequest) -> Dict[str, Any]:
     """Create a new IDLE Wheel position for tracking. Returns position_id."""
     from execution.wheel_storage import save_wheel_position
     from strategy.wheel import WheelPosition
-    import uuid as _uuid
 
     symbol = _clean_text(req.symbol, "symbol")
     pos = WheelPosition(symbol=symbol)
-    position_id = str(_uuid.uuid4())
+    position_id = str(uuid.uuid4())
     save_wheel_position(
         pos,
         position_id=position_id,
