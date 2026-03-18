@@ -31,6 +31,12 @@ from execution.paper_metrics import (
     record_trade,
 )
 from execution.storage import _connect, _prov, init_execution_schema
+from execution.wheel_storage import (
+    init_wheel_schema,
+    save_wheel_position,
+    load_wheel_position,
+    list_wheel_positions,
+)
 from execution.ibkr_settings_profile import extract_ibkr_universe_context
 from execution.universe import (
     build_universe_compare,
@@ -123,6 +129,7 @@ _TTS_LOCK = threading.Lock()
 async def _app_lifespan(_app: FastAPI):
     try:
         init_execution_schema()
+        init_wheel_schema()
     except Exception as exc:
         logger.warning("STARTUP_STORAGE_WARN %s", exc)
     yield
@@ -2471,7 +2478,6 @@ class WheelTransitionRequest(BaseModel):
 @app.get("/opz/wheel/positions")
 def opz_wheel_positions(profile: str = "dev", symbol: Optional[str] = None) -> Dict[str, Any]:
     """List active Wheel positions (excludes CLOSED). Optionally filter by symbol."""
-    from execution.wheel_storage import list_wheel_positions
     from strategy.wheel import WheelState
     import dataclasses
 
@@ -2500,7 +2506,6 @@ def opz_wheel_positions(profile: str = "dev", symbol: Optional[str] = None) -> D
 @app.post("/opz/wheel/new")
 def opz_wheel_new(req: WheelNewRequest) -> Dict[str, Any]:
     """Create a new IDLE Wheel position for tracking. Returns position_id."""
-    from execution.wheel_storage import save_wheel_position
     from strategy.wheel import WheelPosition
 
     symbol = _clean_text(req.symbol, "symbol")
@@ -2524,7 +2529,6 @@ def opz_wheel_transition(position_id: str, req: WheelTransitionRequest) -> Dict[
     for event_types that open orders (open_csp, open_cc).
     For post-fill events (assign, expire_csp, expire_cc, call_away) confirmation is implicit.
     """
-    from execution.wheel_storage import load_wheel_position, save_wheel_position
     from strategy.wheel import WheelPosition, WheelState
 
     pos = load_wheel_position(position_id, profile=req.profile)
