@@ -149,7 +149,7 @@ app.add_middleware(
 # Set OPZ_API_TOKEN env var to enable. Empty = open (dev mode).
 # Clients: X-API-Key: <token>  or  Authorization: Bearer <token>
 _API_TOKEN: str = os.environ.get("OPZ_API_TOKEN", "").strip()
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/console"}
 
 
 @app.middleware("http")
