@@ -20,7 +20,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("opz_api")
@@ -149,7 +149,7 @@ app.add_middleware(
 # Set OPZ_API_TOKEN env var to enable. Empty = open (dev mode).
 # Clients: X-API-Key: <token>  or  Authorization: Bearer <token>
 _API_TOKEN: str = os.environ.get("OPZ_API_TOKEN", "").strip()
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/console"}
+_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/console", "/guide"}
 
 
 @app.middleware("http")
@@ -1064,6 +1064,7 @@ def health() -> Dict[str, str]:
 
 
 _CONSOLE_HTML = Path(__file__).parent / "console_operatore.html"
+_GUIDE_MD = Path(__file__).parent / "guide.md"
 
 
 @app.get("/console", response_class=FileResponse)
@@ -1071,6 +1072,43 @@ def console():
     if not _CONSOLE_HTML.exists():
         raise HTTPException(status_code=404, detail="console not found")
     return FileResponse(_CONSOLE_HTML, media_type="text/html")
+
+
+@app.get("/guide", response_class=HTMLResponse)
+def guide():
+    if not _GUIDE_MD.exists():
+        raise HTTPException(status_code=404, detail="guide not found")
+    import markdown as _md
+    body = _md.markdown(_GUIDE_MD.read_text(encoding="utf-8"), extensions=["tables", "fenced_code"])
+    html = f"""<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QOpz.AI — Guida</title>
+<style>
+  body{{font-family:system-ui,sans-serif;max-width:860px;margin:40px auto;padding:0 20px;
+       background:#0d0d14;color:#c8ccd4;line-height:1.7}}
+  h1,h2,h3{{color:#e8c97a}}
+  h1{{border-bottom:1px solid #2a2a3a;padding-bottom:.4em}}
+  h2{{border-bottom:1px solid #1e1e2e;padding-bottom:.2em;margin-top:2em}}
+  code{{background:#1e1e2e;padding:2px 6px;border-radius:4px;font-size:.9em}}
+  pre{{background:#1e1e2e;padding:16px;border-radius:8px;overflow:auto}}
+  pre code{{background:none;padding:0}}
+  table{{border-collapse:collapse;width:100%}}
+  th,td{{border:1px solid #2a2a3a;padding:8px 12px;text-align:left}}
+  th{{background:#1e1e2e;color:#e8c97a}}
+  a{{color:#5ba3f5}}
+  blockquote{{border-left:3px solid #e8c97a;margin:0;padding-left:1em;color:#8b949e}}
+  .back{{display:inline-block;margin-bottom:20px;color:#5ba3f5;text-decoration:none}}
+</style>
+</head>
+<body>
+<a class="back" href="/console">← Console</a>
+{body}
+</body>
+</html>"""
+    return HTMLResponse(html)
 
 
 @app.get("/opz/state")
