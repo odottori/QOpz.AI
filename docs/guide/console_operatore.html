@@ -95,11 +95,41 @@
   .config-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
   .config-row label { color: var(--muted); font-size: 11px; min-width: 50px; }
   .config-row select { background: var(--card2); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 6px; font-size: 13px; }
+
+  /* Login screen */
+  #loginScreen { display: none; position: fixed; inset: 0; background: var(--bg); z-index: 500; display: flex; align-items: center; justify-content: center; }
+  #loginScreen.hidden { display: none; }
+  .login-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px 32px; width: 320px; text-align: center; }
+  .login-box h2 { color: var(--orange); font-size: 18px; margin-bottom: 6px; letter-spacing: 1px; }
+  .login-box p { color: var(--muted); font-size: 12px; margin-bottom: 24px; }
+  .login-box input { width: 100%; background: var(--card2); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 6px; font-size: 14px; margin-bottom: 14px; letter-spacing: 2px; }
+  .login-box input:focus { outline: 1px solid var(--orange); }
+  .login-box .btn-login { width: 100%; padding: 10px; background: var(--orange); color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .login-box .btn-login:hover { opacity: .85; }
+  .login-error { color: var(--red); font-size: 12px; margin-top: 8px; min-height: 16px; }
+  #mainContent { display: none; }
+  #mainContent.visible { display: block; }
+  .logout-btn { float: right; background: none; border: 1px solid var(--border); color: var(--muted); padding: 3px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; margin-top: 2px; }
+  .logout-btn:hover { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
 
-<h1>QOpz.AI — Console Operatore</h1>
+<!-- Login screen -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h2>QOpz.AI</h2>
+    <p>Inserisci il token di accesso</p>
+    <input type="password" id="loginToken" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" onclick="doLogin()">Accedi</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- Main content -->
+<div id="mainContent">
+
+<h1>QOpz.AI — Console Operatore <button class="logout-btn" onclick="doLogout()">Esci</button></h1>
 <p class="subtitle">Pannello operativo — Wheel positions + regime + opportunità</p>
 
 <div class="config-row">
@@ -200,9 +230,57 @@
 
 <div class="toast" id="toast"></div>
 
+</div><!-- end #mainContent -->
+
 <script>
 const API = () => document.getElementById('apiBase').value.replace(/\/$/, '');
 const PROFILE = () => document.getElementById('profileSelect').value;
+const TOKEN = () => sessionStorage.getItem('qopz_token') || '';
+const HEADERS = (extra) => {
+  const h = {'Content-Type': 'application/json'};
+  const t = TOKEN();
+  if (t) h['X-API-Key'] = t;
+  return Object.assign(h, extra || {});
+};
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const tok = document.getElementById('loginToken').value.trim();
+  if (!tok) return;
+  document.getElementById('loginError').textContent = '';
+  // Verify token by calling /health (public) then a protected endpoint
+  try {
+    const r = await fetch(`${API()}/opz/regime/current`, {
+      headers: {'X-API-Key': tok}
+    });
+    if (r.status === 401) {
+      document.getElementById('loginError').textContent = 'Token non valido';
+      return;
+    }
+    sessionStorage.setItem('qopz_token', tok);
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainContent').classList.add('visible');
+    refreshAll();
+  } catch(e) {
+    document.getElementById('loginError').textContent = `Errore connessione: ${e.message}`;
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('qopz_token');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('mainContent').classList.remove('visible');
+  document.getElementById('loginToken').value = '';
+}
+
+function checkAuth() {
+  const tok = TOKEN();
+  if (tok) {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainContent').classList.add('visible');
+  }
+  // if no token: loginScreen is already visible by default CSS
+}
 
 function onProfileChange() { refreshAll(); }
 
@@ -215,7 +293,7 @@ async function refreshAll() {
 // ── Regime ────────────────────────────────────────────────────────────────────
 async function loadRegime() {
   try {
-    const r = await fetch(`${API()}/opz/regime/current`);
+    const r = await fetch(`${API()}/opz/regime/current`, {headers: HEADERS()});
     const d = await r.json();
     const regime = d.regime || d.current_regime || '—';
     const el = document.getElementById('regimeVal');
@@ -240,7 +318,7 @@ async function loadRegime() {
 async function loadWheelPositions() {
   const tbody = document.getElementById('wheelBody');
   try {
-    const r = await fetch(`${API()}/opz/wheel/positions?profile=${PROFILE()}`);
+    const r = await fetch(`${API()}/opz/wheel/positions?profile=${PROFILE()}`, {headers: HEADERS()});
     const d = await r.json();
     if (!d.positions || d.positions.length === 0) {
       tbody.innerHTML = '<tr><td colspan="9" class="empty">Nessuna posizione Wheel attiva</td></tr>';
@@ -288,7 +366,7 @@ function nextActionBtn(p) {
 async function loadExitCandidates() {
   const tbody = document.getElementById('exitBody');
   try {
-    const r = await fetch(`${API()}/opz/opportunity/exit_candidates?top_n=10&min_score=1`);
+    const r = await fetch(`${API()}/opz/opportunity/exit_candidates?top_n=10&min_score=1`, {headers: HEADERS()});
     const d = await r.json();
     if (!d.candidates || d.candidates.length === 0) {
       tbody.innerHTML = '<tr><td colspan="6" class="empty">Nessun exit candidate urgente</td></tr>';
@@ -316,7 +394,7 @@ async function createPosition() {
   try {
     const r = await fetch(`${API()}/opz/wheel/new`, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: HEADERS(),
       body: JSON.stringify({ symbol: sym, profile: PROFILE() })
     });
     const d = await r.json();
@@ -365,7 +443,7 @@ async function submitTransition() {
   try {
     const r = await fetch(`${API()}/opz/wheel/${posId}/transition`, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: HEADERS(),
       body: JSON.stringify(body)
     });
     const d = await r.json();
@@ -397,8 +475,9 @@ document.getElementById('transModal').addEventListener('click', function(e) {
 });
 
 // Initial load
-refreshAll();
-setInterval(refreshAll, 30000);
+checkAuth();
+if (TOKEN()) refreshAll();
+setInterval(() => { if (TOKEN()) refreshAll(); }, 30000);
 </script>
 </body>
 </html>
