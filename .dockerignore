@@ -13,8 +13,11 @@ logs/
 ops/
 reports/
 
-# ── Frontend (deploy separato su Vercel) ──────────────────────────────────────
-ui/
+# ── Frontend — inclusa nel build nginx multi-stage ───────────────────────────
+# ui/ è necessaria per Dockerfile.nginx (stage ui-builder)
+# Escludi solo node_modules e dist per tenere il context leggero
+ui/node_modules/
+ui/dist/
 
 # ── Test & dev ────────────────────────────────────────────────────────────────
 tests/
