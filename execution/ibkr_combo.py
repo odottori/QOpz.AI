@@ -327,3 +327,85 @@ def default_iron_condor_credit(plan: IronCondorPlan) -> float:
     """Starting limit credit for a balanced Iron Condor: ~20% of narrower wing width."""
     wing = min(plan.put_width, plan.call_width)
     return float(max(0.10, min(5.00, round(wing * 0.20, 2))))
+
+
+# ── Wheel CSP / CC ───────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class CspPlan:
+    """Cash-Secured Put — single-leg order for Wheel entry."""
+
+    symbol: str
+    expiry: str       # YYYYMMDD
+    strike: float
+    quantity: int     # number of contracts (each covers 100 shares)
+
+
+@dataclass(frozen=True)
+class CoveredCallPlan:
+    """Covered Call — single-leg order for Wheel income leg."""
+
+    symbol: str
+    expiry: str       # YYYYMMDD
+    strike: float
+    quantity: int     # must match shares held / 100
+
+
+def build_csp_plan(
+    *,
+    symbol: str,
+    expiry: str,
+    strike: float,
+    quantity: int = 1,
+) -> CspPlan:
+    """
+    Build a Cash-Secured Put plan for Wheel entry.
+    Strike selection (ATM or OTM) is the operator's responsibility.
+    Human confirmation required before submission.
+    """
+    return CspPlan(
+        symbol=symbol,
+        expiry=expiry,
+        strike=float(strike),
+        quantity=int(quantity),
+    )
+
+
+def build_covered_call_plan(
+    *,
+    symbol: str,
+    expiry: str,
+    strike: float,
+    quantity: int = 1,
+    cost_basis: float | None = None,
+) -> CoveredCallPlan:
+    """
+    Build a Covered Call plan for Wheel income leg.
+    If cost_basis is provided and strike < cost_basis, raises ValueError
+    (selling below cost locks in a capital loss — requires explicit operator override).
+    Human confirmation required before submission.
+    """
+    if cost_basis is not None and float(strike) < float(cost_basis):
+        raise ValueError(
+            f"CC strike {strike} < cost_basis {cost_basis}: "
+            "would lock in a capital loss. Override by passing cost_basis=None explicitly."
+        )
+    return CoveredCallPlan(
+        symbol=symbol,
+        expiry=expiry,
+        strike=float(strike),
+        quantity=int(quantity),
+    )
+
+
+def default_csp_premium(strike: float, dte: int) -> float:
+    """Rough starting premium estimate: ~1% of strike for ~30 DTE, scaled linearly."""
+    raw = strike * 0.01 * (dte / 30.0)
+    return float(max(0.10, min(round(raw, 2), strike * 0.05)))
+
+
+def default_cc_premium(strike: float, dte: int) -> float:
+    """Rough starting premium estimate for CC: ~0.5% of strike for ~30 DTE."""
+    raw = strike * 0.005 * (dte / 30.0)
+    return float(max(0.05, min(round(raw, 2), strike * 0.03)))

@@ -20,6 +20,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from execution.ibkr_combo import (
+    CspPlan,
+    CoveredCallPlan,
+    build_csp_plan,
+    build_covered_call_plan,
+)
+
 
 class WheelState(str, Enum):
     IDLE = "IDLE"
@@ -166,6 +173,51 @@ class WheelPosition:
         if self.cost_basis is None:
             return None
         return self.cost_basis - self.total_premium_collected
+
+    # ── combo plan helpers ──────────────────────────────────────────────────
+
+    def to_csp_plan(
+        self,
+        *,
+        strike: float,
+        expiry: str,
+        quantity: int = 1,
+    ) -> "CspPlan":
+        """
+        Return a CspPlan ready for broker submission (state must be IDLE).
+        Caller must confirm with operator before submitting.
+        Does NOT transition state — call open_csp() after confirmation + fill.
+        """
+        if self.state != WheelState.IDLE:
+            raise ValueError(f"to_csp_plan requires IDLE state, got {self.state}")
+        return build_csp_plan(
+            symbol=self.symbol,
+            expiry=expiry,
+            strike=strike,
+            quantity=quantity,
+        )
+
+    def to_cc_plan(
+        self,
+        *,
+        strike: float,
+        expiry: str,
+        quantity: int = 1,
+    ) -> "CoveredCallPlan":
+        """
+        Return a CoveredCallPlan ready for broker submission (state must be ASSIGNED).
+        Validates strike >= cost_basis. Caller must confirm with operator before submitting.
+        Does NOT transition state — call open_cc() after confirmation + fill.
+        """
+        if self.state != WheelState.ASSIGNED:
+            raise ValueError(f"to_cc_plan requires ASSIGNED state, got {self.state}")
+        return build_covered_call_plan(
+            symbol=self.symbol,
+            expiry=expiry,
+            strike=strike,
+            quantity=quantity,
+            cost_basis=self.cost_basis,
+        )
 
     # ── internal ────────────────────────────────────────────────────────────
 
