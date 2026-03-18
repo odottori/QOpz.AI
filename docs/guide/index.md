@@ -53,6 +53,7 @@ Ogni capitolo risponde a una domanda precisa:
 - **Cos'è il "regime di mercato"?** E perché cambia tutto?
 - **Come vengono protetti i tuoi soldi** quando qualcosa va storto?
 - **Come si legge la WAR ROOM?** Pannello per pannello, numero per numero.
+- **Tier e strategie: Wheel, Iron Condor e come crescere.** Quando si sbloccano le strategie avanzate e perché.
 
 Alla fine di questo percorso saprai spiegare QOpz.AI a chiunque. E soprattutto — lo controllerai davvero, non solo lo userai.
 

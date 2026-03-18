@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QOpz.AI — Console Operatore</title>
+<style>
+  :root {
+    --bg:      #0d0d14;
+    --card:    #13131f;
+    --card2:   #1a1a2a;
+    --border:  #2a2a40;
+    --orange:  #ff6d00;
+    --green:   #00c853;
+    --yellow:  #ffd740;
+    --red:     #ff1744;
+    --blue:    #448aff;
+    --teal:    #00bcd4;
+    --text:    #e8e8f0;
+    --muted:   #8888aa;
+    --radius:  10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; padding: 20px; }
+
+  h1 { color: var(--orange); font-size: 20px; letter-spacing: 1px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .card-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+  .regime-badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 15px; letter-spacing: 1px; }
+  .regime-NORMAL  { background: rgba(0,200,83,.15); color: var(--green); border: 1px solid var(--green); }
+  .regime-CAUTION { background: rgba(255,215,64,.15); color: var(--yellow); border: 1px solid var(--yellow); }
+  .regime-SHOCK   { background: rgba(255,23,68,.15); color: var(--red); border: 1px solid var(--red); }
+
+  .stat { margin-bottom: 8px; }
+  .stat-label { color: var(--muted); font-size: 11px; }
+  .stat-val { font-size: 20px; font-weight: 700; color: var(--text); }
+  .stat-val.green { color: var(--green); }
+  .stat-val.red { color: var(--red); }
+  .stat-val.orange { color: var(--orange); }
+
+  /* Wheel positions table */
+  .section-title { color: var(--orange); font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin: 24px 0 10px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 8px; border-bottom: 1px solid rgba(42,42,64,.5); vertical-align: middle; }
+  tr:hover td { background: rgba(255,109,0,.04); }
+
+  .state-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .state-IDLE      { background: rgba(68,138,255,.15); color: var(--blue); }
+  .state-OPEN_CSP  { background: rgba(0,188,212,.15); color: var(--teal); }
+  .state-ASSIGNED  { background: rgba(255,215,64,.15); color: var(--yellow); }
+  .state-OPEN_CC   { background: rgba(255,109,0,.15); color: var(--orange); }
+  .state-CLOSED    { background: rgba(0,200,83,.15); color: var(--green); }
+
+  .btn { cursor: pointer; padding: 5px 12px; border-radius: 6px; border: none; font-size: 12px; font-weight: 600; }
+  .btn-teal   { background: rgba(0,188,212,.2); color: var(--teal); border: 1px solid var(--teal); }
+  .btn-orange { background: rgba(255,109,0,.2); color: var(--orange); border: 1px solid var(--orange); }
+  .btn-green  { background: rgba(0,200,83,.2); color: var(--green); border: 1px solid var(--green); }
+  .btn-red    { background: rgba(255,23,68,.2); color: var(--red); border: 1px solid var(--red); }
+  .btn:hover { opacity: .8; }
+  .btn:disabled { opacity: .3; cursor: default; }
+
+  .empty { color: var(--muted); text-align: center; padding: 24px; font-style: italic; }
+
+  .new-pos-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .new-pos-row input, .new-pos-row select { background: var(--card2); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; width: 110px; }
+  .new-pos-row input:focus { outline: 1px solid var(--orange); }
+
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.7); z-index: 100; justify-content: center; align-items: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; min-width: 340px; max-width: 480px; width: 90%; }
+  .modal h3 { color: var(--orange); margin-bottom: 16px; font-size: 14px; }
+  .modal label { display: block; color: var(--muted); font-size: 11px; margin-bottom: 2px; margin-top: 10px; }
+  .modal input, .modal select { width: 100%; background: var(--card2); border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 6px; font-size: 13px; }
+  .modal input:focus, .modal select:focus { outline: 1px solid var(--orange); }
+  .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; font-size: 13px; z-index: 200; display: none; max-width: 320px; }
+  .toast.show { display: block; animation: fadein .2s ease; }
+  .toast.ok { border-color: var(--green); color: var(--green); }
+  .toast.err { border-color: var(--red); color: var(--red); }
+  @keyframes fadein { from { opacity:0; transform: translateY(10px); } to { opacity:1; } }
+
+  .refresh-btn { float: right; margin-top: -2px; cursor: pointer; color: var(--muted); font-size: 12px; background: none; border: none; }
+  .refresh-btn:hover { color: var(--orange); }
+
+  .config-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+  .config-row label { color: var(--muted); font-size: 11px; min-width: 50px; }
+  .config-row select { background: var(--card2); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>QOpz.AI — Console Operatore</h1>
+<p class="subtitle">Pannello operativo — Wheel positions + regime + opportunità</p>
+
+<div class="config-row">
+  <label>Profile</label>
+  <select id="profileSelect" onchange="onProfileChange()">
+    <option value="dev">dev</option>
+    <option value="paper">paper</option>
+    <option value="live">live</option>
+  </select>
+  <label style="margin-left:12px">API</label>
+  <input id="apiBase" style="background:var(--card2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:13px;width:200px;" value="http://localhost:8765" onchange="refreshAll()">
+</div>
+
+<!-- Stato sistema -->
+<div class="grid">
+  <div class="card" id="regimeCard">
+    <div class="card-title">Regime</div>
+    <div id="regimeVal"><span class="regime-badge regime-NORMAL">—</span></div>
+    <div style="margin-top:8px;font-size:11px;color:var(--muted)" id="regimeTs"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Tier</div>
+    <div class="stat"><div class="stat-label">Capital tier</div><div class="stat-val orange" id="capitalTier">—</div></div>
+    <div class="stat"><div class="stat-label">Active mode</div><div class="stat-val" id="activeMode">—</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Strategie eligibili</div>
+    <div id="eligibleStrats" style="font-size:13px;color:var(--teal);line-height:1.8">—</div>
+  </div>
+</div>
+
+<!-- Wheel positions -->
+<div class="section-title">
+  Posizioni Wheel
+  <button class="refresh-btn" onclick="loadWheelPositions()">↻ aggiorna</button>
+</div>
+
+<div class="new-pos-row">
+  <input id="newSymbol" placeholder="Simbolo (es. IWM)" style="width:140px">
+  <button class="btn btn-teal" onclick="createPosition()">+ Nuova posizione</button>
+</div>
+
+<table id="wheelTable">
+  <thead>
+    <tr>
+      <th>Simbolo</th>
+      <th>Stato</th>
+      <th>CSP strike</th>
+      <th>CSP exp</th>
+      <th>Cost basis</th>
+      <th>CC strike</th>
+      <th>Premium tot.</th>
+      <th>Cicli</th>
+      <th>Azione</th>
+    </tr>
+  </thead>
+  <tbody id="wheelBody">
+    <tr><td colspan="9" class="empty">Caricamento…</td></tr>
+  </tbody>
+</table>
+
+<!-- Exit candidates -->
+<div class="section-title">
+  Exit Candidates
+  <button class="refresh-btn" onclick="loadExitCandidates()">↻ aggiorna</button>
+</div>
+<table id="exitTable">
+  <thead>
+    <tr><th>Simbolo</th><th>Strategia</th><th>Scadenza</th><th>Score</th><th>Motivo</th><th>P&L stimato</th></tr>
+  </thead>
+  <tbody id="exitBody">
+    <tr><td colspan="6" class="empty">Caricamento…</td></tr>
+  </tbody>
+</table>
+
+<!-- Modal transizione Wheel -->
+<div class="modal-overlay" id="transModal">
+  <div class="modal">
+    <h3 id="transTitle">Transizione Wheel</h3>
+    <input type="hidden" id="transPositionId">
+    <input type="hidden" id="transEventType">
+
+    <div id="transFields">
+      <label>Strike</label>
+      <input type="number" id="transStrike" step="0.5" placeholder="es. 190.00">
+      <label>Scadenza (YYYYMMDD)</label>
+      <input type="text" id="transExpiry" placeholder="es. 20260417" maxlength="8">
+      <label>Premio ricevuto (per azione)</label>
+      <input type="number" id="transPremium" step="0.01" placeholder="es. 1.50">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-red" onclick="closeModal()">Annulla</button>
+      <button class="btn btn-green" onclick="submitTransition()">Conferma</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = () => document.getElementById('apiBase').value.replace(/\/$/, '');
+const PROFILE = () => document.getElementById('profileSelect').value;
+
+function onProfileChange() { refreshAll(); }
+
+async function refreshAll() {
+  loadRegime();
+  loadWheelPositions();
+  loadExitCandidates();
+}
+
+// ── Regime ────────────────────────────────────────────────────────────────────
+async function loadRegime() {
+  try {
+    const r = await fetch(`${API()}/opz/regime/current`);
+    const d = await r.json();
+    const regime = d.regime || d.current_regime || '—';
+    const el = document.getElementById('regimeVal');
+    el.innerHTML = `<span class="regime-badge regime-${regime}">${regime}</span>`;
+    document.getElementById('regimeTs').textContent = d.as_of ? `as of ${d.as_of}` : '';
+
+    // Tier info
+    document.getElementById('capitalTier').textContent = d.capital_tier || '—';
+    document.getElementById('activeMode').textContent = d.active_mode || '—';
+
+    // Eligible strategies
+    const strats = d.eligible_strategies || [];
+    document.getElementById('eligibleStrats').innerHTML = strats.length
+      ? strats.map(s => `<span style="margin-right:8px">✓ ${s}</span>`).join('')
+      : '<span style="color:var(--red)">nessuna (SHOCK o dati mancanti)</span>';
+  } catch(e) {
+    document.getElementById('regimeVal').innerHTML = `<span style="color:var(--muted)">API non raggiungibile</span>`;
+  }
+}
+
+// ── Wheel positions ────────────────────────────────────────────────────────────
+async function loadWheelPositions() {
+  const tbody = document.getElementById('wheelBody');
+  try {
+    const r = await fetch(`${API()}/opz/wheel/positions?profile=${PROFILE()}`);
+    const d = await r.json();
+    if (!d.positions || d.positions.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">Nessuna posizione Wheel attiva</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.positions.map(p => `
+      <tr>
+        <td><strong>${p.symbol}</strong></td>
+        <td><span class="state-badge state-${p.state}">${p.state}</span></td>
+        <td>${p.csp_strike != null ? p.csp_strike.toFixed(2) : '—'}</td>
+        <td>${p.csp_expiry || '—'}</td>
+        <td>${p.unrealized_cost_basis != null ? p.unrealized_cost_basis.toFixed(2) : '—'}</td>
+        <td>${p.cc_strike != null ? p.cc_strike.toFixed(2) : '—'}</td>
+        <td>${p.total_premium_collected != null ? p.total_premium_collected.toFixed(2) : '0.00'}</td>
+        <td>${p.cycle_count}</td>
+        <td>${nextActionBtn(p)}</td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty" style="color:var(--red)">Errore: ${e.message}</td></tr>`;
+  }
+}
+
+function nextActionBtn(p) {
+  const id = p.position_id;
+  switch(p.state) {
+    case 'IDLE':
+      return `<button class="btn btn-teal" onclick="openModal('${id}','open_csp','Apri CSP — ${p.symbol}',true)">Apri CSP</button>`;
+    case 'OPEN_CSP':
+      return `
+        <button class="btn btn-green" onclick="openModal('${id}','expire_csp','Scadenza OTM — ${p.symbol}',false)">Scaduta OTM</button>
+        <button class="btn btn-orange" style="margin-left:4px" onclick="openModal('${id}','assign','Assegnazione — ${p.symbol}',false)">Assegnata</button>`;
+    case 'ASSIGNED':
+      return `<button class="btn btn-teal" onclick="openModal('${id}','open_cc','Apri CC — ${p.symbol}',true)">Apri CC</button>`;
+    case 'OPEN_CC':
+      return `
+        <button class="btn btn-green" onclick="openModal('${id}','expire_cc','CC scaduta OTM — ${p.symbol}',false)">CC scaduta</button>
+        <button class="btn btn-orange" style="margin-left:4px" onclick="openModal('${id}','call_away','Azioni richiamate — ${p.symbol}',false)">Call away</button>`;
+    default:
+      return '—';
+  }
+}
+
+// ── Exit candidates ────────────────────────────────────────────────────────────
+async function loadExitCandidates() {
+  const tbody = document.getElementById('exitBody');
+  try {
+    const r = await fetch(`${API()}/opz/opportunity/exit_candidates?top_n=10&min_score=1`);
+    const d = await r.json();
+    if (!d.candidates || d.candidates.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">Nessun exit candidate urgente</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.candidates.map(c => `
+      <tr>
+        <td><strong>${c.symbol || '—'}</strong></td>
+        <td>${c.strategy || '—'}</td>
+        <td>${c.expiry || '—'}</td>
+        <td><span style="color:${c.exit_score>=4?'var(--red)':c.exit_score>=2?'var(--yellow)':'var(--green)'};font-weight:700">${c.exit_score}</span></td>
+        <td style="color:var(--muted);font-size:12px">${(c.exit_reasons||[]).join(', ')||'—'}</td>
+        <td style="color:${(c.unrealized_pnl||0)>=0?'var(--green)':'var(--red)'}">${c.unrealized_pnl!=null?c.unrealized_pnl.toFixed(2):'—'}</td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty" style="color:var(--red)">Errore: ${e.message}</td></tr>`;
+  }
+}
+
+// ── Create position ────────────────────────────────────────────────────────────
+async function createPosition() {
+  const sym = document.getElementById('newSymbol').value.trim().toUpperCase();
+  if (!sym) { showToast('Inserisci un simbolo', 'err'); return; }
+  try {
+    const r = await fetch(`${API()}/opz/wheel/new`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ symbol: sym, profile: PROFILE() })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('newSymbol').value = '';
+      showToast(`Posizione creata: ${sym} (${d.position_id.slice(0,8)}…)`, 'ok');
+      loadWheelPositions();
+    } else {
+      showToast('Errore creazione posizione', 'err');
+    }
+  } catch(e) {
+    showToast(`Errore: ${e.message}`, 'err');
+  }
+}
+
+// ── Transition modal ───────────────────────────────────────────────────────────
+function openModal(posId, eventType, title, needsFields) {
+  document.getElementById('transPositionId').value = posId;
+  document.getElementById('transEventType').value = eventType;
+  document.getElementById('transTitle').textContent = title;
+  document.getElementById('transFields').style.display = needsFields ? 'block' : 'none';
+  document.getElementById('transStrike').value = '';
+  document.getElementById('transExpiry').value = '';
+  document.getElementById('transPremium').value = '';
+  document.getElementById('transModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('transModal').classList.remove('open');
+}
+
+async function submitTransition() {
+  const posId = document.getElementById('transPositionId').value;
+  const eventType = document.getElementById('transEventType').value;
+  const body = { event_type: eventType, profile: PROFILE() };
+  const needsFields = ['open_csp','open_cc'].includes(eventType);
+  if (needsFields) {
+    const strike = parseFloat(document.getElementById('transStrike').value);
+    const expiry = document.getElementById('transExpiry').value.trim();
+    const premium = parseFloat(document.getElementById('transPremium').value);
+    if (!strike || !expiry || !premium) { showToast('Compila tutti i campi', 'err'); return; }
+    body.strike = strike;
+    body.expiry = expiry;
+    body.premium = premium;
+  }
+  try {
+    const r = await fetch(`${API()}/opz/wheel/${posId}/transition`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.ok) {
+      closeModal();
+      showToast(`${d.prev_state} → ${d.new_state}${d.realized_pnl!=null?' | P&L: '+d.realized_pnl.toFixed(2):''}`, 'ok');
+      loadWheelPositions();
+    } else {
+      showToast(d.detail || 'Errore transizione', 'err');
+    }
+  } catch(e) {
+    showToast(`Errore: ${e.message}`, 'err');
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let _toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.className = 'toast', 3500);
+}
+
+// Close modal on overlay click
+document.getElementById('transModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Initial load
+refreshAll();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>

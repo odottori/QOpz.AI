@@ -31,6 +31,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY api/          api/
 COPY execution/    execution/
 COPY strategy/     strategy/
+COPY scripts/      scripts/
 COPY config/       config/
 COPY rebuild_manifest.py ./
 

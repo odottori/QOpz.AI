@@ -2447,6 +2447,135 @@ def opz_exit_candidates(top_n: int = 10, min_score: int = 1) -> ExitCandidatesOu
     }
 
 
+# ── Wheel positions ────────────────────────────────────────────────────────────
+
+
+class WheelNewRequest(BaseModel):
+    symbol: str = Field(..., description="Underlying symbol, e.g. IWM")
+    profile: str = Field("dev")
+    run_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+
+
+class WheelTransitionRequest(BaseModel):
+    event_type: str = Field(..., description="open_csp | expire_csp | assign | open_cc | expire_cc | call_away")
+    profile: str = Field("dev")
+    run_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    # fields required by each event type
+    strike: Optional[float] = None
+    expiry: Optional[str] = None      # YYYYMMDD
+    premium: Optional[float] = None
+    shares: int = 100
+
+
+@app.get("/opz/wheel/positions")
+def opz_wheel_positions(profile: str = "dev", symbol: Optional[str] = None) -> Dict[str, Any]:
+    """List active Wheel positions (excludes CLOSED). Optionally filter by symbol."""
+    from execution.wheel_storage import list_wheel_positions
+    from strategy.wheel import WheelState
+    import dataclasses
+
+    rows = list_wheel_positions(profile=profile, symbol=symbol or None)
+    positions = []
+    for pid, pos in rows:
+        positions.append({
+            "position_id": pid,
+            "symbol": pos.symbol,
+            "state": pos.state.value,
+            "csp_strike": pos.csp_strike,
+            "csp_expiry": pos.csp_expiry,
+            "csp_premium_received": pos.csp_premium_received,
+            "shares": pos.shares,
+            "cost_basis": pos.cost_basis,
+            "cc_strike": pos.cc_strike,
+            "cc_expiry": pos.cc_expiry,
+            "cc_premium_received": pos.cc_premium_received,
+            "total_premium_collected": pos.total_premium_collected,
+            "cycle_count": pos.cycle_count,
+            "unrealized_cost_basis": pos.unrealized_cost_basis_per_share(),
+        })
+    return {"ok": True, "profile": profile, "n": len(positions), "positions": positions}
+
+
+@app.post("/opz/wheel/new")
+def opz_wheel_new(req: WheelNewRequest) -> Dict[str, Any]:
+    """Create a new IDLE Wheel position for tracking. Returns position_id."""
+    from execution.wheel_storage import save_wheel_position
+    from strategy.wheel import WheelPosition
+    import uuid as _uuid
+
+    symbol = _clean_text(req.symbol, "symbol")
+    pos = WheelPosition(symbol=symbol)
+    position_id = str(_uuid.uuid4())
+    save_wheel_position(
+        pos,
+        position_id=position_id,
+        profile=req.profile,
+        run_id=req.run_id,
+        event_type="created",
+    )
+    return {"ok": True, "position_id": position_id, "symbol": symbol, "state": "IDLE"}
+
+
+@app.post("/opz/wheel/{position_id}/transition")
+def opz_wheel_transition(position_id: str, req: WheelTransitionRequest) -> Dict[str, Any]:
+    """
+    Apply a state transition to a tracked Wheel position.
+    Requires prior human confirmation via /opz/execution/preview + /opz/execution/confirm
+    for event_types that open orders (open_csp, open_cc).
+    For post-fill events (assign, expire_csp, expire_cc, call_away) confirmation is implicit.
+    """
+    from execution.wheel_storage import load_wheel_position, save_wheel_position
+    from strategy.wheel import WheelPosition, WheelState
+
+    pos = load_wheel_position(position_id, profile=req.profile)
+    if pos is None:
+        raise HTTPException(status_code=404, detail=f"position {position_id} not found for profile {req.profile}")
+
+    prev_state = pos.state
+    event = req.event_type
+
+    try:
+        if event == "open_csp":
+            if req.strike is None or req.expiry is None or req.premium is None:
+                raise HTTPException(status_code=400, detail="open_csp requires strike, expiry, premium")
+            pos.open_csp(strike=req.strike, expiry=req.expiry, premium=req.premium, shares=req.shares)
+        elif event == "expire_csp":
+            pos.expire_csp()
+        elif event == "assign":
+            pos.assign()
+        elif event == "open_cc":
+            if req.strike is None or req.expiry is None or req.premium is None:
+                raise HTTPException(status_code=400, detail="open_cc requires strike, expiry, premium")
+            pos.open_cc(strike=req.strike, expiry=req.expiry, premium=req.premium)
+        elif event == "expire_cc":
+            pos.expire_cc()
+        elif event == "call_away":
+            pos.call_away()
+        else:
+            raise HTTPException(status_code=400, detail=f"unknown event_type: {event}")
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    save_wheel_position(
+        pos,
+        position_id=position_id,
+        profile=req.profile,
+        run_id=req.run_id,
+        prev_state=prev_state,
+        event_type=event,
+    )
+
+    return {
+        "ok": True,
+        "position_id": position_id,
+        "symbol": pos.symbol,
+        "prev_state": prev_state.value,
+        "new_state": pos.state.value,
+        "event_type": event,
+        "realized_pnl": pos.realized_pnl(),
+    }
+
+
 
 
 
