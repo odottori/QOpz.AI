@@ -1,5 +1,21 @@
 # REGISTRO INTEGRITÃ€ â€” v.T.11.13
 
+## Build 2026-03-18 — [bonifica-ROC30+ROC35] Tier naming + Wheel integration
+
+| File | Tipo | Note |
+|---|---|---|
+| `.canonici/00_MASTER.md` | upd | Bonifica TOC: STARTER→OPERATIONAL → MICRO→SMALL→MEDIUM→ADVANCED; Piano 90gg → Roadmap R0-R5 |
+| `docs/guide/07_tier_strategie.md` | new | Cap. 6 guida — Tier e strategie (MICRO/SMALL/MEDIUM/ADVANCED, Wheel, Iron Condor, router regime) |
+| `docs/guide/trade_lifecycle.html` | upd | Slide 11-16: ciclo Wheel (IDLE/CSP/ASSIGNED/CC/CLOSED) + Tier Roadmap |
+| `docs/guide/index.md` | upd | Prefazione: aggiunto riferimento capitolo Tier e strategie |
+| `execution/wheel_storage.py` | new | DuckDB schema + CRUD per Wheel positions (init_wheel_schema, save, load, list) |
+| `api/opz_api.py` | upd | Endpoint /opz/wheel/positions, /opz/wheel/new, /opz/wheel/transition; rimossa auth token (nginx basic auth) |
+| `ui/src/App.tsx` | upd | Pannello Wheel in War Room tab (state machine badges, table CSP/CC/premium/cycles) |
+| `ui/src/vite-env.d.ts` | new | Vite type declarations (ImportMeta.env) |
+| `Dockerfile.nginx` | upd | Multi-stage: Node.js (React build) + Python/MkDocs + nginx:alpine |
+| `docker/nginx.conf` | upd | Nginx gateway: basic auth, /guide/, /opz/ proxy, SPA routing |
+| `docker-compose.yml` | upd | api + nginx services; NGINX_PASSWORD env; named volumes |
+
 ## Build 2026-03-05 10:14:26 UTC
 
 | File | SHA_prev | SHA_curr | Stato | Note |

@@ -251,6 +251,29 @@ type EvReportResponse = {
   human_review_required: number; events_flagged: number;
 };
 
+// ── ROC35: Wheel positions ────────────────────────────────────────────────────
+type WheelState = "IDLE" | "OPEN_CSP" | "ASSIGNED" | "OPEN_CC" | "CLOSED";
+type WheelPosition = {
+  position_id: string;
+  symbol: string;
+  state: WheelState;
+  csp_strike: number | null;
+  csp_expiry: string | null;
+  cc_strike: number | null;
+  cc_expiry: string | null;
+  total_premium_collected: number;
+  unrealized_cost_basis: number | null;
+  cycle_count: number;
+  opened_at: string;
+  updated_at: string;
+};
+type WheelPositionsResponse = {
+  ok: boolean;
+  profile: string;
+  n: number;
+  positions: WheelPosition[];
+};
+
 type NarratorTutorialResponse = {
   path: string;
   exists: boolean;
@@ -296,7 +319,9 @@ type TabKey = "warroom" | "pipeline" | "universe" | "opportunity" | "trades" | "
 type UniverseSubTab = "titoli" | "indici" | "opzioni" | "ciclo" | "palinsesto";
 type MarkdownTable = { headers: string[]; rows: string[][] };
 type ReleaseMdView = { before: string; table: MarkdownTable | null; after: string };
-const API_BASE = "http://localhost:8765";
+// In production (Docker/nginx) usa URL relativo — nginx fa proxy.
+// In dev locale: VITE_API_BASE=http://localhost:8765 in .env.local
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
 function fmtPct(v: number | null): string {
   if (v === null) return "-";
@@ -500,6 +525,8 @@ export default function App() {
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
   const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
+  const [wheelPositions, setWheelPositions] = useState<WheelPositionsResponse | null>(null);
+  const [wheelFetchedAt, setWheelFetchedAt] = useState<number | null>(null);
 
   const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [snapEquity, setSnapEquity] = useState<string>("10000");
@@ -836,6 +863,7 @@ export default function App() {
       void doFetchSysStatus();
       void doFetchRegimeCurrent();
       void doFetchExitCandidates();
+      void doFetchWheelPositions();
       if (!universeScannerName && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
@@ -1279,6 +1307,15 @@ export default function App() {
       const r = await apiJson<ExitCandidatesResponse>(`${API_BASE}/opz/opportunity/exit_candidates?min_score=1&top_n=5`);
       setExitCandidates(r);
       setExitCandidatesFetchedAt(Date.now());
+    } catch (e) { /* silenzioso */ }
+  }
+
+  async function doFetchWheelPositions() {
+    try {
+      const profile = "paper";
+      const r = await apiJson<WheelPositionsResponse>(`${API_BASE}/opz/wheel/positions?profile=${profile}`);
+      setWheelPositions(r);
+      setWheelFetchedAt(Date.now());
     } catch (e) { /* silenzioso */ }
   }
 
@@ -1950,6 +1987,93 @@ export default function App() {
                     ⟳ EXIT SCAN
                   </button>
                 )}
+              </article>
+
+              {/* ── WHEEL POSITIONS ── */}
+              <article className="panel" style={{ gridColumn: "1 / -1" }}>
+                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>🔄 WHEEL POSITIONS</span>
+                  <span style={{ fontSize: "0.65rem", color: "#555", fontWeight: 400 }}>
+                    {wheelFetchedAt ? new Date(wheelFetchedAt).toLocaleTimeString("it-IT") : "—"}
+                  </span>
+                </div>
+
+                {!wheelPositions && (
+                  <div className="dim" style={{ fontSize: "0.7rem" }}>Nessun dato — clicca ⟳ per aggiornare.</div>
+                )}
+
+                {wheelPositions && wheelPositions.positions.length === 0 && (
+                  <div className="dim" style={{ fontSize: "0.7rem" }}>Nessuna posizione Wheel attiva.</div>
+                )}
+
+                {wheelPositions && wheelPositions.positions.length > 0 && (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
+                      <thead>
+                        <tr style={{ color: "#555", borderBottom: "1px solid #2a2a2a" }}>
+                          <th style={{ textAlign: "left", padding: "3px 6px" }}>SYMBOL</th>
+                          <th style={{ textAlign: "left", padding: "3px 6px" }}>STATE</th>
+                          <th style={{ textAlign: "right", padding: "3px 6px" }}>CSP K</th>
+                          <th style={{ textAlign: "left", padding: "3px 6px" }}>CSP EXP</th>
+                          <th style={{ textAlign: "right", padding: "3px 6px" }}>CC K</th>
+                          <th style={{ textAlign: "left", padding: "3px 6px" }}>CC EXP</th>
+                          <th style={{ textAlign: "right", padding: "3px 6px" }}>PREMIUM</th>
+                          <th style={{ textAlign: "right", padding: "3px 6px" }}>CYCLES</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {wheelPositions.positions.map((p) => {
+                          const stateColor: Record<string, string> = {
+                            IDLE: "#555",
+                            OPEN_CSP: "#60a5fa",
+                            ASSIGNED: "#fbbf24",
+                            OPEN_CC: "#a78bfa",
+                            CLOSED: "#4ade80",
+                          };
+                          const col = stateColor[p.state] ?? "#888";
+                          return (
+                            <tr key={p.position_id} style={{ borderBottom: "1px solid #1a1a1a" }}>
+                              <td style={{ padding: "4px 6px", fontWeight: 700 }}>{p.symbol}</td>
+                              <td style={{ padding: "4px 6px" }}>
+                                <span style={{
+                                  color: col, fontWeight: 700,
+                                  background: col + "22", borderRadius: 3,
+                                  padding: "1px 5px", fontSize: "0.65rem",
+                                }}>{p.state}</span>
+                              </td>
+                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#ccc" }}>
+                                {p.csp_strike ?? "—"}
+                              </td>
+                              <td style={{ padding: "4px 6px", color: "#777" }}>
+                                {p.csp_expiry ?? "—"}
+                              </td>
+                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#ccc" }}>
+                                {p.cc_strike ?? "—"}
+                              </td>
+                              <td style={{ padding: "4px 6px", color: "#777" }}>
+                                {p.cc_expiry ?? "—"}
+                              </td>
+                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#4ade80" }}>
+                                +{p.total_premium_collected.toFixed(0)}
+                              </td>
+                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#888" }}>
+                                {p.cycle_count}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <button
+                  className="btn btn-secondary mt10"
+                  style={{ fontSize: "0.7rem", padding: "3px 8px" }}
+                  onClick={() => void doFetchWheelPositions()}
+                >
+                  ⟳ WHEEL REFRESH
+                </button>
               </article>
             </div>
           )}

@@ -138,9 +138,9 @@ Modulo 3: Risk Management & Execution (Aggiornato v11.1)
 
 Strategie Certificate: Parametri Ottimizzati
 
-Tier Progressione: STARTER â†’ OPERATIONAL
+Tier Progressione: MICRO → SMALL → MEDIUM → ADVANCED
 
-Piano Implementazione 90 Giorni
+Roadmap Implementazione (milestone R0–R5)
 
 Metriche di Successo e Kill Switch
 

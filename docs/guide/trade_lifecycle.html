@@ -434,7 +434,7 @@
 <header>
   <div class="header-title">QOpz.AI — Il Viaggio di un Trade</div>
   <div class="progress-wrap"><div class="progress-bar" id="pbar" style="width:10%"></div></div>
-  <div class="step-counter">Step <span id="scur">1</span> / <span id="stot">10</span></div>
+  <div class="step-counter">Step <span id="scur">1</span> / <span id="stot">16</span></div>
 </header>
 
 <div class="stage">
@@ -1148,6 +1148,398 @@
     </div>
   </div>
 
+
+  <!-- STEP 11 — Wheel: Il Ciclo -->
+  <div class="step" data-step="11">
+    <div class="step-header">
+      <div class="step-icon">🔄</div>
+      <div class="step-meta">
+        <div class="step-label">Step 11 — Strategia Wheel</div>
+        <div class="step-title">Il Ciclo della Ruota</div>
+        <div class="step-subtitle">Una strategia di incasso premium in loop — disponibile dal tier SMALL</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Cos'è il Wheel</div>
+        <div class="description">
+          Il Wheel è una sequenza ciclica di vendite di opzioni sullo stesso sottostante. Non si scommette sulla direzione — si incassa il premio di chi vuole proteggersi dalla volatilità, in entrambe le direzioni.<br><br>
+          Ogni ciclo passa attraverso cinque stati. Quando un ciclo si chiude, può aprirne uno nuovo — da qui il nome: la <strong>ruota</strong> gira.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Stato 1</div>
+            <div class="data-value" style="color:#555;font-size:16px">IDLE</div>
+            <div class="data-sub">In attesa del setup</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Stato 2</div>
+            <div class="data-value blue" style="font-size:16px">OPEN_CSP</div>
+            <div class="data-sub">Put venduta, premio incassato</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Stato 3</div>
+            <div class="data-value warn" style="font-size:16px">ASSIGNED</div>
+            <div class="data-sub">Azioni ricevute al broker</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Stato 4</div>
+            <div class="data-value" style="color:#a78bfa;font-size:16px">OPEN_CC</div>
+            <div class="data-sub">Call venduta sulle azioni</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">Stato 5</div>
+            <div class="data-value ok" style="font-size:16px">CLOSED</div>
+            <div class="data-sub">Ciclo completato — profitto totale incassato</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">WAR ROOM — Pannello Wheel</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row"><span class="dim">Sottostante</span><span class="hl">IWM</span></div>
+            <div class="row"><span class="dim">Tier richiesto</span><span class="badge blue">SMALL</span></div>
+            <div class="row"><span class="dim">Capitale minimo</span><span>€2 000</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">Stato attuale</span><span class="badge blue">OPEN_CSP</span></div>
+            <div class="row"><span class="dim">Premium incassato</span><span class="hlg">+$0.72</span></div>
+            <div class="row"><span class="dim">Cicli completati</span><span>3</span></div>
+            <div class="row"><span class="dim">Premio totale cicli</span><span class="hlg">+$214</span></div>
+          </div>
+<span class="dim"># Il Wheel è paziente — guadagna con</span><br>
+<span class="dim"># il tempo e la volatilità, non con la direzione</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 12 — Wheel: OPEN_CSP -->
+  <div class="step" data-step="12">
+    <div class="step-header">
+      <div class="step-icon">💰</div>
+      <div class="step-meta">
+        <div class="step-label">Step 12 — Wheel · OPEN_CSP</div>
+        <div class="step-title">Cash Secured Put: vendi la put</div>
+        <div class="step-subtitle">Incassi subito un premio — ti impegni ad acquistare se il prezzo scende</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Fase 1 del Wheel — vendita put OTM</div>
+        <div class="description">
+          IWM quota $195. Vendi una put con strike $190 (2.6% sotto il prezzo). Incassi $0.72 per azione. Il tuo impegno: se IWM scende sotto 190 entro la scadenza, acquisti 100 azioni a $190 ciascuna.<br><br>
+          Il premio è già in tasca. Il rischio è noto: $190 di costo base, ridotto del premio incassato.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Strike put venduta</div>
+            <div class="data-value blue">$190</div>
+            <div class="data-sub">2.6% OTM</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Premio incassato</div>
+            <div class="data-value ok">$0.72</div>
+            <div class="data-sub">subito in cassa</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">DTE</div>
+            <div class="data-value ok">28</div>
+            <div class="data-sub">giorni alla scadenza</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Cash bloccato</div>
+            <div class="data-value warn">$19 000</div>
+            <div class="data-sub">100 azioni × $190</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">Break-even effettivo</div>
+            <div class="data-value ok">$189.28</div>
+            <div class="data-sub">$190 − $0.72 incassato</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">wheel_state_machine — IWM</div>
+        </div>
+        <div class="screen-body">
+<span class="dim">transition:</span> <span class="hlb">IDLE → OPEN_CSP</span><br>
+<br>
+          <div class="section">
+            <div class="row"><span class="dim">symbol</span><span class="hl">IWM</span></div>
+            <div class="row"><span class="dim">csp_strike</span><span class="hlb">190</span></div>
+            <div class="row"><span class="dim">csp_expiry</span><span>2026-04-17</span></div>
+            <div class="row"><span class="dim">premium</span><span class="hlg">+$72.00</span></div>
+            <div class="row"><span class="dim">cycle_count</span><span>4</span></div>
+          </div>
+<span class="dim">event: </span><span class="hlg">OPEN_CSP_ENTERED</span><br>
+<span class="dim">saved to:</span> <span class="hlt">wheel_position_events</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 13 — Wheel: ASSIGNED -->
+  <div class="step" data-step="13">
+    <div class="step-header">
+      <div class="step-icon">📦</div>
+      <div class="step-meta">
+        <div class="step-label">Step 13 — Wheel · ASSIGNED</div>
+        <div class="step-title">Azioni assegnate: ora sei long IWM</div>
+        <div class="step-subtitle">IWM è sceso sotto 190 — ricevi 100 azioni al prezzo concordato</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Assegnazione — cosa cambia</div>
+        <div class="description">
+          IWM è scaduto a $188.40 — sotto lo strike 190. Il broker ti assegna 100 azioni a $190 ciascuna. Il costo effettivo è $189.28 (ridotto dal premio incassato).<br><br>
+          <strong>Questo non è un fallimento.</strong> Era uno scenario previsto e accettato. Da qui si apre la seconda fase: vendere una covered call.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">IWM alla scadenza</div>
+            <div class="data-value bad">$188.40</div>
+            <div class="data-sub">sotto strike 190</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Azioni ricevute</div>
+            <div class="data-value blue">100</div>
+            <div class="data-sub">a $190 / azione</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Costo base effettivo</div>
+            <div class="data-value warn">$189.28</div>
+            <div class="data-sub">dopo premium CSP</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">uPnL momentaneo</div>
+            <div class="data-value bad">−$88</div>
+            <div class="data-sub">$188.40 vs $189.28</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">Prossima mossa</div>
+            <div class="data-value" style="color:#a78bfa;font-size:16px">Vendi Covered Call →</div>
+            <div class="data-sub">riduce il costo base ad ogni ciclo</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">wheel_state_machine — IWM</div>
+        </div>
+        <div class="screen-body">
+<span class="dim">transition:</span> <span class="hly">OPEN_CSP → ASSIGNED</span><br>
+<br>
+          <div class="section">
+            <div class="row"><span class="dim">assegnazione</span><span class="hly">190P esercitata</span></div>
+            <div class="row"><span class="dim">IWM_price</span><span>$188.40</span></div>
+            <div class="row"><span class="dim">shares</span><span class="hlb">100</span></div>
+            <div class="row"><span class="dim">cost_basis</span><span class="hly">$189.28</span></div>
+          </div>
+<span class="dim">event: </span><span class="hly">ASSIGNED_ENTERED</span><br>
+<span class="dim">→ prossima azione: </span><span class="hlb">OPEN_CC</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 14 — Wheel: OPEN_CC -->
+  <div class="step" data-step="14">
+    <div class="step-header">
+      <div class="step-icon">📞</div>
+      <div class="step-meta">
+        <div class="step-label">Step 14 — Wheel · OPEN_CC</div>
+        <div class="step-title">Covered Call: vendi la call sulle azioni</div>
+        <div class="step-subtitle">Le azioni che hai sono la tua copertura — incassi un altro premio</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Fase 2 del Wheel — covered call</div>
+        <div class="description">
+          Hai 100 azioni IWM a costo $189.28. Vendi una call con strike $192 (leggermente OTM). Incassi $0.55.<br><br>
+          Se IWM sale sopra 192, le azioni vengono cedute al prezzo concordato — con profitto. Se rimane sotto, incassi solo il premio e ripeti il ciclo.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Strike call venduta</div>
+            <div class="data-value" style="color:#a78bfa">$192</div>
+            <div class="data-sub">1.9% sopra il costo base</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Premio incassato</div>
+            <div class="data-value ok">$0.55</div>
+            <div class="data-sub">riduce ancora il costo</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Costo base aggiornato</div>
+            <div class="data-value ok">$188.73</div>
+            <div class="data-sub">$189.28 − $0.55</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Se assegnata a $192</div>
+            <div class="data-value ok">+$327</div>
+            <div class="data-sub">100 × ($192 − $188.73)</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">wheel_state_machine — IWM</div>
+        </div>
+        <div class="screen-body">
+<span class="dim">transition:</span> <span class="hlb" style="color:#a78bfa">ASSIGNED → OPEN_CC</span><br>
+<br>
+          <div class="section">
+            <div class="row"><span class="dim">cc_strike</span><span style="color:#a78bfa">192</span></div>
+            <div class="row"><span class="dim">cc_expiry</span><span>2026-05-16</span></div>
+            <div class="row"><span class="dim">premium</span><span class="hlg">+$55.00</span></div>
+            <div class="row"><span class="dim">total_premium</span><span class="hlg">+$127.00</span></div>
+            <div class="row"><span class="dim">costo_base</span><span class="hlg">$188.73</span></div>
+          </div>
+<span class="dim">event: </span><span class="hlg">OPEN_CC_ENTERED</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 15 — Wheel: CLOSED -->
+  <div class="step" data-step="15">
+    <div class="step-header">
+      <div class="step-icon">✅</div>
+      <div class="step-meta">
+        <div class="step-label">Step 15 — Wheel · CLOSED</div>
+        <div class="step-title">Ciclo completato — la ruota gira di nuovo</div>
+        <div class="step-subtitle">Le azioni cedute a $192 — profitto totale ciclo: +$327</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">Riepilogo ciclo Wheel #4</div>
+        <div class="description">
+          IWM ha superato $192. Le azioni vengono cedute. Il ciclo è chiuso con profitto.<br><br>
+          La <strong>ruota può girare di nuovo</strong>: il sistema è pronto per un nuovo OPEN_CSP sullo stesso sottostante, accumulando premi ciclo dopo ciclo.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Premio CSP</div>
+            <div class="data-value ok">+$72</div>
+            <div class="data-sub">dalla vendita put</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Premio CC</div>
+            <div class="data-value ok">+$55</div>
+            <div class="data-sub">dalla covered call</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">Guadagno cessione azioni</div>
+            <div class="data-value ok">+$200</div>
+            <div class="data-sub">100 × ($192 − $190) netto</div>
+          </div>
+          <div class="data-item full">
+            <div class="data-label">Profitto totale ciclo #4</div>
+            <div class="data-value ok" style="font-size:32px">+$327</div>
+            <div class="data-sub">su $18 928 di capitale impegnato — ~1.7% per ciclo</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">wheel_position_events — CLOSED</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row"><span class="dim">event</span><span class="hlg">CLOSED</span></div>
+            <div class="row"><span class="dim">position_id</span><span class="hlt">whl_IWM_004</span></div>
+            <div class="row"><span class="dim">cycle_count</span><span>4</span></div>
+            <div class="row"><span class="dim">total_premium</span><span class="hlg">+$127.00</span></div>
+            <div class="row"><span class="dim">capital_gain</span><span class="hlg">+$200.00</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">profitto ciclo</span><span class="hlg">+$327.00</span></div>
+            <div class="row"><span class="dim">durata ciclo</span><span>42 giorni</span></div>
+            <div class="row"><span class="dim">stato</span><span class="badge pass">CLOSED ✓</span></div>
+          </div>
+<span class="hlg">→ pronto per ciclo #5</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 16 — Tier Roadmap -->
+  <div class="step" data-step="16">
+    <div class="step-header">
+      <div class="step-icon">🗺️</div>
+      <div class="step-meta">
+        <div class="step-label">Step 16 — Tier Roadmap</div>
+        <div class="step-title">Da MICRO ad ADVANCED</div>
+        <div class="step-subtitle">Ogni tier sblocca nuove strategie — la progressione è guidata dai risultati</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="panel-title">I quattro livelli operativi</div>
+        <div class="description">
+          Non si salta al livello successivo per decisione — ci si qualifica con i risultati. Ogni upgrade gate richiede un numero minimo di trade chiusi, uno Sharpe OOS sufficiente e zero violazioni di rischio.
+        </div>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">MICRO · €1k–2k</div>
+            <div class="data-value blue" style="font-size:14px">Bull Put (IWM)</div>
+            <div class="data-sub">max 1–2 posizioni · kelly off</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">SMALL · €2k–5k</div>
+            <div class="data-value" style="color:#a78bfa;font-size:14px">+ Iron Condor · Wheel</div>
+            <div class="data-sub">IWM + SPY · kelly post N≥50</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">MEDIUM · €5k–15k</div>
+            <div class="data-value ok" style="font-size:14px">+ PMCC · Calendar · Hedge</div>
+            <div class="data-sub">SPY QQQ IWM · kelly on · twap</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">ADVANCED · €15k+</div>
+            <div class="data-value orange" style="font-size:14px">+ Ratio Spread · Delta OL</div>
+            <div class="data-sub">multi-underlying · full execution</div>
+          </div>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="screen-bar">
+          <div class="screen-dot r"></div><div class="screen-dot y"></div><div class="screen-dot g"></div>
+          <div class="screen-title">tier_feature_matrix — upgrade gate</div>
+        </div>
+        <div class="screen-body">
+          <div class="section">
+            <div class="row"><span class="dim">tier attuale</span><span class="badge blue">MICRO</span></div>
+            <div class="row"><span class="dim">trade chiusi</span><span class="hly">12 / 50 richiesti</span></div>
+            <div class="row"><span class="dim">Sharpe OOS</span><span class="hlg">0.74 ✓ (min 0.6)</span></div>
+            <div class="row"><span class="dim">violazioni rischio</span><span class="hlg">0 ✓</span></div>
+            <div class="row"><span class="dim">DATA_MODE</span><span class="hlt">VENDOR_REAL_CHAIN</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="dim">upgrade a SMALL</span><span class="hly">38 trade mancanti</span></div>
+            <div class="row"><span class="dim">kelly status</span><span class="hly">DISABILITATO (N&lt;50)</span></div>
+            <div class="row"><span class="dim">Wheel disponibile</span><span class="hly">al tier SMALL</span></div>
+          </div>
+<span class="dim"># La progressione è automatica quando</span><br>
+<span class="dim"># tutti i gate vengono superati</span><br>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /stage -->
 
 <footer>
@@ -1199,10 +1591,34 @@
     <span class="toc-num">10</span><span class="toc-icon">🏁</span>
     <span class="toc-name">Trade chiuso</span>
   </div>
+  <div class="toc-item" data-step="11" onclick="goTo(11)">
+    <span class="toc-num">11</span><span class="toc-icon">🔄</span>
+    <span class="toc-name">Wheel — ciclo</span>
+  </div>
+  <div class="toc-item" data-step="12" onclick="goTo(12)">
+    <span class="toc-num">12</span><span class="toc-icon">💰</span>
+    <span class="toc-name">CSP — vendita put</span>
+  </div>
+  <div class="toc-item" data-step="13" onclick="goTo(13)">
+    <span class="toc-num">13</span><span class="toc-icon">📦</span>
+    <span class="toc-name">Assegnazione</span>
+  </div>
+  <div class="toc-item" data-step="14" onclick="goTo(14)">
+    <span class="toc-num">14</span><span class="toc-icon">📞</span>
+    <span class="toc-name">CC — covered call</span>
+  </div>
+  <div class="toc-item" data-step="15" onclick="goTo(15)">
+    <span class="toc-num">15</span><span class="toc-icon">✅</span>
+    <span class="toc-name">Ciclo chiuso</span>
+  </div>
+  <div class="toc-item" data-step="16" onclick="goTo(16)">
+    <span class="toc-num">16</span><span class="toc-icon">🗺️</span>
+    <span class="toc-name">Tier Roadmap</span>
+  </div>
 </nav>
 
 <script>
-  const TOTAL = 10;
+  const TOTAL = 16;
   let current = 1;
 
   function goTo(n) {
