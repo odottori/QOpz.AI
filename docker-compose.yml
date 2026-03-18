@@ -31,6 +31,5 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.guide
-    ports:
-      - "8766:80"
     restart: unless-stopped
+    # no external port — proxied via API at /guide (auth enforced)

@@ -18,9 +18,10 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 import logging
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("opz_api")
@@ -1071,6 +1072,22 @@ def console():
     if not _CONSOLE_HTML.exists():
         raise HTTPException(status_code=404, detail="console not found")
     return FileResponse(_CONSOLE_HTML, media_type="text/html")
+
+
+_GUIDE_BASE = os.environ.get("GUIDE_URL", "http://qopz-guide")
+
+
+@app.get("/guide/{path:path}")
+@app.get("/guide")
+async def guide_proxy(request: Request, path: str = ""):
+    target = f"{_GUIDE_BASE}/{path}" if path else f"{_GUIDE_BASE}/"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(target)
+        return Response(content=r.content, status_code=r.status_code,
+                        media_type=r.headers.get("content-type", "text/html"))
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="guide service unavailable")
 
 
 @app.get("/opz/state")
