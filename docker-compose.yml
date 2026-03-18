@@ -1,24 +1,26 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # QOpz.AI — docker-compose
 # Uso: docker compose up --build
-# API:   http://localhost:8765
-# Guide: http://localhost:8766
+# Accesso: http://localhost  (utente: opz, password: NGINX_PASSWORD)
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
+
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8765:8765"
+    expose:
+      - "8765"
     environment:
-      - OPZ_PROFILE=dev
-      - OPZ_API_TOKEN=${OPZ_API_TOKEN:-}
+      - OPZ_PROFILE=${OPZ_PROFILE:-paper}
+      - OPZ_DATA_MODE=${OPZ_DATA_MODE:-VENDOR_REAL_CHAIN}
     volumes:
-      - ./db:/app/db
-      - ./logs:/app/logs
+      - qopz-db:/app/db
+      - qopz-logs:/app/logs
       - ./ops:/app/ops
+    networks:
+      - qopz-net
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
@@ -27,9 +29,26 @@ services:
       retries: 3
       start_period: 15s
 
-  guide:
+  nginx:
     build:
       context: .
-      dockerfile: Dockerfile.guide
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      - NGINX_USER=${NGINX_USER:-opz}
+      - NGINX_PASSWORD=${NGINX_PASSWORD:?Set NGINX_PASSWORD in .env}
+    networks:
+      - qopz-net
     restart: unless-stopped
-    # no external port — proxied via API at /guide (auth enforced)
+
+volumes:
+  qopz-db:
+  qopz-logs:
+
+networks:
+  qopz-net:
+    driver: bridge

@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# QOpz.AI — Nginx Gateway (multi-stage)
+# Stage 1: build MkDocs guide
+# Stage 2: nginx:alpine — basic auth + reverse proxy to qopz-api
+# Port: 80
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: build MkDocs ────────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+RUN pip install --no-cache-dir "mkdocs-material>=9.5"
+
+WORKDIR /build
+COPY docs/     docs/
+COPY mkdocs.yml mkdocs.yml
+RUN mkdocs build --clean -q
+
+# ── Stage 2: nginx gateway ────────────────────────────────────────────────────
+FROM nginx:alpine
+
+RUN apk add --no-cache apache2-utils
+
+COPY --from=builder /build/site /usr/share/nginx/guide
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Entrypoint inline (evita CRLF da Windows)
+RUN printf '#!/bin/sh\nhtpasswd -bc /etc/nginx/.htpasswd "${NGINX_USER:-opz}" "${NGINX_PASSWORD:?NGINX_PASSWORD required}"\nexec nginx -g "daemon off;"\n' > /entrypoint.sh \
+    && chmod +x /entrypoint.sh
+
+EXPOSE 80
+
+ENTRYPOINT ["/entrypoint.sh"]

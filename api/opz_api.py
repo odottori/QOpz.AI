@@ -146,24 +146,8 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-API-Key"],
 )
 
-# ── Token auth ────────────────────────────────────────────────────────────────
-# Set OPZ_API_TOKEN env var to enable. Empty = open (dev mode).
-# Clients: X-API-Key: <token>  or  Authorization: Bearer <token>
-_API_TOKEN: str = os.environ.get("OPZ_API_TOKEN", "").strip()
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc", "/console"}
-
-
-@app.middleware("http")
-async def _token_auth(request: Request, call_next):
-    if _API_TOKEN and request.url.path not in _PUBLIC_PATHS:
-        token = request.headers.get("X-API-Key", "")
-        if not token:
-            auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer "):
-                token = auth[7:]
-        if not secrets.compare_digest(token, _API_TOKEN):
-            return JSONResponse({"ok": False, "reason": "Unauthorized"}, status_code=401)
-    return await call_next(request)
+# ── Auth ──────────────────────────────────────────────────────────────────────
+# Gestita da nginx (basic auth). FastAPI è interno alla rete Docker.
 
 
 @app.exception_handler(Exception)
