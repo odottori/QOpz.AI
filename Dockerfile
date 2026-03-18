@@ -35,6 +35,11 @@ COPY scripts/      scripts/
 COPY config/       config/
 COPY rebuild_manifest.py ./
 
+# ── Docs (MkDocs build) ───────────────────────────────────────────────────────
+COPY docs/         docs/
+COPY mkdocs.yml    mkdocs.yml
+RUN mkdocs build --clean -q
+
 # ── Runtime directories (db/ sarà montato come volume su Fly.io) ──────────────
 RUN mkdir -p db logs ops reports
 

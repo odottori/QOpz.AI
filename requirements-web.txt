@@ -2,3 +2,4 @@
 fastapi>=0.134.0
 uvicorn>=0.41.0
 markdown>=3.7
+mkdocs-material>=9.5

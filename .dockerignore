@@ -19,7 +19,6 @@ ui/
 # ── Test & dev ────────────────────────────────────────────────────────────────
 tests/
 tools/
-docs/
 planner/
 samples/
 .quarantine/
@@ -36,7 +35,6 @@ samples/
 *.ps1
 
 # ── Docs & config vari ───────────────────────────────────────────────────────
-*.md
 AGENTS.md
 CLAUDE.md
 *.lock
