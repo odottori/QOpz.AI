@@ -1,5 +1,5 @@
 # QOpz.AI — Guida Completa
-*Prefazione + Capitoli 0–5 + Appendice A*
+*Prefazione + Capitoli 0–7 + Appendice A*
 
 ---
 
