@@ -22,8 +22,10 @@ RUN apk add --no-cache apache2-utils
 
 COPY --from=builder /build/site /usr/share/nginx/html
 COPY docker/nginx-guide.conf /etc/nginx/conf.d/default.conf
-COPY docker/guide-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+
+# Scriviamo l'entrypoint inline per evitare CRLF da Windows
+RUN printf '#!/bin/sh\nhtpasswd -bc /etc/nginx/.htpasswd "${GUIDE_USER:-opz}" "${GUIDE_PASSWORD:?GUIDE_PASSWORD required}"\nexec nginx -g "daemon off;"\n' > /entrypoint.sh \
+    && chmod +x /entrypoint.sh
 
 EXPOSE 80
 
