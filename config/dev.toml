@@ -41,3 +41,9 @@ manual_trigger_file = "ops/kill_switch.trigger"
 # List env-var names that must be set before the system can start in this profile.
 # Empty in dev (no external credentials required).
 required_env = []
+
+[tier]
+# capital_tier = ceiling of available strategies (determined by deposited capital)
+# active_mode  = currently selected operating mode (must be <= capital_tier)
+capital_tier = "MICRO"
+active_mode  = "MICRO"

@@ -40,3 +40,9 @@ manual_trigger_file = "ops/kill_switch.trigger"
 
 [secrets]
 required_env = []
+
+[tier]
+# capital_tier = ceiling of available strategies (determined by deposited capital)
+# active_mode  = currently selected operating mode (must be <= capital_tier)
+capital_tier = "SMALL"
+active_mode  = "SMALL"

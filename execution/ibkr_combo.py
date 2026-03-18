@@ -11,6 +11,21 @@ except Exception:  # pragma: no cover
 
 
 @dataclass(frozen=True)
+class IronCondorPlan:
+    """4-leg Iron Condor: sell put spread + sell call spread (same expiry)."""
+
+    symbol: str
+    expiry: str               # YYYYMMDD
+    put_long_strike: float    # lowest strike (buy put)
+    put_short_strike: float   # sell put
+    call_short_strike: float  # sell call
+    call_long_strike: float   # highest strike (buy call)
+    put_width: float          # put_short - put_long
+    call_width: float         # call_long - call_short
+    quantity: int
+
+
+@dataclass(frozen=True)
 class ComboPlan:
     symbol: str
     expiry: str  # YYYYMMDD
@@ -236,3 +251,79 @@ def place_modify_cancel(
         "short_conId": short_leg.conId,
         "long_conId": long_leg.conId,
     }
+
+
+# ── Iron Condor ─────────────────────────────────────────────────────────────
+
+
+def build_iron_condor_plan(
+    *,
+    symbol: str,
+    expiry: str,
+    put_long_strike: float,
+    put_short_strike: float,
+    call_short_strike: float,
+    call_long_strike: float,
+    quantity: int = 1,
+) -> IronCondorPlan:
+    """
+    Build and validate an Iron Condor plan.
+
+    Strike order must be: put_long < put_short < call_short < call_long
+    Both spreads should be equidistant for balanced risk (not enforced, just recommended).
+    """
+    pl = float(put_long_strike)
+    ps = float(put_short_strike)
+    cs = float(call_short_strike)
+    cl = float(call_long_strike)
+
+    if not (pl < ps < cs < cl):
+        raise ValueError(
+            f"Strike order violation: put_long({pl}) < put_short({ps}) < "
+            f"call_short({cs}) < call_long({cl}) required"
+        )
+    return IronCondorPlan(
+        symbol=symbol,
+        expiry=expiry,
+        put_long_strike=pl,
+        put_short_strike=ps,
+        call_short_strike=cs,
+        call_long_strike=cl,
+        put_width=round(ps - pl, 4),
+        call_width=round(cl - cs, 4),
+        quantity=int(quantity),
+    )
+
+
+def build_iron_condor_contract(
+    ib: "IB",
+    plan: IronCondorPlan,
+) -> tuple["Contract", "Contract", "Contract", "Contract", "Contract"]:
+    """
+    Returns (combo_contract, put_long, put_short, call_short, call_long).
+    4-leg BAG order: BUY put_long, SELL put_short, SELL call_short, BUY call_long.
+    """
+    put_long = Option(plan.symbol, plan.expiry, plan.put_long_strike, "P", "SMART", currency="USD")
+    put_short = Option(plan.symbol, plan.expiry, plan.put_short_strike, "P", "SMART", currency="USD")
+    call_short = Option(plan.symbol, plan.expiry, plan.call_short_strike, "C", "SMART", currency="USD")
+    call_long = Option(plan.symbol, plan.expiry, plan.call_long_strike, "C", "SMART", currency="USD")
+    ib.qualifyContracts(put_long, put_short, call_short, call_long)
+
+    combo = Contract()
+    combo.symbol = plan.symbol
+    combo.secType = "BAG"
+    combo.currency = "USD"
+    combo.exchange = "SMART"
+    combo.comboLegs = [
+        ComboLeg(conId=put_long.conId, ratio=1, action="BUY", exchange="SMART"),
+        ComboLeg(conId=put_short.conId, ratio=1, action="SELL", exchange="SMART"),
+        ComboLeg(conId=call_short.conId, ratio=1, action="SELL", exchange="SMART"),
+        ComboLeg(conId=call_long.conId, ratio=1, action="BUY", exchange="SMART"),
+    ]
+    return combo, put_long, put_short, call_short, call_long
+
+
+def default_iron_condor_credit(plan: IronCondorPlan) -> float:
+    """Starting limit credit for a balanced Iron Condor: ~20% of narrower wing width."""
+    wing = min(plan.put_width, plan.call_width)
+    return float(max(0.10, min(5.00, round(wing * 0.20, 2))))
