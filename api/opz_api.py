@@ -20,7 +20,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("opz_api")
@@ -1061,6 +1061,16 @@ def _bootstrap_runtime_data(profile: str = "paper") -> dict[str, Any]:
 @app.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+_CONSOLE_HTML = Path(__file__).parent / "console_operatore.html"
+
+
+@app.get("/console", response_class=FileResponse)
+def console():
+    if not _CONSOLE_HTML.exists():
+        raise HTTPException(status_code=404, detail="console not found")
+    return FileResponse(_CONSOLE_HTML, media_type="text/html")
 
 
 @app.get("/opz/state")
