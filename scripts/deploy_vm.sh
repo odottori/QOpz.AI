@@ -58,6 +58,15 @@ echo "[6/6] Starting container..."
 docker stop "$CONTAINER" 2>/dev/null || true
 docker rm   "$CONTAINER" 2>/dev/null || true
 
+# Genera token se non già presente in .env
+TOKEN_FILE="$APP_DIR/.env"
+if [ -f "$TOKEN_FILE" ] && grep -q "OPZ_API_TOKEN=" "$TOKEN_FILE"; then
+  API_TOKEN=$(grep "OPZ_API_TOKEN=" "$TOKEN_FILE" | cut -d= -f2)
+else
+  API_TOKEN=$(openssl rand -hex 24)
+  echo "OPZ_API_TOKEN=$API_TOKEN" >> "$TOKEN_FILE"
+fi
+
 docker run -d \
   --name "$CONTAINER" \
   --restart unless-stopped \
@@ -66,12 +75,15 @@ docker run -d \
   -v "${LOGS_DIR}:/app/logs" \
   -e OPZ_PROFILE=paper \
   -e OPZ_DATA_MODE=VENDOR_REAL_CHAIN \
+  -e "OPZ_API_TOKEN=${API_TOKEN}" \
   "$IMAGE"
 
 echo ""
 echo "=== Done ==="
 echo "Container: $CONTAINER"
 echo "API:       http://$(hostname -I | awk '{print $1}'):${PORT}/health"
+echo "Console:   http://$(hostname -I | awk '{print $1}'):${PORT}/console"
+echo "Token:     $API_TOKEN"
 echo "Logs:      docker logs -f $CONTAINER"
 echo ""
 echo "IMPORTANT: TWS paper must be running on $TWS_HOST"
