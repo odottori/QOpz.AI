@@ -263,7 +263,13 @@ type TierDetail = { capital: string; strategies: string[]; max_positions: number
 type TierResponse = {
   ok: boolean; profile: string;
   capital_tier: TierName; active_mode: TierName;
-  features: TierFeatures; tier_detail: TierDetail; next_tier: TierName | null;
+  features: TierFeatures;
+  features_validated: TierFeatures;
+  features_available: TierFeatures;
+  tier_detail: TierDetail;
+  next_tier: TierName | null;
+  next_capital_tier: TierName | null;
+  next_operational_tier: TierName | null;
 };
 
 // ── ROC35: Wheel positions ────────────────────────────────────────────────────
@@ -2028,22 +2034,29 @@ export default function App() {
 
               {/* ── WHEEL POSITIONS ── */}
               {(() => {
-                const _TIER_ORDER: TierName[] = ["MICRO", "SMALL", "MEDIUM", "ADVANCED"];
-                const activeTier = tierInfo?.active_mode ?? "MICRO";
-                const wheelUnlocked = _TIER_ORDER.indexOf(activeTier) >= _TIER_ORDER.indexOf("SMALL");
+                // Copilot model: due livelli separati
+                // wheelAvailable: capitale sufficiente (capital_tier ≥ SMALL) — pannello visibile
+                // wheelValidated: gate superato (active_mode ≥ SMALL) — operazione certificata
+                const wheelAvailable  = tierInfo?.features_available?.wheel  ?? false;
+                const wheelValidated  = tierInfo?.features_validated?.wheel  ?? false;
+                const wheelWarning    = wheelAvailable && !wheelValidated;
+                const capitalTierName = tierInfo?.capital_tier ?? "MICRO";
                 return (
               <article className="panel" style={{ gridColumn: "1 / -1", position: "relative" }}>
                 <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>🔄 WHEEL POSITIONS</span>
                   <span style={{ fontSize: "0.65rem", color: "#555", fontWeight: 400 }}>
-                    {wheelUnlocked
-                      ? (wheelFetchedAt ? new Date(wheelFetchedAt).toLocaleTimeString("it-IT") : "—")
-                      : <span style={{ color: "#a78bfa" }}>🔒 SMALL tier required</span>
+                    {!wheelAvailable
+                      ? <span style={{ color: "#a78bfa" }}>🔒 Capitale insufficiente</span>
+                      : wheelWarning
+                        ? <span style={{ color: "#f97316" }}>⚠ Non ancora validato</span>
+                        : (wheelFetchedAt ? new Date(wheelFetchedAt).toLocaleTimeString("it-IT") : "—")
                     }
                   </span>
                 </div>
 
-                {!wheelUnlocked && (
+                {/* BLOCCO REALE: capitale insufficiente */}
+                {!wheelAvailable && (
                   <div style={{
                     padding: "16px 12px",
                     background: "rgba(167,139,250,0.06)",
@@ -2054,26 +2067,50 @@ export default function App() {
                   }}>
                     <span style={{ fontSize: "1.2rem" }}>🔒</span>
                     <div>
-                      <div style={{ color: "#a78bfa", fontWeight: 700, marginBottom: 2 }}>Wheel disponibile dal tier SMALL (€2k–5k)</div>
-                      <div>Tier attuale: <strong style={{ color: "#60a5fa" }}>{activeTier}</strong> — Iron Condor e Wheel si sbloccano al tier successivo.</div>
-                      {tierInfo?.next_tier && (
+                      <div style={{ color: "#a78bfa", fontWeight: 700, marginBottom: 2 }}>Wheel richiede capitale SMALL (€2k–5k)</div>
+                      <div>Capitale attuale: <strong style={{ color: "#60a5fa" }}>{capitalTierName}</strong> — aumenta il capitale per accedere a questa strategia.</div>
+                      {tierInfo?.next_capital_tier && (
                         <div style={{ marginTop: 4, color: "#555" }}>
-                          Upgrade gate → 50 trade chiusi · Sharpe OOS ≥ 0.6 · 0 violazioni
+                          Prossimo tier capitale → {tierInfo.next_capital_tier}
                         </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                {wheelUnlocked && !wheelPositions && (
+                {/* WARNING COPILOTA: capitale ok, gate non ancora superato */}
+                {wheelWarning && (
+                  <div style={{
+                    padding: "10px 12px",
+                    background: "rgba(249,115,22,0.08)",
+                    border: "1px solid #f9731644",
+                    borderRadius: 6,
+                    fontSize: "0.72rem", color: "#f97316",
+                    display: "flex", alignItems: "center", gap: 10,
+                    marginBottom: 10,
+                  }}>
+                    <span style={{ fontSize: "1.1rem" }}>⚠</span>
+                    <div>
+                      <strong>Strategia non ancora validata sul tuo track record.</strong>
+                      {" "}Procedi con consapevolezza.
+                      {tierInfo?.next_operational_tier && (
+                        <span style={{ color: "#888", marginLeft: 6 }}>
+                          Gate operativo: 50 trade chiusi · Sharpe OOS ≥ 0.6 · 0 violazioni
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {wheelAvailable && !wheelPositions && (
                   <div className="dim" style={{ fontSize: "0.7rem" }}>Nessun dato — clicca ⟳ per aggiornare.</div>
                 )}
 
-                {wheelUnlocked && wheelPositions && wheelPositions.positions.length === 0 && (
+                {wheelAvailable && wheelPositions && wheelPositions.positions.length === 0 && (
                   <div className="dim" style={{ fontSize: "0.7rem" }}>Nessuna posizione Wheel attiva.</div>
                 )}
 
-                {wheelUnlocked && wheelPositions && wheelPositions.positions.length > 0 && (
+                {wheelAvailable && wheelPositions && wheelPositions.positions.length > 0 && (
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
                       <thead>
@@ -2134,7 +2171,7 @@ export default function App() {
                   </div>
                 )}
 
-                {wheelUnlocked && (
+                {wheelAvailable && (
                   <button
                     className="btn btn-secondary mt10"
                     style={{ fontSize: "0.7rem", padding: "3px 8px" }}

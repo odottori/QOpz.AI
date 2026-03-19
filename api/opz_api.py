@@ -2517,7 +2517,8 @@ def opz_tier(profile: str = "dev") -> Dict[str, Any]:
         except ValueError:
             return False
 
-    features = {
+    # features_validated: gate superato (active_mode) — strategia operativa certificata
+    features_validated = {
         "bull_put":         True,
         "iron_condor":      tier_gte(active_mode, "SMALL"),
         "wheel":            tier_gte(active_mode, "SMALL"),
@@ -2530,6 +2531,21 @@ def opz_tier(profile: str = "dev") -> Dict[str, Any]:
         "multi_underlying": tier_gte(active_mode, "ADVANCED"),
     }
 
+    # features_available: capitale sufficiente (capital_tier) — operatore PUÒ scegliere,
+    # ma non ha ancora superato il gate. Copilota avvisa, non blocca.
+    features_available = {
+        "bull_put":         True,
+        "iron_condor":      tier_gte(capital_tier, "SMALL"),
+        "wheel":            tier_gte(capital_tier, "SMALL"),
+        "pmcc_calendar":    tier_gte(capital_tier, "MEDIUM"),
+        "hedge_active":     tier_gte(capital_tier, "MEDIUM"),
+        "ratio_spread":     tier_gte(capital_tier, "ADVANCED"),
+        "delta_overlay":    tier_gte(capital_tier, "ADVANCED"),
+        "kelly_enabled":    tier_gte(capital_tier, "SMALL"),
+        "twap_vwap":        tier_gte(capital_tier, "MEDIUM"),
+        "multi_underlying": tier_gte(capital_tier, "ADVANCED"),
+    }
+
     tier_info = {
         "MICRO":    {"capital": "€1k–2k", "strategies": ["Bull Put"], "max_positions": 2},
         "SMALL":    {"capital": "€2k–5k", "strategies": ["Bull Put", "Iron Condor", "Wheel"], "max_positions": 3},
@@ -2539,17 +2555,18 @@ def opz_tier(profile: str = "dev") -> Dict[str, Any]:
 
     next_tier_map = {"MICRO": "SMALL", "SMALL": "MEDIUM", "MEDIUM": "ADVANCED", "ADVANCED": None}
 
-    # next_tier = prossimo tier OPERATIVO (basato su active_mode, non capital_tier).
-    # Esempio: capital_tier=SMALL, active_mode=MICRO → next_tier=SMALL (devi ancora
-    # superare il gate operativo per SMALL, non salti già a MEDIUM).
     return {
         "ok": True,
         "profile": profile,
         "capital_tier": capital_tier,
         "active_mode": active_mode,
-        "features": features,
+        "features": features_validated,           # backward compat
+        "features_validated": features_validated,
+        "features_available": features_available,
         "tier_detail": tier_info.get(active_mode, {}),
-        "next_tier": next_tier_map.get(active_mode),
+        "next_tier": next_tier_map.get(active_mode),            # backward compat
+        "next_capital_tier": next_tier_map.get(capital_tier),
+        "next_operational_tier": next_tier_map.get(active_mode),
     }
 
 
