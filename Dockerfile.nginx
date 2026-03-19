@@ -26,7 +26,8 @@ COPY mkdocs.yml mkdocs.yml
 RUN mkdocs build --clean -q
 
 # ── Stage 3: nginx gateway ────────────────────────────────────────────────────
-FROM nginx:alpine
+# Pin versione per build riproducibili
+FROM nginx:1.27-alpine
 
 RUN apk add --no-cache apache2-utils
 
@@ -42,5 +43,9 @@ RUN printf '#!/bin/sh\nhtpasswd -bc /etc/nginx/.htpasswd "${NGINX_USER:-opz}" "$
     && chmod +x /entrypoint.sh
 
 EXPOSE 80
+
+# Nginx master gira come root (binding :80), worker come nobody (default nginx)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://localhost/health 2>/dev/null | grep -q '"ok"' || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

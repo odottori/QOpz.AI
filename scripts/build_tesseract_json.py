@@ -1,4 +1,4 @@
-﻿import json, re, pathlib
+import json, re, pathlib
 
 root = pathlib.Path("data/ibkr_screens/ocr_txt")
 rows = []

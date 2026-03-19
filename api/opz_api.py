@@ -2539,6 +2539,9 @@ def opz_tier(profile: str = "dev") -> Dict[str, Any]:
 
     next_tier_map = {"MICRO": "SMALL", "SMALL": "MEDIUM", "MEDIUM": "ADVANCED", "ADVANCED": None}
 
+    # next_tier = prossimo tier OPERATIVO (basato su active_mode, non capital_tier).
+    # Esempio: capital_tier=SMALL, active_mode=MICRO → next_tier=SMALL (devi ancora
+    # superare il gate operativo per SMALL, non salti già a MEDIUM).
     return {
         "ok": True,
         "profile": profile,
@@ -2546,7 +2549,7 @@ def opz_tier(profile: str = "dev") -> Dict[str, Any]:
         "active_mode": active_mode,
         "features": features,
         "tier_detail": tier_info.get(active_mode, {}),
-        "next_tier": next_tier_map.get(capital_tier),
+        "next_tier": next_tier_map.get(active_mode),
     }
 
 

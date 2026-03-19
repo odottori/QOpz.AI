@@ -38,6 +38,12 @@ COPY rebuild_manifest.py ./
 # ── Runtime directories (db/ sarà montato come volume su Fly.io) ──────────────
 RUN mkdir -p db logs ops reports
 
+# ── Non-root user ─────────────────────────────────────────────────────────────
+RUN groupadd --system appgroup && useradd --system --gid appgroup --no-create-home appuser \
+    && chown -R appuser:appgroup /app
+
+USER appuser
+
 # ── Health check ──────────────────────────────────────────────────────────────
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:8765/health || exit 1
