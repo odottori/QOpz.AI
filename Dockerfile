@@ -47,7 +47,7 @@ RUN mkdir -p db logs ops reports
 RUN groupadd --system appgroup && useradd --system --gid appgroup --no-create-home appuser \
     && chown -R appuser:appgroup /app
 
-RUN printf '#!/bin/sh\nset -e\nfor d in /app/db /app/logs /app/ops /app/reports; do\n  mkdir -p "$d"\n  chown -R appuser:appgroup "$d" 2>/dev/null || true\n  chmod -R ug+rwX "$d" 2>/dev/null || true\ndone\nexec gosu appuser "$@"\n' > /entrypoint-api.sh \
+RUN printf '#!/bin/sh\nset -e\nfor d in /app/db /app/logs /app/ops /app/reports /app/data /app/data/audio; do\n  mkdir -p "$d"\n  chown -R appuser:appgroup "$d" 2>/dev/null || true\n  chmod -R ug+rwX "$d" 2>/dev/null || true\ndone\nexec gosu appuser "$@"\n' > /entrypoint-api.sh \
     && chmod +x /entrypoint-api.sh
 
 # ── Health check ──────────────────────────────────────────────────────────────

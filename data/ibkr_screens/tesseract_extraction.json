@@ -1,0 +1,22 @@
+{
+  "rows": [
+    {
+      "symbol": "NVDA",
+      "tab": "opzioni",
+      "file": "sample_nvda.png",
+      "raw_line": "NVDA 180.83 180.84 180.86"
+    },
+    {
+      "symbol": "AMZN",
+      "tab": "opzioni",
+      "file": "sample_amzn.png",
+      "raw_line": "AMZN 216.85 216.79 216.85"
+    },
+    {
+      "symbol": "MSFT",
+      "tab": "opzioni",
+      "file": "sample_msft.png",
+      "raw_line": "MSFT 41249 + 412.45 412.61"
+    }
+  ]
+}

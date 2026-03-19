@@ -2695,6 +2695,16 @@ _AUDIO_DIR = ROOT / "data" / "audio"
 _BRIEFING_LATEST = _AUDIO_DIR / "briefing_latest.mp3"
 
 
+def _resolve_latest_briefing_path() -> Optional[Path]:
+    """Return latest briefing path with fallback to newest timestamped file."""
+    if _BRIEFING_LATEST.exists():
+        return _BRIEFING_LATEST
+    if not _AUDIO_DIR.exists():
+        return None
+    files = sorted(_AUDIO_DIR.glob("briefing_2*.mp3"), reverse=True)
+    return files[0] if files else None
+
+
 @app.get("/opz/briefing/list")
 def opz_briefing_list() -> list:
     """Lista dei briefing MP3 disponibili, ordinati per data discendente (max 20)."""
@@ -2721,12 +2731,13 @@ def opz_briefing_file(filename: str):
 @app.get("/opz/briefing/latest")
 def opz_briefing_latest():
     """Serve l'ultimo briefing audio MP3 generato."""
-    if not _BRIEFING_LATEST.exists():
-        raise HTTPException(status_code=404, detail="Nessun briefing disponibile — esegui POST /opz/briefing/generate")
+    latest_path = _resolve_latest_briefing_path()
+    if latest_path is None:
+        raise HTTPException(status_code=404, detail="Nessun briefing disponibile - esegui POST /opz/briefing/generate")
     return FileResponse(
-        path=str(_BRIEFING_LATEST),
+        path=str(latest_path),
         media_type="audio/mpeg",
-        filename="briefing_latest.mp3",
+        filename=latest_path.name,
     )
 
 

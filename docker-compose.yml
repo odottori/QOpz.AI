@@ -43,6 +43,7 @@ services:
     volumes:
       - qopz-db:/app/db
       - qopz-logs:/app/logs
+      - ./data:/app/data
       - ./ops:/app/ops
     networks:
       - qopz-net
