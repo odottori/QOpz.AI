@@ -1399,7 +1399,10 @@ export default function App() {
       const list = await apiJson<string[]>(`${API_BASE}/opz/briefing/list`);
       setBriefingList(list);
       setBriefingListIdx(0);
-    } catch { /* nessun briefing disponibile */ }
+    } catch {
+      setBriefingList([]);
+      setBriefingListIdx(0);
+    }
   }
 
   async function doBriefingGenerate() {
@@ -1423,10 +1426,10 @@ export default function App() {
     finally { setBriefingBusy(false); }
   }
 
-  const briefingAudioSrc =
-    briefingList.length > 0 && briefingListIdx > 0
-      ? `${API_BASE}/opz/briefing/file/${briefingList[briefingListIdx]}`
-      : `${API_BASE}/opz/briefing/latest`;
+  const briefingSelected = briefingList[briefingListIdx];
+  const briefingAudioSrc = briefingSelected
+    ? `${API_BASE}/opz/briefing/file/${encodeURIComponent(briefingSelected)}`
+    : `${API_BASE}/opz/briefing/latest`;
 
   const briefingLabel = (() => {
     const name = briefingList[briefingListIdx] ?? "";
@@ -1440,7 +1443,9 @@ export default function App() {
     if (!el) return;
     el.src = briefingAudioSrc;
     el.load();
-    void el.play();
+    void el.play().catch((err) => {
+      setError(`Play briefing fallito: ${String(err)}`);
+    });
   }
 
   function doBriefingStop() {
@@ -3078,6 +3083,7 @@ export default function App() {
               onPlay={() => setBriefingPlaying(true)}
               onPause={() => setBriefingPlaying(false)}
               onEnded={() => setBriefingPlaying(false)}
+              onError={() => setError("Riproduzione briefing fallita: audio non disponibile.")}
             />
 
             <div className="narrator-briefing-label dim">{briefingLabel}</div>
