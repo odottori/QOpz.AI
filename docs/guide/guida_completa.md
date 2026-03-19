@@ -650,6 +650,19 @@ Per questi casi, QOpz.AI non promette protezione anticipatoria — ma garantisce
 Non puoi prevedere tutto. Puoi però fare in modo che l'imprevedibile non ti distrugga.
 
 ---
+---
+
+## Capitolo 6 — Il Viaggio di un Trade
+### Dalla catena di opzioni al profitto incassato
+
+*Questo capitolo è disponibile come presentazione interattiva.*
+
+👉 [Apri Il Viaggio di un Trade →](trade_lifecycle.md)
+
+Il capitolo illustra passo per passo, con numeri reali, come nasce un trade: dalla selezione nella catena di opzioni, attraverso i filtri e lo score, fino all'esecuzione, alla gestione attiva e alla chiusura. Ogni tappa mostra esattamente cosa vede l'operatore in quel momento nella WAR ROOM.
+
+---
+---
 
 # Capitolo 7 — Tier e strategie
 ## Come cresce il sistema con il tuo capitale
@@ -728,4 +741,4 @@ Questo è più importante di quanto sembri. La Wheel può durare settimane. Le a
 
 ---
 
-*Nel prossimo capitolo vediamo come leggere la WAR ROOM — il pannello operativo che raccoglie in un unico posto tutto quello che serve per decidere.*
+*Il ciclo completo di un trade — dalla catena di opzioni al profitto incassato — è documentato in dettaglio nel capitolo [Il Viaggio di un Trade](trade_lifecycle.md).*

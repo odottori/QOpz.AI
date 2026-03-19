@@ -1447,7 +1447,7 @@ def execution_preview(req: PreviewRequest) -> PreviewResponse:
 @app.post("/opz/execution/confirm")
 def execution_confirm(req: ConfirmRequest) -> Dict[str, Any]:
     # Kill switch check — must be the first gate (invariante CLAUDE.md)
-    if Path("ops/kill_switch.trigger").exists():
+    if (ROOT / "ops" / "kill_switch.trigger").exists():
         raise HTTPException(
             status_code=503,
             detail={"stage": "execution_confirm", "reason": "KILL SWITCH ATTIVO — esecuzione bloccata"},
@@ -2126,7 +2126,7 @@ def opz_system_status() -> SystemStatusOut:
     ts_now = datetime.now(timezone.utc).isoformat()
 
     # ── Kill switch ───────────────────────────────────────────────────────────
-    ks_path = Path("ops/kill_switch.trigger")
+    ks_path = ROOT / "ops" / "kill_switch.trigger"
     kill_switch_active = ks_path.exists()
 
     # ── Data mode ─────────────────────────────────────────────────────────────

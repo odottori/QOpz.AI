@@ -7,7 +7,7 @@
 
 Hai bisogno di:
 - Console aperta su `http://localhost:8173` (o indirizzo VM)
-- API in esecuzione (`docker compose up -d` sulla VM, o `start_api.bat` in locale)
+- API in esecuzione (`docker compose up -d` sulla VM, o `QOPZ_START.bat` in locale)
 - IBKR TWS o IBG attivo se vuoi dati reali (porta 7496 paper, 7497 live)
 
 Se l'API è online vedrai **API LIVE** verde in alto a destra. Se vedi **API DOWN**, l'API non risponde — non procedere.

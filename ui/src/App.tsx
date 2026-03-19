@@ -350,6 +350,8 @@ type ReleaseMdView = { before: string; table: MarkdownTable | null; after: strin
 // In production (Docker/nginx) usa URL relativo — nginx fa proxy.
 // In dev locale: VITE_API_BASE=http://localhost:8765 in .env.local
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+/** Profilo attivo — unico punto di modifica per dev/paper/live */
+const ACTIVE_PROFILE = (import.meta.env.VITE_PROFILE as string | undefined) ?? "paper";
 
 function fmtPct(v: number | null): string {
   if (v === null) return "-";
@@ -872,15 +874,23 @@ export default function App() {
       const ctxQuery = universeSettingsPath.trim()
         ? `?settings_path=${encodeURIComponent(universeSettingsPath.trim())}`
         : "";
-      const [s, rs, ps, la, ul, ic, nt] = await Promise.all([
+      // Promise.allSettled: un endpoint lento/down non blocca gli altri
+      const settled = await Promise.allSettled([
         apiJson<unknown>(`${API_BASE}/opz/state`),
         apiJson<ReleaseStatusResponse>(`${API_BASE}/opz/release_status`),
-        apiJson<PaperSummaryResponse>(`${API_BASE}/opz/paper/summary?profile=paper&window_days=60`),
+        apiJson<PaperSummaryResponse>(`${API_BASE}/opz/paper/summary?profile=${ACTIVE_PROFILE}&window_days=60`),
         apiJson<LastActionsResponse>(`${API_BASE}/opz/last_actions?limit=8`),
         apiJson<UniverseLatestResponse>(`${API_BASE}/opz/universe/latest`),
         apiJson<UniverseIbkrContext>(`${API_BASE}/opz/universe/ibkr_context${ctxQuery}`),
         apiJson<NarratorTutorialResponse>(`${API_BASE}/opz/narrator/tutorial`),
       ]);
+      const ok = <T,>(r: PromiseSettledResult<T>): T | null =>
+        r.status === "fulfilled" ? r.value : null;
+      const [s, rs, ps, la, ul, ic, nt] = settled.map(ok) as [
+        unknown, ReleaseStatusResponse | null, PaperSummaryResponse | null,
+        LastActionsResponse | null, UniverseLatestResponse | null,
+        UniverseIbkrContext | null, NarratorTutorialResponse | null,
+      ];
       const up = await apiJson<UniverseProvenanceResponse>(
         `${API_BASE}/opz/universe/provenance${provenanceQuery({
           batchId: ul?.batch_id ?? null,
@@ -888,13 +898,13 @@ export default function App() {
           regime: ul?.regime ?? universeRegime,
         })}`
       ).catch(() => null);
-      setStateJson(s);
-      setReleaseMd(rs.content || "");
-      setPaperSummary(ps);
-      setLastActions(la);
-      setUniverseLatest(ul);
-      setIbkrContext(ic);
-      setNarratorTutorial(nt);
+      if (s !== null) setStateJson(s);
+      if (rs !== null) setReleaseMd(rs.content || "");
+      if (ps !== null) setPaperSummary(ps);
+      if (la !== null) setLastActions(la);
+      if (ul !== null) setUniverseLatest(ul);
+      if (ic !== null) setIbkrContext(ic);
+      if (nt !== null) setNarratorTutorial(nt);
       setUniverseProvenance(up);
       void doFetchEquityHistory();
       void doFetchSysStatus();
@@ -903,10 +913,10 @@ export default function App() {
       void doFetchWheelPositions();
       void doFetchTier();
       void doFetchBriefingList();
-      if (!universeScannerName && ic.scanners.length > 0) {
+      if (!universeScannerName && ic?.scanners && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
-      if (!universeSymbols.trim() && ic.symbols.length > 0) {
+      if (!universeSymbols.trim() && ic?.symbols && ic.symbols.length > 0) {
         setUniverseSymbols(ic.symbols.slice(0, 40).join(","));
       }
     } catch (e) {
@@ -1282,7 +1292,7 @@ export default function App() {
 
   async function doLoadEvReport() {
     try {
-      const r = await apiJson<EvReportResponse>(`${API_BASE}/opz/opportunity/ev_report?profile=paper&window_days=30`);
+      const r = await apiJson<EvReportResponse>(`${API_BASE}/opz/opportunity/ev_report?profile=${ACTIVE_PROFILE}&window_days=30`);
       setEvReport(r);
       setMessage(`EV report caricato: ${r.total_candidates} candidati (30gg).`);
     } catch (e) { setError(String(e)); }
@@ -1345,7 +1355,7 @@ export default function App() {
 
   async function doFetchEquityHistory() {
     try {
-      const r = await apiJson<EquityHistoryResponse>(`${API_BASE}/opz/paper/equity_history?profile=paper&limit=60`);
+      const r = await apiJson<EquityHistoryResponse>(`${API_BASE}/opz/paper/equity_history?profile=${ACTIVE_PROFILE}&limit=60`);
       setEquityHistory(r);
       clearFetchErr("equity");
     } catch (e) { markFetchErr("equity"); }
@@ -1362,8 +1372,7 @@ export default function App() {
 
   async function doFetchWheelPositions() {
     try {
-      const profile = "paper";
-      const r = await apiJson<WheelPositionsResponse>(`${API_BASE}/opz/wheel/positions?profile=${profile}`);
+      const r = await apiJson<WheelPositionsResponse>(`${API_BASE}/opz/wheel/positions?profile=${ACTIVE_PROFILE}`);
       setWheelPositions(r);
       setWheelFetchedAt(Date.now());
       clearFetchErr("wheel");
@@ -1373,7 +1382,7 @@ export default function App() {
   async function doFetchTier(currentRegime?: string) {
     const reg = currentRegime ?? regimeCurrent?.regime ?? "NORMAL";
     try {
-      const r = await apiJson<TierResponse>(`${API_BASE}/opz/tier?profile=paper&regime=${reg}`);
+      const r = await apiJson<TierResponse>(`${API_BASE}/opz/tier?profile=${ACTIVE_PROFILE}&regime=${reg}`);
       setTierInfo(r);
       clearFetchErr("tier");
     } catch (e) { markFetchErr("tier"); }

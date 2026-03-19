@@ -133,31 +133,25 @@ class TestKillSwitch(unittest.TestCase):
         self.assertEqual(self._ks_signal(body)["status"], "OK")
 
     def test_kill_switch_active_when_file_present(self):
+        import api.opz_api as _mod
         with tempfile.TemporaryDirectory() as td:
             ks = Path(td) / "ops" / "kill_switch.trigger"
             ks.parent.mkdir(parents=True)
             ks.touch()
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(td)
+            with patch.object(_mod, "ROOT", Path(td)):
                 body = _get()
-                self.assertTrue(body["kill_switch_active"])
-            finally:
-                os.chdir(old_cwd)
+            self.assertTrue(body["kill_switch_active"])
 
     def test_kill_switch_signal_alert_when_active(self):
+        import api.opz_api as _mod
         with tempfile.TemporaryDirectory() as td:
             ks = Path(td) / "ops" / "kill_switch.trigger"
             ks.parent.mkdir(parents=True)
             ks.touch()
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(td)
+            with patch.object(_mod, "ROOT", Path(td)):
                 body = _get()
-                sig = self._ks_signal(body)
-                self.assertEqual(sig["status"], "ALERT")
-            finally:
-                os.chdir(old_cwd)
+            sig = self._ks_signal(body)
+            self.assertEqual(sig["status"], "ALERT")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
