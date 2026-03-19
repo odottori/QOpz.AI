@@ -21,11 +21,12 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # ── Python dependencies ───────────────────────────────────────────────────────
-COPY requirements-core.txt requirements-web.txt ./
+COPY requirements-core.txt requirements-web.txt requirements-broker-ib.txt ./
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir \
         -r requirements-core.txt \
-        -r requirements-web.txt
+        -r requirements-web.txt \
+        -r requirements-broker-ib.txt
 
 # ── Application code ──────────────────────────────────────────────────────────
 COPY api/          api/
