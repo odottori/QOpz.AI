@@ -70,9 +70,9 @@ def _fetch_data(api_base: str) -> dict:
     return {
         "regime":   _get(api_base, "/opz/regime/current"),
         "summary":  _get(api_base, "/opz/paper/summary?profile=paper&window_days=60"),
-        "status":   _get(api_base, "/opz/system_status"),
+        "status":   _get(api_base, "/opz/system/status"),
         "tier":     _get(api_base, "/opz/tier?profile=paper"),
-        "exits":    _get(api_base, "/opz/exit_candidates?profile=paper"),
+        "exits":    _get(api_base, "/opz/opportunity/exit_candidates?profile=paper"),
     }
 
 
