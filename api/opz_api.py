@@ -1893,7 +1893,10 @@ def _db_connect_ro():
     db_path = str(_st.EXEC_DB_PATH)
     if not Path(db_path).exists():
         raise FileNotFoundError(f"DB non trovato: {db_path}")
-    con = duckdb.connect(db_path, read_only=True)
+    # Use the same connection configuration used by execution.storage._connect().
+    # Mixing read_only=True and default connections on the same file can trigger:
+    # "Can't open a connection to same database file with a different configuration".
+    con = duckdb.connect(db_path)
     try:
         yield con
     finally:
