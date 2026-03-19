@@ -31,6 +31,35 @@ reports/            # Output validator (phase0_validation_*.json)
 
 ---
 
+## Deploy cycle (ciclo completo)
+
+Quando l'utente dice "deploya", "rebuilda", "push e rebuild" o simili, esegui in ordine:
+
+```bash
+# 1. Audit pre-commit
+PYTHONIOENCODING=utf-8 python scripts/quick_audit.py --scope all --severity HIGH
+
+# 2. TypeScript check
+cd ui && npx tsc --noEmit && cd ..
+
+# 3. Gates
+python tools/planner_guard.py check --check-target index
+python tools/run_gates.py --skip-manifest --skip-certify
+
+# 4. Commit (conventional commits) + push
+git add <file modificati>
+git commit -m "tipo(scope): descrizione\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+git push origin main
+
+# 5. Rebuild VM (servizio nginx include UI React)
+ssh -i ~/.ssh/qopz_vm_key -o StrictHostKeyChecking=no root@178.104.94.34 \
+  "cd /opt/qopz && git pull origin main && \
+   docker compose build --no-cache nginx && \
+   docker compose up -d && docker compose ps"
+```
+
+---
+
 ## Comandi rapidi
 
 ```bash
