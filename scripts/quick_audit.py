@@ -23,6 +23,12 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Literal
 
+# Forza stdout/stderr a utf-8 per evitare crash su console cp1252 (Windows)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).resolve().parent.parent
 
 SEVERITY = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]
