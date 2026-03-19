@@ -18,7 +18,7 @@ services:
       - TWS_SETTINGS_PATH=/home/ibgateway/settings
       - READ_ONLY_API=no
     volumes:
-      - ibg-settings:/home/ibgateway/settings
+      - ./data/ibg-settings:/home/ibgateway/settings
     networks:
       - qopz-net
     restart: unless-stopped
@@ -75,7 +75,6 @@ services:
 volumes:
   qopz-db:
   qopz-logs:
-  ibg-settings:        # settings IBG persistenti tra restart
 
 networks:
   qopz-net:
