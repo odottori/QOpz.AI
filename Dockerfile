@@ -58,8 +58,4 @@ EXPOSE 8765
 
 ENTRYPOINT ["/entrypoint-api.sh"]
 
-CMD ["uvicorn", "api.opz_api:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8765", \
-     "--workers", "1", \
-     "--log-level", "info"]
+CMD ["uvicorn", "api.opz_api:app", "--host", "0.0.0.0", "--port", "8765", "--workers", "1", "--log-level", "info"]
