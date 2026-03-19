@@ -42,6 +42,7 @@ IBKR_PORTS: list[int] = [4004, 7497, 4002, 7496, 4001]  # 4004 = IBG via socat (
 IBKR_HOST: str = os.environ.get("IBKR_HOST", "127.0.0.1")  # override via env per Docker (es. IBKR_HOST=ibg)
 IBKR_CLIENT_ID: int = 10          # client_id dedicato al monitoring (non trading)
 CONNECT_TIMEOUT: float = 2.0      # secondi per il probe TCP
+IB_API_TIMEOUT: float = 12.0     # secondi per l'handshake ib_insync (IBG più lento di TWS locale)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -151,8 +152,8 @@ class IBKRConnectionManager:
                         self._host,
                         port,
                         clientId=self._client_id,
-                        timeout=timeout,
-                        readonly=True,      # solo lettura: dati, nessun ordine
+                        timeout=IB_API_TIMEOUT,  # handshake più lento del probe TCP
+                        readonly=True,           # solo lettura: dati, nessun ordine
                     )
                     if ib.isConnected():
                         self._connected = True
