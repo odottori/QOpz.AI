@@ -17,6 +17,7 @@ services:
       - TRADING_MODE=${IBKR_TRADING_MODE:-paper}
       - TWS_SETTINGS_PATH=/home/ibgateway/settings
       - READ_ONLY_API=no
+      - EXISTING_SESSION_DETECTED_ACTION=primary
     volumes:
       - ./data/ibg-settings:/home/ibgateway/settings
     networks:
