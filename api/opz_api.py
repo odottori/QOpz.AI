@@ -148,6 +148,9 @@ app.add_middleware(
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 # Gestita da nginx (basic auth). FastAPI è interno alla rete Docker.
+# DESIGN CHOICE: nessun auth middleware in FastAPI per scelta architetturale —
+# l'assunzione è che FastAPI non sia mai esposto direttamente senza nginx davanti.
+# Se si vuole esporre FastAPI standalone, aggiungere HTTPBasic o API-key middleware.
 
 
 @app.exception_handler(Exception)
@@ -1071,6 +1074,9 @@ def console():
 _GUIDE_BASE = os.environ.get("GUIDE_URL", "http://qopz-guide")
 
 
+_GUIDE_LOCAL_FALLBACK = ROOT / "docs" / "guide" / "guida_completa.md"
+
+
 @app.get("/guide/{path:path}")
 @app.get("/guide")
 async def guide_proxy(request: Request, path: str = ""):
@@ -1081,7 +1087,13 @@ async def guide_proxy(request: Request, path: str = ""):
         return Response(content=r.content, status_code=r.status_code,
                         media_type=r.headers.get("content-type", "text/html"))
     except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="guide service unavailable")
+        # Fallback locale: serve guida_completa.md come testo
+        if _GUIDE_LOCAL_FALLBACK.exists():
+            return Response(
+                content=_GUIDE_LOCAL_FALLBACK.read_text(encoding="utf-8"),
+                media_type="text/plain; charset=utf-8",
+            )
+        raise HTTPException(status_code=503, detail="guide service unavailable and local fallback missing")
 
 
 @app.get("/opz/state")
@@ -2154,7 +2166,7 @@ def opz_system_status() -> SystemStatusOut:
             n_closed_trades = int(row_n[0]) if row_n else 0
 
             row_r = con.execute(
-                "SELECT regime FROM paper_trades WHERE regime IS NOT NULL ORDER BY entry_ts_utc DESC LIMIT 1"
+                "SELECT regime_at_entry FROM paper_trades WHERE regime_at_entry IS NOT NULL ORDER BY entry_ts_utc DESC LIMIT 1"
             ).fetchone()
             if row_r:
                 regime = str(row_r[0])

@@ -45,7 +45,7 @@ def _dump_json(path: Path, payload: Dict[str, Any]) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
         os.replace(tmp, path)
-    except Exception:
+    except Exception:  # cleanup tempfile before re-raising any write error
         try:
             os.unlink(tmp)
         except OSError:

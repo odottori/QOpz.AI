@@ -1474,7 +1474,7 @@ export default function App() {
 
   useEffect(() => {
     if (!message && !error) return;
-    const timeout = error ? 10000 : 5000; // errori visibili 10s, info 5s
+    const timeout = error ? 30000 : 10000; // errori visibili 30s, info 10s
     const id = window.setTimeout(() => {
       setMessage("");
       setError("");
@@ -1624,6 +1624,7 @@ export default function App() {
           <span className="clock">{clockText}</span>
           <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API LIVE" : "API DOWN"}</span>
           <button className="btn btn-primary" onClick={refreshAll} disabled={busy}>{busy ? "REFRESHING" : "REFRESH"}</button>
+          <a className="btn btn-ghost" href={`${API_BASE}/guide`} target="_blank" rel="noreferrer">GUIDA</a>
           <a className="btn btn-ghost" href={`${API_BASE}/health`} target="_blank" rel="noreferrer">API /HEALTH</a>
           <button
             className={`btn ${(sysStatus?.kill_switch_active) ? "btn-warning" : "btn-danger"}`}
