@@ -124,6 +124,12 @@ p {
   background: rgba(255, 48, 48, 0.12);
 }
 
+.regime-offline {
+  border-color: #555;
+  color: #888;
+  background: rgba(128, 128, 128, 0.08);
+}
+
 .notice {
   margin: 8px 12px;
   border: 1px solid;

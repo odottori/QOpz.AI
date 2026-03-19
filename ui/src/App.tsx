@@ -1553,7 +1553,7 @@ export default function App() {
     if (live === "SHOCK")   return { cls: "regime-shock",   text: "SHOCK" };
     // Fallback: nessun dato regime ancora disponibile
     if (hasPaperData) return { cls: "regime-caution", text: "CAUTION" };
-    return { cls: "regime-shock", text: "SHOCK" };
+    return { cls: "regime-offline", text: "UNKNOWN" };
   }, [apiOnline, goGate?.pass, hasPaperData]);
 
   const kellyHalf = useMemo(() => {
