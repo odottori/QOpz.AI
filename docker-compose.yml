@@ -6,6 +6,29 @@
 
 services:
 
+  # ── IB Gateway (headless, auto-login via env) ──────────────────────────────
+  # Porta interna 4002 = paper | 4001 = live (auto-detect dal connection manager)
+  # Credenziali: IBKR_USERNAME e IBKR_PASSWORD nel file .env sulla VM
+  ibg:
+    image: ghcr.io/gnzsnz/ib-gateway:stable
+    environment:
+      - TWS_USERID=${IBKR_USERNAME:?Imposta IBKR_USERNAME nel .env}
+      - TWS_PASSWORD=${IBKR_PASSWORD:?Imposta IBKR_PASSWORD nel .env}
+      - TRADING_MODE=${IBKR_TRADING_MODE:-paper}
+      - TWS_SETTINGS_PATH=/home/ibgateway/settings
+      - READ_ONLY_API=no
+    volumes:
+      - ibg-settings:/home/ibgateway/settings
+    networks:
+      - qopz-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 4002 || nc -z localhost 4001"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   api:
     build:
       context: .
@@ -15,12 +38,16 @@ services:
     environment:
       - OPZ_PROFILE=${OPZ_PROFILE:-paper}
       - OPZ_DATA_MODE=${OPZ_DATA_MODE:-VENDOR_REAL_CHAIN}
+      - IBKR_HOST=ibg          # punta al container IBG sulla qopz-net
     volumes:
       - qopz-db:/app/db
       - qopz-logs:/app/logs
       - ./ops:/app/ops
     networks:
       - qopz-net
+    depends_on:
+      ibg:
+        condition: service_started   # non blocca: API degrada gracefully se IBG non è pronto
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
@@ -48,6 +75,7 @@ services:
 volumes:
   qopz-db:
   qopz-logs:
+  ibg-settings:        # settings IBG persistenti tra restart
 
 networks:
   qopz-net:

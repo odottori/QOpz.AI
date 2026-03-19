@@ -25,6 +25,7 @@ Uso tipico (auto-detect silenzioso all'avvio):
 from __future__ import annotations
 
 import logging
+import os
 import re
 import socket
 import threading
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 # Porte candidate (ordine di priorità)
 # ─────────────────────────────────────────────────────────────────────────────
 IBKR_PORTS: list[int] = [7497, 4002, 7496, 4001]
-IBKR_HOST: str = "127.0.0.1"
+IBKR_HOST: str = os.environ.get("IBKR_HOST", "127.0.0.1")  # override via env per Docker (es. IBKR_HOST=ibg)
 IBKR_CLIENT_ID: int = 10          # client_id dedicato al monitoring (non trading)
 CONNECT_TIMEOUT: float = 2.0      # secondi per il probe TCP
 
