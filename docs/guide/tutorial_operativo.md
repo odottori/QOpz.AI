@@ -164,7 +164,7 @@ Se IBKR non è connesso, il sistema usa dati sintetici (watermark **SYNTHETIC** 
 
 | Azione | Dove |
 |--------|------|
-| Briefing audio | WAR ROOM → ▶ BRIEFING |
+| Briefing audio | WAR ROOM → barra NARRATORE (◀ PREV / ▶ PLAY / NEXT ▶) |
 | Regime corrente | Topbar, badge colorato |
 | Exit urgenti | WAR ROOM → EXIT CANDIDATES |
 | Scan opportunità | OPPORTUNITY → OPP SCAN |
