@@ -699,6 +699,71 @@ select:focus {
   min-height: 14px;
 }
 
+/* ── Narrator player inline (WAR ROOM) ─────────────────────────────────── */
+.narrator-player-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  margin-bottom: 10px;
+  background: #0d1117;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+}
+
+.narrator-player-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 180px;
+  flex: 1;
+}
+
+.narrator-player-icon {
+  font-size: 0.85rem;
+}
+
+.narrator-player-label {
+  font-size: 0.62rem;
+  color: #6b7280;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.narrator-player-transport {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.narrator-btn {
+  font-size: 0.62rem !important;
+  padding: 2px 8px !important;
+}
+
+.narrator-btn-main {
+  font-size: 0.65rem !important;
+  padding: 3px 12px !important;
+  font-weight: 700;
+}
+
+.narrator-player-switches {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 6px;
+  border-left: 1px solid #1f2937;
+}
+
+.narrator-player-switches .narrator-switch-row {
+  gap: 6px;
+  font-size: 0.6rem;
+}
+
 .narrator-controls {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;

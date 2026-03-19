@@ -1833,25 +1833,55 @@ export default function App() {
 
                     {activeTab === "warroom" && (
             <>
-            {/* ── BRIEFING AUDIO — pill compatta ─────────────────────────────── */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "5px 10px", marginBottom: 8,
-              background: "#0d1117", border: "1px solid #1f2937", borderRadius: 4,
-            }}>
-              <span style={{ color: "#60a5fa", fontSize: "0.7rem", fontWeight: 700, letterSpacing: 1 }}>
-                📻 BRIEFING
-              </span>
-              <span style={{ color: "#4b5563", fontSize: "0.65rem", flex: 1 }}>{briefingLabel}</span>
-              <button className="btn btn-primary" style={{ fontSize: "0.65rem", padding: "2px 10px" }}
-                onClick={() => setAiDrawerOpen(true)} title="Apri player narratore">
-                ▶ PLAYER
-              </button>
-              <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px" }}
-                onClick={doBriefingGenerate} disabled={briefingBusy || !apiOnline}
-                title="Genera nuovo briefing e invia su Telegram">
-                {briefingBusy ? "..." : "⊕ GENERA"}
-              </button>
+            {/* ── NARRATORE — player inline ───────────────────────────────────── */}
+            <div className="narrator-player-bar">
+              {/* label + track */}
+              <div className="narrator-player-track">
+                <span className="narrator-player-icon">📻</span>
+                <span className="narrator-player-label">{briefingLabel}</span>
+              </div>
+              {/* transport controls */}
+              <div className="narrator-player-transport">
+                <button className="btn btn-ghost narrator-btn"
+                  onClick={doBriefingPrev}
+                  disabled={briefingListIdx >= briefingList.length - 1 || briefingList.length === 0}
+                  title="Briefing precedente">◀ PREV</button>
+                <button
+                  className={`btn narrator-btn-main ${briefingPlaying ? "btn-warning" : "btn-primary"}`}
+                  onClick={briefingPlaying ? doBriefingStop : doBriefingPlay}
+                  disabled={!apiOnline}
+                >{briefingPlaying ? "■ STOP" : "▶ PLAY"}</button>
+                <button className="btn btn-ghost narrator-btn"
+                  onClick={doBriefingNext}
+                  disabled={briefingListIdx <= 0}
+                  title="Briefing successivo">NEXT ▶</button>
+                <button className="btn btn-ghost narrator-btn"
+                  onClick={() => void doBriefingGenerate()}
+                  disabled={briefingBusy || !apiOnline}
+                  title="Genera nuovo briefing e invia su Telegram"
+                >{briefingBusy ? "..." : "⊕ GENERA"}</button>
+              </div>
+              {/* automation switches */}
+              <div className="narrator-player-switches">
+                <label className="narrator-switch-row">
+                  <span>Auto-apri</span>
+                  <span className={`toggle-pill ${briefingAutoOpen ? "on" : ""}`}
+                    onClick={() => setBriefingAutoOpen(v => !v)} role="switch"
+                    aria-checked={briefingAutoOpen} tabIndex={0}
+                    onKeyDown={(e) => e.key === "Enter" && setBriefingAutoOpen(v => !v)}>
+                    <span className="toggle-knob" />
+                  </span>
+                </label>
+                <label className="narrator-switch-row">
+                  <span>AutoPlay</span>
+                  <span className={`toggle-pill ${briefingAutoPlay ? "on" : ""}`}
+                    onClick={() => setBriefingAutoPlay(v => !v)} role="switch"
+                    aria-checked={briefingAutoPlay} tabIndex={0}
+                    onKeyDown={(e) => e.key === "Enter" && setBriefingAutoPlay(v => !v)}>
+                    <span className="toggle-knob" />
+                  </span>
+                </label>
+              </div>
             </div>
 
             <div className="panel-grid three">
