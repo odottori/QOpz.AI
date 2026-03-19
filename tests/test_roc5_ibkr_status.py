@@ -233,12 +233,12 @@ class TestIbkrStatusPortsProbed(unittest.TestCase):
             r = CLIENT.get(ENDPOINT)
         self.assertIn(4002, r.json()["ports_probed"])
 
-    def test_ports_probed_order_7497_first(self):
-        """7497 (TWS paper) deve essere il primo."""
+    def test_ports_probed_order_4004_first(self):
+        """4004 (socat -> IBG Docker) deve essere il primo."""
         mock_mgr = _make_mock_manager(connected=False)
         with patch("execution.ibkr_connection.get_manager", return_value=mock_mgr):
             r = CLIENT.get(ENDPOINT)
-        self.assertEqual(r.json()["ports_probed"][0], 7497)
+        self.assertEqual(r.json()["ports_probed"][0], 4004)
 
 
 if __name__ == "__main__":

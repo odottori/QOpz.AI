@@ -21,7 +21,6 @@ ui/dist/
 
 # ── Test & dev ────────────────────────────────────────────────────────────────
 tests/
-tools/
 planner/
 samples/
 .quarantine/

@@ -1301,9 +1301,15 @@ export default function App() {
   async function doCheckIbkr(tryConnect = false) {
     setIbkrChecking(true);
     try {
-      const r = await apiJson<IbkrStatusResponse>(
+      let r = await apiJson<IbkrStatusResponse>(
         `${API_BASE}/opz/ibkr/status?try_connect=${tryConnect}`
       );
+      // Auto-recovery: se il poll passivo vede disconnected, tenta una reconnessione.
+      if (!r.connected && !tryConnect) {
+        r = await apiJson<IbkrStatusResponse>(
+          `${API_BASE}/opz/ibkr/status?try_connect=true`
+        );
+      }
       setIbkrStatus(r);
       setMessage(r.message);
       // Aggiorna account solo se connesso
@@ -1605,7 +1611,7 @@ export default function App() {
 
   // Auto-check IBKR status on mount + poll every 30s
   useEffect(() => {
-    void doCheckIbkr(false);
+    void doCheckIbkr(true);
     const id = window.setInterval(() => void doCheckIbkr(false), 30_000);
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

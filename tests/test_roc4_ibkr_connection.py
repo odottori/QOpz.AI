@@ -90,9 +90,9 @@ class TestIBKRConnectionManagerConnect(unittest.TestCase):
         self.assertFalse(result)
         self.assertFalse(mgr.is_connected)
 
-    def test_try_connect_port_order_7497_first(self):
-        """Il primo elemento di IBKR_PORTS è 7497 (TWS paper)."""
-        self.assertEqual(IBKR_PORTS[0], 7497)
+    def test_try_connect_port_order_4004_first(self):
+        """Il primo elemento di IBKR_PORTS è 4004 (socat -> IBG Docker)."""
+        self.assertEqual(IBKR_PORTS[0], 4004)
 
     def test_try_connect_timeout_graceful(self):
         """Timeout breve → ritorna False senza eccezione."""
