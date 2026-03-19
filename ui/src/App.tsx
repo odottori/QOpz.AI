@@ -260,9 +260,13 @@ type TierFeatures = {
   multi_underlying: boolean;
 };
 type TierDetail = { capital: string; strategies: string[]; max_positions: number; };
+type BlockVis = { visible: boolean; interactive: boolean; gate: string; reason: string | null };
+type BlockVisibility = Record<string, BlockVis>;
+
 type TierResponse = {
   ok: boolean; profile: string;
   capital_tier: TierName; active_mode: TierName;
+  regime: string;
   features: TierFeatures;
   features_validated: TierFeatures;
   features_available: TierFeatures;
@@ -270,6 +274,9 @@ type TierResponse = {
   next_tier: TierName | null;
   next_capital_tier: TierName | null;
   next_operational_tier: TierName | null;
+  block_visibility: BlockVisibility;
+  data_gate: { ok: boolean; data_mode: string; n_closed: number };
+  kill_switch_active: boolean;
 };
 
 // ── ROC35: Wheel positions ────────────────────────────────────────────────────
@@ -1355,9 +1362,10 @@ export default function App() {
     } catch (e) { markFetchErr("wheel"); }
   }
 
-  async function doFetchTier() {
+  async function doFetchTier(currentRegime?: string) {
+    const reg = currentRegime ?? regimeCurrent?.regime ?? "NORMAL";
     try {
-      const r = await apiJson<TierResponse>(`${API_BASE}/opz/tier?profile=paper`);
+      const r = await apiJson<TierResponse>(`${API_BASE}/opz/tier?profile=paper&regime=${reg}`);
       setTierInfo(r);
       clearFetchErr("tier");
     } catch (e) { markFetchErr("tier"); }
@@ -1553,6 +1561,17 @@ export default function App() {
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-fetch tier when regime changes — block_visibility depends on regime
+  useEffect(() => {
+    if (regimeCurrent?.regime) void doFetchTier(regimeCurrent.regime);
+  }, [regimeCurrent?.regime]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper: read block visibility for a block key (safe default = fully visible/interactive)
+  function blk(key: string): BlockVis {
+    return tierInfo?.block_visibility?.[key]
+      ?? { visible: true, interactive: true, gate: "unknown", reason: null };
+  }
+
   const navItems: Array<{ id: TabKey; label: string }> = [
     { id: "warroom", label: "WAR ROOM" },
     { id: "universe", label: "UNIVERSE SCANNER" },
@@ -1692,6 +1711,33 @@ export default function App() {
               );
             })()}
           </div>
+
+          {/* ── SHOCK banner — ALWAYS_VISIBLE, collapses trading UI ── */}
+          {regimeView.text === "SHOCK" && (
+            <div style={{
+              background: "#3b0000", border: "1px solid #ef4444", borderRadius: 4,
+              padding: "8px 14px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <span style={{ color: "#ef4444", fontWeight: 700, fontSize: "0.85rem" }}>🛑 REGIME SHOCK</span>
+              <span style={{ color: "#fca5a5", fontSize: "0.75rem" }}>
+                Trading sospeso — tutti i pannelli operativi sono in sola lettura.
+                Solo monitoring, kill switch e risk panel rimangono attivi.
+              </span>
+            </div>
+          )}
+
+          {/* ── CAUTION banner ── */}
+          {regimeView.text === "CAUTION" && (
+            <div style={{
+              background: "#2c1a00", border: "1px solid #f59e0b", borderRadius: 4,
+              padding: "6px 14px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <span style={{ color: "#f59e0b", fontWeight: 700, fontSize: "0.8rem" }}>⚠ REGIME CAUTION</span>
+              <span style={{ color: "#fcd34d", fontSize: "0.7rem" }}>
+                Sizing 50% — solo spread stretti con filtro direzionale. Nuovi condor sospesi.
+              </span>
+            </div>
+          )}
 
           <div className="tabs">
             {navItems.map((tab) => (
@@ -2248,23 +2294,42 @@ export default function App() {
 
               <article className="panel">
                 <div className="panel-title">EXEC PREVIEW/CONFIRM</div>
+                {!blk("order_preview").interactive && blk("order_preview").reason && (
+                  <div className="notice error" style={{ marginBottom: 6 }}>
+                    🛑 {blk("order_preview").reason}
+                  </div>
+                )}
                 <div className="form-grid">
-                  <label>Symbol</label><input value={symbol} onChange={(e) => setSymbol(e.target.value)} />
-                  <label>Strategy</label><input value={strategy} onChange={(e) => setStrategy(e.target.value)} />
-                  <label>Payload JSON</label><textarea rows={6} value={payload} onChange={(e) => setPayload(e.target.value)} />
+                  <label>Symbol</label><input value={symbol} onChange={(e) => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
+                  <label>Strategy</label>
+                  <select value={strategy} onChange={(e) => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive} style={{ background: "#111", color: "#ccc", border: "1px solid #333", padding: "2px 4px", fontSize: "0.75rem" }}>
+                    {/* Tier-aware strategy list — shows only strategies available for current capital_tier */}
+                    <option value="BULL_PUT">BULL_PUT</option>
+                    {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
+                    {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
+                    {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
+                    {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
+                    {(tierInfo?.features_available?.ratio_spread ?? false) && <option value="RATIO_SPREAD">RATIO_SPREAD</option>}
+                    {(tierInfo?.features_available?.delta_overlay ?? false) && <option value="DELTA_OVERLAY">DELTA_OVERLAY</option>}
+                    {/* Allow custom value if already set (e.g. loaded from scan) */}
+                    {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE","RATIO_SPREAD","DELTA_OVERLAY"].includes(strategy) && (
+                      <option value={strategy}>{strategy}</option>
+                    )}
+                  </select>
+                  <label>Payload JSON</label><textarea rows={6} value={payload} onChange={(e) => setPayload(e.target.value)} disabled={!blk("order_preview").interactive} />
                 </div>
                 {payloadJsonError && <div className="notice error">Payload JSON non valido.</div>}
                 {previewDirty && <div className="notice error">Preview non allineata al payload corrente.</div>}
                 <div className="actions">
-                  <button className="btn btn-primary" onClick={doPreview} disabled={busy || payloadJsonError}>PREVIEW</button>
-                  <select value={confirmDecision} onChange={(e) => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}> 
+                  <button className="btn btn-primary" onClick={doPreview} disabled={busy || payloadJsonError || !blk("order_preview").interactive}>PREVIEW</button>
+                  <select value={confirmDecision} onChange={(e) => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")} disabled={!blk("order_confirm").interactive}>
                     <option value="APPROVE">APPROVE</option><option value="REJECT">REJECT</option>
                   </select>
                   <button
                     className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
                     onClick={doConfirm}
-                    disabled={busy || !preview || payloadJsonError || previewDirty}
-                    title={confirmArmed ? "Clicca ancora per inviare l'ordine" : "Prima conferma — secondo click invia"}
+                    disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
+                    title={!blk("order_confirm").interactive ? (blk("order_confirm").reason ?? "Non disponibile") : confirmArmed ? "Clicca ancora per inviare l'ordine" : "Prima conferma — secondo click invia"}
                   >{confirmArmed ? "⚠ CONFERMA ORDINE?" : "CONFIRM"}</button>
                 </div>
                 <pre className="console">{preview ? JSON.stringify(preview, null, 2) : "Nessuna anteprima."}</pre>
@@ -2811,16 +2876,25 @@ export default function App() {
         </section>
 
         <aside className="rightpanel">
-          <section className="rp-section">
-            <div className="rp-title">KELLY SIZING LIVE</div>
-            <div className="kelly-result">
-              <div className="kelly-val">{kellyHalf === null ? "-" : `${(kellyHalf * 100).toFixed(2)}%`}</div>
-              <div className="kelly-label">Half-Kelly target</div>
-            </div>
-            <div className="kelly-row"><span className="kelly-key">Win rate</span><span className="kelly-v">{fmtPct(paperSummary?.win_rate ?? null)}</span></div>
-            <div className="kelly-row"><span className="kelly-key">Profit factor</span><span className="kelly-v">{fmtNum(paperSummary?.profit_factor ?? null)}</span></div>
-            <div className="kelly-row"><span className="kelly-key">Avg slippage</span><span className="kelly-v">{fmtNum(paperSummary?.avg_slippage_ticks ?? null)}</span></div>
-          </section>
+          {blk("kelly_sizing").visible ? (
+            <section className="rp-section">
+              <div className="rp-title">KELLY SIZING LIVE</div>
+              <div className="kelly-result">
+                <div className="kelly-val">{kellyHalf === null ? "-" : `${(kellyHalf * 100).toFixed(2)}%`}</div>
+                <div className="kelly-label">Half-Kelly target</div>
+              </div>
+              <div className="kelly-row"><span className="kelly-key">Win rate</span><span className="kelly-v">{fmtPct(paperSummary?.win_rate ?? null)}</span></div>
+              <div className="kelly-row"><span className="kelly-key">Profit factor</span><span className="kelly-v">{fmtNum(paperSummary?.profit_factor ?? null)}</span></div>
+              <div className="kelly-row"><span className="kelly-key">Avg slippage</span><span className="kelly-v">{fmtNum(paperSummary?.avg_slippage_ticks ?? null)}</span></div>
+            </section>
+          ) : (
+            <section className="rp-section">
+              <div className="rp-title">KELLY SIZING</div>
+              <div style={{ color: "#555", fontSize: "0.7rem", padding: "4px 0" }}>
+                🔒 {blk("kelly_sizing").reason ?? "Kelly disabilitato"}
+              </div>
+            </section>
+          )}
 
           <section className="rp-section">
             <div className="rp-title">FASE CORRENTE</div>

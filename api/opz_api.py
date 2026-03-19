@@ -2509,10 +2509,20 @@ class WheelTransitionRequest(BaseModel):
 
 
 @app.get("/opz/tier")
-def opz_tier(profile: str = "dev") -> Dict[str, Any]:
+def opz_tier(profile: str = "dev", regime: str = "NORMAL") -> Dict[str, Any]:
     """
-    Return capital_tier and active_mode from config/<profile>.toml.
-    Also exposes which strategies and features are enabled for the current tier.
+    Return capital_tier, active_mode and block_visibility from config/<profile>.toml.
+
+    `regime` param: pass current regime from the UI (NORMAL/CAUTION/SHOCK).
+    `block_visibility` drives dynamic UI composition — each block specifies whether
+    it is visible, interactive, which gate controls it, and why (for tooltips).
+
+    Gate types:
+      always_visible  — kill switch, regime pill, monitoring panels
+      capital_gate    — capital_tier insufficient
+      validation_gate — active_mode gate not yet passed (copilot warning, not hard block)
+      data_gate       — Kelly: requires DATA_MODE=VENDOR_REAL_CHAIN and N≥50 closed trades
+      regime_gate     — SHOCK: trading suspended, blocks become read-only
     """
     import tomllib
 
@@ -2533,7 +2543,6 @@ def opz_tier(profile: str = "dev") -> Dict[str, Any]:
     _TIER_ORDER = ["MICRO", "SMALL", "MEDIUM", "ADVANCED"]
 
     def tier_gte(a: str, b: str) -> bool:
-        """True if tier a >= tier b."""
         try:
             return _TIER_ORDER.index(a) >= _TIER_ORDER.index(b)
         except ValueError:
@@ -2548,13 +2557,12 @@ def opz_tier(profile: str = "dev") -> Dict[str, Any]:
         "hedge_active":     tier_gte(active_mode, "MEDIUM"),
         "ratio_spread":     tier_gte(active_mode, "ADVANCED"),
         "delta_overlay":    tier_gte(active_mode, "ADVANCED"),
-        "kelly_enabled":    tier_gte(active_mode, "SMALL"),   # requires also N≥50
+        "kelly_enabled":    tier_gte(active_mode, "SMALL"),
         "twap_vwap":        tier_gte(active_mode, "MEDIUM"),
         "multi_underlying": tier_gte(active_mode, "ADVANCED"),
     }
 
-    # features_available: capitale sufficiente (capital_tier) — operatore PUÒ scegliere,
-    # ma non ha ancora superato il gate. Copilota avvisa, non blocca.
+    # features_available: capitale sufficiente (capital_tier) — copilota avvisa, non blocca
     features_available = {
         "bull_put":         True,
         "iron_condor":      tier_gte(capital_tier, "SMALL"),
@@ -2577,18 +2585,103 @@ def opz_tier(profile: str = "dev") -> Dict[str, Any]:
 
     next_tier_map = {"MICRO": "SMALL", "SMALL": "MEDIUM", "MEDIUM": "ADVANCED", "ADVANCED": None}
 
+    # ── Block visibility ──────────────────────────────────────────────────────
+    shock = (regime == "SHOCK")
+    kill_switch_active = (ROOT / "ops" / "kill_switch.trigger").exists()
+
+    # data_gate: Kelly requires real chain data AND enough closed trades
+    data_mode = os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
+    n_closed = 0
+    try:
+        with _db_connect_ro() as _con:
+            _row = _con.execute(
+                "SELECT COUNT(*) FROM paper_trades WHERE exit_ts_utc IS NOT NULL"
+            ).fetchone()
+            n_closed = int(_row[0]) if _row else 0
+    except Exception:
+        pass
+    data_gate_ok = (data_mode == "VENDOR_REAL_CHAIN") and (n_closed >= 50)
+
+    def _blk(visible: bool, interactive: bool, gate: str, reason: Optional[str] = None) -> Dict[str, Any]:
+        return {"visible": visible, "interactive": interactive, "gate": gate, "reason": reason}
+
+    def _strategy_blk(tier_req: str, label: str) -> Dict[str, Any]:
+        """Capital + validation + regime gate for a strategy block."""
+        cap_ok = tier_gte(capital_tier, tier_req)
+        val_ok = tier_gte(active_mode, tier_req)
+        if not cap_ok:
+            return _blk(False, False, "capital_gate",
+                        f"{label}: richiede capitale {tier_req} (attuale: {capital_tier})")
+        if shock:
+            return _blk(True, False, "regime_gate", f"SHOCK: {label} sospeso")
+        if not val_ok:
+            # capitale OK ma gate non validato → copilot warning, pannello usabile
+            return _blk(True, True, "validation_gate",
+                        f"⚠ {label}: gate {tier_req} non ancora validato")
+        return _blk(True, True, "validation_gate")
+
+    trading_ok = not shock and not kill_switch_active
+    trading_reason = ("SHOCK: trading sospeso" if shock
+                      else "Kill switch attivo" if kill_switch_active
+                      else None)
+
+    block_visibility: Dict[str, Any] = {
+        # ── ALWAYS VISIBLE — mai toccati dal gate system ──────────────────────
+        "kill_switch":       _blk(True, True,  "always_visible"),
+        "regime_pill":       _blk(True, False, "always_visible"),
+        "risk_summary":      _blk(True, False, "always_visible"),
+        "connection_status": _blk(True, False, "always_visible"),
+        "equity_chart":      _blk(True, False, "always_visible"),
+        "gate_status":       _blk(True, False, "always_visible"),
+        "ibkr_account":      _blk(True, False, "always_visible"),
+        "exit_candidates":   _blk(True, False, "always_visible"),
+        "trade_log":         _blk(True, False, "always_visible"),
+        "regime_matrix":     _blk(True, False, "always_visible"),
+        # ── SCANNING — read-only in SHOCK ─────────────────────────────────────
+        "universe_scanner":  _blk(True, not shock, "regime_gate" if shock else "always_visible",
+                                  "SHOCK: scanning sospeso" if shock else None),
+        "opportunity_scan":  _blk(True, not shock, "regime_gate" if shock else "always_visible",
+                                  "SHOCK: scan sospeso" if shock else None),
+        "pipeline_auto":     _blk(True, not shock, "regime_gate" if shock else "always_visible",
+                                  "SHOCK: pipeline sospesa" if shock else None),
+        # ── STRATEGY BLOCKS — capital + validation + regime ───────────────────
+        "strategy_bull_put":      _strategy_blk("MICRO",    "Bull Put"),
+        "strategy_iron_condor":   _strategy_blk("SMALL",    "Iron Condor"),
+        "strategy_wheel":         _strategy_blk("SMALL",    "Wheel"),
+        "wheel_panel":            _strategy_blk("SMALL",    "Wheel"),
+        "strategy_pmcc_calendar": _strategy_blk("MEDIUM",   "PMCC/Calendar"),
+        "strategy_hedge_active":  _strategy_blk("MEDIUM",   "Hedge Attivo"),
+        "strategy_ratio_spread":  _strategy_blk("ADVANCED", "Ratio Spread"),
+        "strategy_delta_overlay": _strategy_blk("ADVANCED", "Delta Overlay"),
+        # ── ORDER FLOW — trading_ok gate ──────────────────────────────────────
+        "order_preview": _blk(True, trading_ok, "regime_gate", trading_reason),
+        "order_confirm": _blk(True, trading_ok, "regime_gate", trading_reason),
+        # ── KELLY — data_gate only ────────────────────────────────────────────
+        "kelly_sizing": _blk(
+            data_gate_ok, data_gate_ok and not shock, "data_gate",
+            None if data_gate_ok else (
+                f"Kelly disabilitato — richiede DATA_MODE=VENDOR_REAL_CHAIN "
+                f"e N≥50 trade chiusi (attuale: {data_mode}, N={n_closed})"
+            )
+        ),
+    }
+
     return {
         "ok": True,
         "profile": profile,
         "capital_tier": capital_tier,
         "active_mode": active_mode,
+        "regime": regime,
         "features": features_validated,           # backward compat
         "features_validated": features_validated,
         "features_available": features_available,
         "tier_detail": tier_info.get(active_mode, {}),
-        "next_tier": next_tier_map.get(active_mode),            # backward compat
+        "next_tier": next_tier_map.get(active_mode),
         "next_capital_tier": next_tier_map.get(capital_tier),
         "next_operational_tier": next_tier_map.get(active_mode),
+        "block_visibility": block_visibility,
+        "data_gate": {"ok": data_gate_ok, "data_mode": data_mode, "n_closed": n_closed},
+        "kill_switch_active": kill_switch_active,
     }
 
 
