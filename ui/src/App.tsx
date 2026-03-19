@@ -1430,7 +1430,6 @@ export default function App() {
   const briefingAudioSrc = briefingSelected
     ? `${API_BASE}/opz/briefing/file/${encodeURIComponent(briefingSelected)}`
     : `${API_BASE}/opz/briefing/latest`;
-  const canPlayBriefingAction = briefingPlaying || (apiOnline && briefingList.length > 0);
 
   const briefingLabel = (() => {
     const name = briefingList[briefingListIdx] ?? "";
@@ -1865,7 +1864,7 @@ export default function App() {
                 <button
                   className={`btn narrator-btn-main ${briefingPlaying ? "btn-warning" : "btn-primary"}`}
                   onClick={briefingPlaying ? doBriefingStop : doBriefingPlay}
-                  disabled={!canPlayBriefingAction}
+                  disabled={!apiOnline || (!briefingPlaying && briefingList.length === 0)}
                 >{briefingPlaying ? "■ STOP" : "▶ PLAY"}</button>
                 <button className="btn btn-ghost narrator-btn"
                   onClick={doBriefingNext}
@@ -3101,7 +3100,7 @@ export default function App() {
               <button
                 className={`btn ${briefingPlaying ? "btn-warning" : "btn-primary"}`}
                 onClick={briefingPlaying ? doBriefingStop : doBriefingPlay}
-                disabled={!canPlayBriefingAction}
+                disabled={!apiOnline || (!briefingPlaying && briefingList.length === 0)}
               >{briefingPlaying ? "■ STOP" : "▶ PLAY"}</button>
               <button className="btn" onClick={doBriefingNext}
                 disabled={briefingListIdx <= 0}
