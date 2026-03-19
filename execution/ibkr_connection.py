@@ -35,6 +35,13 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# nest_asyncio permette ib_insync sync connect() dentro FastAPI/uvicorn (event loop già attivo)
+try:
+    import nest_asyncio
+    nest_asyncio.apply()
+except ImportError:
+    pass
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Porte candidate (ordine di priorità)
 # ─────────────────────────────────────────────────────────────────────────────
