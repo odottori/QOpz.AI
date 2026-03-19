@@ -60,6 +60,34 @@ ssh -i ~/.ssh/qopz_vm_key -o StrictHostKeyChecking=no root@178.104.94.34 \
 
 ---
 
+## Avvio locale (sviluppo)
+
+```bash
+# API backend (porta 8765) — tieni aperto in un terminale dedicato
+.venv\Scripts\python.exe -m uvicorn api.opz_api:app --port 8765 --reload
+
+# UI React (porta 8173) — tieni aperto in un altro terminale
+cd ui && npm run dev
+
+# Poi apri: http://localhost:8173
+```
+
+> **Nota**: se la porta 8765 è occupata, usa `netstat -ano | findstr :8765` per trovare il PID
+> e `taskkill /F /PID <PID>` in PowerShell (non in Git Bash).
+
+---
+
+## Allineamento VM (solo git pull, no rebuild)
+
+Quando non ci sono modifiche a `ui/` o `Dockerfile.nginx`:
+
+```bash
+ssh -i ~/.ssh/qopz_vm_key -o StrictHostKeyChecking=no root@178.104.94.34 \
+  "cd /opt/qopz && git pull origin main && docker compose ps"
+```
+
+---
+
 ## Comandi rapidi
 
 ```bash
