@@ -42,6 +42,10 @@ data/providers/synt_*
 !.dockerignore
 !.gitattributes
 
+# Telegram / secrets — mai committare
+config/telegram.toml
+data/audio/
+
 # Local-only (do not commit)
 baseline/
 docs/*.xml

@@ -539,6 +539,7 @@ export default function App() {
   const [selectedOpportunityKey, setSelectedOpportunityKey] = useState<string>("");
   const [oppScanResult, setOppScanResult] = useState<ScanFullResponse | null>(null);
   const [oppScanBusy, setOppScanBusy] = useState<boolean>(false);
+  const [briefingBusy, setBriefingBusy] = useState<boolean>(false);
   const [oppScanSymbols, setOppScanSymbols] = useState<string>("SPY,QQQ,AAPL,MSFT,NVDA");
   const [oppScanRegime, setOppScanRegime] = useState<"NORMAL" | "CAUTION" | "SHOCK">("NORMAL");
   const [oppScanTopN, setOppScanTopN] = useState<string>("5");
@@ -1371,6 +1372,20 @@ export default function App() {
     } catch (e) { markFetchErr("tier"); }
   }
 
+  async function doBriefingGenerate() {
+    setBriefingBusy(true);
+    setMessage("Generazione briefing in corso... (30-60s)");
+    try {
+      const r = await apiJson<{ ok: boolean; stderr?: string }>(`${API_BASE}/opz/briefing/generate`, { method: "POST" });
+      if (r.ok) {
+        setMessage("Briefing generato. Clicca ▶ per ascoltare.");
+      } else {
+        setError(`Briefing fallito: ${r.stderr ?? "errore sconosciuto"}`);
+      }
+    } catch (e) { setError(String(e)); }
+    finally { setBriefingBusy(false); }
+  }
+
   async function doKillSwitch() {
     const ksActive = sysStatus?.kill_switch_active ?? false;
     const action = ksActive ? "deactivate" : "activate";
@@ -1748,6 +1763,31 @@ export default function App() {
           </div>
 
                     {activeTab === "warroom" && (
+            <>
+            {/* ── BRIEFING AUDIO — banner compatto ───────────────────────────── */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "6px 12px", marginBottom: 8,
+              background: "#0d1117", border: "1px solid #1f2937", borderRadius: 4,
+            }}>
+              <span style={{ color: "#60a5fa", fontSize: "0.7rem", fontWeight: 700, letterSpacing: 1 }}>
+                📻 BRIEFING
+              </span>
+              <audio
+                controls
+                src={`${API_BASE}/opz/briefing/latest`}
+                style={{ height: 28, flex: 1, minWidth: 0, opacity: apiOnline ? 1 : 0.4 }}
+                preload="none"
+              />
+              <button
+                className="btn btn-ghost"
+                style={{ fontSize: "0.65rem", padding: "2px 8px", whiteSpace: "nowrap" }}
+                onClick={doBriefingGenerate}
+                disabled={briefingBusy || !apiOnline}
+                title="Genera nuovo briefing audio e invia su Telegram"
+              >{briefingBusy ? "..." : "GENERA"}</button>
+            </div>
+
             <div className="panel-grid three">
               <article className="panel">
                 {/* ── ROC10: equity sparkline header ── */}
@@ -2259,6 +2299,7 @@ export default function App() {
                 );
               })()}
             </div>
+            </>
           )}
 
           {activeTab === "pipeline" && (

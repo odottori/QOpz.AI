@@ -2685,6 +2685,73 @@ def opz_tier(profile: str = "dev", regime: str = "NORMAL") -> Dict[str, Any]:
     }
 
 
+# ── Briefing audio ────────────────────────────────────────────────────────────
+
+_AUDIO_DIR = ROOT / "data" / "audio"
+_BRIEFING_LATEST = _AUDIO_DIR / "briefing_latest.mp3"
+
+
+@app.get("/opz/briefing/latest")
+def opz_briefing_latest():
+    """Serve l'ultimo briefing audio MP3 generato."""
+    if not _BRIEFING_LATEST.exists():
+        raise HTTPException(status_code=404, detail="Nessun briefing disponibile — esegui POST /opz/briefing/generate")
+    return FileResponse(
+        path=str(_BRIEFING_LATEST),
+        media_type="audio/mpeg",
+        filename="briefing_latest.mp3",
+    )
+
+
+@app.post("/opz/briefing/generate")
+async def opz_briefing_generate(no_telegram: bool = False) -> Dict[str, Any]:
+    """
+    Avvia la generazione del briefing audio in background.
+    Richiede edge-tts installato nell'ambiente Python.
+    """
+    script = ROOT / "scripts" / "generate_briefing.py"
+    if not script.exists():
+        raise HTTPException(status_code=500, detail="Script generate_briefing.py non trovato")
+
+    cmd = [sys.executable, str(script), "--api", "http://localhost:8765"]
+    if no_telegram:
+        cmd.append("--no-telegram")
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(ROOT),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        ok = proc.returncode == 0
+        return {
+            "ok": ok,
+            "returncode": proc.returncode,
+            "stdout": stdout.decode(errors="replace")[-2000:],
+            "stderr": stderr.decode(errors="replace")[-1000:],
+            "mp3_path": str(_BRIEFING_LATEST) if _BRIEFING_LATEST.exists() else None,
+        }
+    except asyncio.TimeoutError:
+        return {"ok": False, "reason": "timeout (120s) — edge-tts potrebbe non essere installato"}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.get("/opz/briefing/text")
+def opz_briefing_text() -> Dict[str, Any]:
+    """Restituisce il testo del briefing senza generare audio (debug/preview)."""
+    import importlib.util
+    script = ROOT / "scripts" / "generate_briefing.py"
+    spec = importlib.util.spec_from_file_location("generate_briefing", script)
+    mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    data = mod._fetch_data("http://localhost:8765")
+    text = mod._compose_text(data)
+    return {"ok": True, "text": text, "chars": len(text)}
+
+
 @app.get("/opz/wheel/positions")
 def opz_wheel_positions(profile: str = "dev", symbol: Optional[str] = None) -> Dict[str, Any]:
     """List active Wheel positions (excludes CLOSED). Optionally filter by symbol."""
