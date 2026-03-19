@@ -578,6 +578,7 @@ export default function App() {
   const [sysStatusFetchedAt, setSysStatusFetchedAt] = useState<number | null>(null);
   const [ibkrAccountFetchedAt, setIbkrAccountFetchedAt] = useState<number | null>(null);
   const [exitCandidatesFetchedAt, setExitCandidatesFetchedAt] = useState<number | null>(null);
+  const [fetchErrors, setFetchErrors] = useState<Set<string>>(new Set());
   const [aiDrawerOpen, setAiDrawerOpen] = useState<boolean>(false);
   const [narratorTutorial, setNarratorTutorial] = useState<NarratorTutorialResponse | null>(null);
   const [narratorBusy, setNarratorBusy] = useState<boolean>(false);
@@ -1303,26 +1304,36 @@ export default function App() {
     finally { setIbkrAccountLoading(false); }
   }
 
+  function clearFetchErr(key: string) {
+    setFetchErrors(prev => { const s = new Set(prev); s.delete(key); return s; });
+  }
+  function markFetchErr(key: string) {
+    setFetchErrors(prev => new Set(prev).add(key));
+  }
+
   async function doFetchSysStatus() {
     try {
       const r = await apiJson<SystemStatusResponse>(`${API_BASE}/opz/system/status`);
       setSysStatus(r);
       setSysStatusFetchedAt(Date.now());
-    } catch (e) { /* silenzioso */ }
+      clearFetchErr("sysStatus");
+    } catch (e) { markFetchErr("sysStatus"); }
   }
 
   async function doFetchRegimeCurrent() {
     try {
       const r = await apiJson<RegimeCurrentResponse>(`${API_BASE}/opz/regime/current?window=30`);
       setRegimeCurrent(r);
-    } catch (e) { /* silenzioso */ }
+      clearFetchErr("regime");
+    } catch (e) { markFetchErr("regime"); }
   }
 
   async function doFetchEquityHistory() {
     try {
       const r = await apiJson<EquityHistoryResponse>(`${API_BASE}/opz/paper/equity_history?profile=paper&limit=60`);
       setEquityHistory(r);
-    } catch (e) { /* silenzioso */ }
+      clearFetchErr("equity");
+    } catch (e) { markFetchErr("equity"); }
   }
 
   async function doFetchExitCandidates() {
@@ -1330,7 +1341,8 @@ export default function App() {
       const r = await apiJson<ExitCandidatesResponse>(`${API_BASE}/opz/opportunity/exit_candidates?min_score=1&top_n=5`);
       setExitCandidates(r);
       setExitCandidatesFetchedAt(Date.now());
-    } catch (e) { /* silenzioso */ }
+      clearFetchErr("exitCandidates");
+    } catch (e) { markFetchErr("exitCandidates"); }
   }
 
   async function doFetchWheelPositions() {
@@ -1339,14 +1351,16 @@ export default function App() {
       const r = await apiJson<WheelPositionsResponse>(`${API_BASE}/opz/wheel/positions?profile=${profile}`);
       setWheelPositions(r);
       setWheelFetchedAt(Date.now());
-    } catch (e) { /* silenzioso */ }
+      clearFetchErr("wheel");
+    } catch (e) { markFetchErr("wheel"); }
   }
 
   async function doFetchTier() {
     try {
       const r = await apiJson<TierResponse>(`${API_BASE}/opz/tier?profile=paper`);
       setTierInfo(r);
-    } catch (e) { /* silenzioso */ }
+      clearFetchErr("tier");
+    } catch (e) { markFetchErr("tier"); }
   }
 
   async function doKillSwitch() {
@@ -1379,6 +1393,10 @@ export default function App() {
   const stateObj = stateJson && typeof stateJson === "object" ? (stateJson as Record<string, unknown>) : null;
   const nextStep = typeof stateObj?.next_step === "string" ? stateObj.next_step : "-";
   const progressObj = stateObj?.progress && typeof stateObj.progress === "object" ? (stateObj.progress as Record<string, unknown>) : null;
+  const plannerComplete = nextStep === "COMPLETE";
+  const phaseProgress = plannerComplete
+    ? { f1: 100, f2: 100, f3: 100, f4: 100 }
+    : { f1: 100, f2: 85, f3: 40, f4: 0 };
   const blockedCount = Array.isArray(progressObj?.blocked_steps) ? progressObj.blocked_steps.length : 0;
   const universeItems = universeLatest?.items ?? [];
   const ibkrScanners = ibkrContext?.scanners ?? [];
@@ -1436,7 +1454,12 @@ export default function App() {
 
   const regimeView = useMemo(() => {
     if (!apiOnline) return { cls: "regime-shock", text: "OFFLINE" };
-    if (goGate?.pass) return { cls: "regime-normal", text: "NORMAL" };
+    // Fonte autorevole: regime corrente da /opz/regime/current
+    const live = regimeCurrent?.regime;
+    if (live === "NORMAL")  return { cls: "regime-normal",  text: "NORMAL" };
+    if (live === "CAUTION") return { cls: "regime-caution", text: "CAUTION" };
+    if (live === "SHOCK")   return { cls: "regime-shock",   text: "SHOCK" };
+    // Fallback: nessun dato regime ancora disponibile
     if (hasPaperData) return { cls: "regime-caution", text: "CAUTION" };
     return { cls: "regime-shock", text: "SHOCK" };
   }, [apiOnline, goGate?.pass, hasPaperData]);
@@ -1593,10 +1616,15 @@ export default function App() {
           <span className="top-mini">Sizing: {regimeView.text === "NORMAL" ? "100%" : regimeView.text === "CAUTION" ? "50%" : regimeView.text === "SHOCK" ? "0%" : "—"}</span>
         </div>
         <div className="topbar-right">
+          {fetchErrors.size > 0 && (
+            <span style={{ color: "#f97316", fontSize: "0.7rem" }} title={`Fetch falliti: ${Array.from(fetchErrors).join(", ")}`}>
+              ⚠ {fetchErrors.size} stale
+            </span>
+          )}
           <span className="clock">{clockText}</span>
           <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API LIVE" : "API DOWN"}</span>
           <button className="btn btn-primary" onClick={refreshAll} disabled={busy}>{busy ? "REFRESHING" : "REFRESH"}</button>
-          <a className="btn btn-ghost" href="http://localhost:8765/health" target="_blank" rel="noreferrer">API /HEALTH</a>
+          <a className="btn btn-ghost" href={`${API_BASE}/health`} target="_blank" rel="noreferrer">API /HEALTH</a>
           <button
             className={`btn ${(sysStatus?.kill_switch_active) ? "btn-warning" : "btn-danger"}`}
             onClick={doKillSwitch}
@@ -1633,14 +1661,14 @@ export default function App() {
 
           <div className="phases-box">
             <div className="phases-title">PROGRESSIONE 90 GIORNI</div>
-            <div className="phase-row"><span>F1 Pipeline</span><b className="ok">100%</b></div>
-            <div className="phase-bar"><span style={{ width: "100%" }} /></div>
-            <div className="phase-row"><span>F2 Regime</span><b className="ok">85%</b></div>
-            <div className="phase-bar"><span style={{ width: "85%" }} /></div>
-            <div className="phase-row"><span>F3 Paper</span><b className="warn">40%</b></div>
-            <div className="phase-bar"><span style={{ width: "40%" }} /></div>
-            <div className="phase-row"><span>F4 Scoring</span><b className="dim">0%</b></div>
-            <div className="phase-bar"><span style={{ width: "0%" }} /></div>
+            <div className="phase-row"><span>F1 Pipeline</span><b className={phaseProgress.f1 === 100 ? "ok" : "warn"}>{phaseProgress.f1}%</b></div>
+            <div className="phase-bar"><span style={{ width: `${phaseProgress.f1}%` }} /></div>
+            <div className="phase-row"><span>F2 Regime</span><b className={phaseProgress.f2 === 100 ? "ok" : "warn"}>{phaseProgress.f2}%</b></div>
+            <div className="phase-bar"><span style={{ width: `${phaseProgress.f2}%` }} /></div>
+            <div className="phase-row"><span>F3 Paper</span><b className={phaseProgress.f3 === 100 ? "ok" : phaseProgress.f3 > 0 ? "warn" : "dim"}>{phaseProgress.f3}%</b></div>
+            <div className="phase-bar"><span style={{ width: `${phaseProgress.f3}%` }} /></div>
+            <div className="phase-row"><span>F4 Scoring</span><b className={phaseProgress.f4 === 100 ? "ok" : phaseProgress.f4 > 0 ? "warn" : "dim"}>{phaseProgress.f4}%</b></div>
+            <div className="phase-bar"><span style={{ width: `${phaseProgress.f4}%` }} /></div>
           </div>
         </aside><section className="centerpane">
           <div className="metrics-row">
@@ -2283,7 +2311,7 @@ export default function App() {
                   <input
                     value={universeSettingsPath}
                     onChange={(e) => setUniverseSettingsPath(e.target.value)}
-                    placeholder="default: docs/IBKR setting decriptato.sanitized.xml"
+                    placeholder="default: docs/IBKE setting decriptato.sanitized.xml"
                   />
 
                   <label>Scanner</label>

@@ -374,9 +374,15 @@ def _run_script_json(script_rel: str, args: list[str]) -> dict[str, Any]:
 
 
 def _read_tutorial_markdown(path: Optional[str] = None) -> dict[str, Any]:
-    p = Path(path).expanduser() if path else TUTORIAL_TEXT2SPEECH_PATH
-    if not p.is_absolute():
-        p = ROOT / p
+    if path:
+        p = Path(path).expanduser()
+        if not p.is_absolute():
+            p = ROOT / p
+    else:
+        p = TUTORIAL_TEXT2SPEECH_PATH
+        if not p.exists():
+            # fallback: guida_completa è il documento operativo principale
+            p = ROOT / "docs" / "guide" / "guida_completa.md"
     if not p.exists():
         return {"path": str(p), "exists": False, "content": ""}
     try:

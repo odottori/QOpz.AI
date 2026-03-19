@@ -26,7 +26,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "IBM Plex Mono", Consolas, monospace;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 body::after {
@@ -52,7 +52,7 @@ p {
 
 .terminal-app {
   min-height: 100vh;
-  min-width: 1025px; /* operator console — designed for desktop */
+  min-width: 800px; /* operator console — optimized for desktop, usable from ~800px */
 }
 
 .topbar {
@@ -178,7 +178,7 @@ p {
 h4,
 label {
   color: var(--dim);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1.6px;
   text-transform: uppercase;
 }
