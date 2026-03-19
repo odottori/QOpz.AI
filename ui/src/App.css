@@ -692,20 +692,62 @@ select:focus {
   width: 100%;
 }
 
-.narrator-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+.narrator-briefing-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.5px;
   margin-bottom: 8px;
-  font-size: 9px;
+  min-height: 14px;
 }
 
-.narrator-tts-actions {
+.narrator-controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;
   margin-bottom: 10px;
 }
+
+.narrator-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.narrator-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* toggle pill */
+.toggle-pill {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  background: #374151;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle-pill.on { background: #3b82f6; }
+.toggle-knob {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 14px; height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.toggle-pill.on .toggle-knob { transform: translateX(16px); }
 
 .narrator-search-block {
   margin-bottom: 10px;

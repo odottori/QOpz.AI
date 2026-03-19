@@ -540,6 +540,12 @@ export default function App() {
   const [oppScanResult, setOppScanResult] = useState<ScanFullResponse | null>(null);
   const [oppScanBusy, setOppScanBusy] = useState<boolean>(false);
   const [briefingBusy, setBriefingBusy] = useState<boolean>(false);
+  const [briefingList, setBriefingList] = useState<string[]>([]);
+  const [briefingListIdx, setBriefingListIdx] = useState<number>(0);
+  const [briefingPlaying, setBriefingPlaying] = useState<boolean>(false);
+  const [briefingAutoOpen, setBriefingAutoOpen] = useState<boolean>(false);
+  const [briefingAutoPlay, setBriefingAutoPlay] = useState<boolean>(false);
+  const briefingAudioRef = useRef<HTMLAudioElement | null>(null);
   const [oppScanSymbols, setOppScanSymbols] = useState<string>("SPY,QQQ,AAPL,MSFT,NVDA");
   const [oppScanRegime, setOppScanRegime] = useState<"NORMAL" | "CAUTION" | "SHOCK">("NORMAL");
   const [oppScanTopN, setOppScanTopN] = useState<string>("5");
@@ -896,6 +902,7 @@ export default function App() {
       void doFetchExitCandidates();
       void doFetchWheelPositions();
       void doFetchTier();
+      void doFetchBriefingList();
       if (!universeScannerName && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
@@ -1372,18 +1379,71 @@ export default function App() {
     } catch (e) { markFetchErr("tier"); }
   }
 
+  async function doFetchBriefingList() {
+    try {
+      const list = await apiJson<string[]>(`${API_BASE}/opz/briefing/list`);
+      setBriefingList(list);
+      setBriefingListIdx(0);
+    } catch { /* nessun briefing disponibile */ }
+  }
+
   async function doBriefingGenerate() {
     setBriefingBusy(true);
     setMessage("Generazione briefing in corso... (30-60s)");
     try {
       const r = await apiJson<{ ok: boolean; stderr?: string }>(`${API_BASE}/opz/briefing/generate`, { method: "POST" });
       if (r.ok) {
-        setMessage("Briefing generato. Clicca ▶ per ascoltare.");
+        setMessage("Briefing generato.");
+        await doFetchBriefingList();
+        if (briefingAutoOpen) setAiDrawerOpen(true);
+        if (briefingAutoPlay && briefingAudioRef.current) {
+          briefingAudioRef.current.src = `${API_BASE}/opz/briefing/latest`;
+          briefingAudioRef.current.load();
+          void briefingAudioRef.current.play();
+        }
       } else {
         setError(`Briefing fallito: ${r.stderr ?? "errore sconosciuto"}`);
       }
     } catch (e) { setError(String(e)); }
     finally { setBriefingBusy(false); }
+  }
+
+  const briefingAudioSrc =
+    briefingList.length > 0 && briefingListIdx > 0
+      ? `${API_BASE}/opz/briefing/file/${briefingList[briefingListIdx]}`
+      : `${API_BASE}/opz/briefing/latest`;
+
+  const briefingLabel = (() => {
+    const name = briefingList[briefingListIdx] ?? "";
+    const m = name.match(/briefing_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+    if (!m) return "Ultimo briefing";
+    return `${m[3]}/${m[2]}/${m[1]}  ${m[4]}:${m[5]}`;
+  })();
+
+  function doBriefingPlay() {
+    const el = briefingAudioRef.current;
+    if (!el) return;
+    el.src = briefingAudioSrc;
+    el.load();
+    void el.play();
+  }
+
+  function doBriefingStop() {
+    const el = briefingAudioRef.current;
+    if (!el) return;
+    el.pause();
+    el.currentTime = 0;
+    setBriefingPlaying(false);
+  }
+
+  function doBriefingPrev() {
+    setBriefingListIdx(i => Math.min(i + 1, Math.max(0, briefingList.length - 1)));
+    setBriefingPlaying(false);
+  }
+
+  function doBriefingNext() {
+    setBriefingListIdx(i => Math.max(i - 1, 0));
+    setBriefingPlaying(false);
   }
 
   async function doKillSwitch() {
@@ -1764,28 +1824,25 @@ export default function App() {
 
                     {activeTab === "warroom" && (
             <>
-            {/* ── BRIEFING AUDIO — banner compatto ───────────────────────────── */}
+            {/* ── BRIEFING AUDIO — pill compatta ─────────────────────────────── */}
             <div style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "6px 12px", marginBottom: 8,
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "5px 10px", marginBottom: 8,
               background: "#0d1117", border: "1px solid #1f2937", borderRadius: 4,
             }}>
               <span style={{ color: "#60a5fa", fontSize: "0.7rem", fontWeight: 700, letterSpacing: 1 }}>
                 📻 BRIEFING
               </span>
-              <audio
-                controls
-                src={`${API_BASE}/opz/briefing/latest`}
-                style={{ height: 28, flex: 1, minWidth: 0, opacity: apiOnline ? 1 : 0.4 }}
-                preload="none"
-              />
-              <button
-                className="btn btn-ghost"
-                style={{ fontSize: "0.65rem", padding: "2px 8px", whiteSpace: "nowrap" }}
-                onClick={doBriefingGenerate}
-                disabled={briefingBusy || !apiOnline}
-                title="Genera nuovo briefing audio e invia su Telegram"
-              >{briefingBusy ? "..." : "GENERA"}</button>
+              <span style={{ color: "#4b5563", fontSize: "0.65rem", flex: 1 }}>{briefingLabel}</span>
+              <button className="btn btn-primary" style={{ fontSize: "0.65rem", padding: "2px 10px" }}
+                onClick={() => setAiDrawerOpen(true)} title="Apri player narratore">
+                ▶ PLAYER
+              </button>
+              <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px" }}
+                onClick={doBriefingGenerate} disabled={briefingBusy || !apiOnline}
+                title="Genera nuovo briefing e invia su Telegram">
+                {briefingBusy ? "..." : "⊕ GENERA"}
+              </button>
             </div>
 
             <div className="panel-grid three">
@@ -2967,30 +3024,66 @@ export default function App() {
 
         <aside id="ai-drawer-panel" className={`ai-drawer ${aiDrawerOpen ? "open" : ""}`} aria-hidden={!aiDrawerOpen}>
           <section className="ai-drawer-section">
-            <div className="rp-title">NARRATORE APP</div>
-            <p className="dim ai-drawer-copy">
-              Tutorial in box da <code>docs/TUTORIAL_APPLICAZIONE.md</code> con lettura TEXT2SPEECH (qwenTTS).
-            </p>
-            <div className="narrator-meta dim">
-              <span>Voice: {narratorVoiceState.toUpperCase()}</span>
-              <span>Lines: {narratorTutorial?.lines ?? 0}</span>
-            </div>
-            <div className="actions narrator-tts-actions">
-              <button className="btn btn-primary" onClick={() => void doNarratorTts("play")} disabled={narratorBusy || !tutorialText.trim()}>
-                PLAY
-              </button>
-              <button className="btn" onClick={() => void doNarratorTts("pause")} disabled={narratorBusy}>
-                PAUSA
-              </button>
-              <button className="btn" onClick={() => void doNarratorTts("stop")} disabled={narratorBusy}>
-                STOP
-              </button>
+            <div className="rp-title">NARRATORE</div>
+
+            {/* elemento audio nascosto — controllato via ref */}
+            <audio
+              ref={briefingAudioRef}
+              preload="none"
+              onPlay={() => setBriefingPlaying(true)}
+              onPause={() => setBriefingPlaying(false)}
+              onEnded={() => setBriefingPlaying(false)}
+            />
+
+            <div className="narrator-briefing-label dim">{briefingLabel}</div>
+
+            {/* controlli player */}
+            <div className="narrator-controls">
+              <button className="btn" onClick={doBriefingPrev}
+                disabled={briefingListIdx >= briefingList.length - 1 || briefingList.length === 0}
+                title="Briefing precedente">◀ PREV</button>
+              <button
+                className={`btn ${briefingPlaying ? "btn-warning" : "btn-primary"}`}
+                onClick={briefingPlaying ? doBriefingStop : doBriefingPlay}
+                disabled={!apiOnline}
+              >{briefingPlaying ? "■ STOP" : "▶ PLAY"}</button>
+              <button className="btn" onClick={doBriefingNext}
+                disabled={briefingListIdx <= 0}
+                title="Briefing successivo">NEXT ▶</button>
+              <button className="btn btn-ghost" onClick={() => void doBriefingGenerate()}
+                disabled={briefingBusy || !apiOnline}
+                title="Genera nuovo briefing e invia su Telegram"
+                style={{ gridColumn: "1 / -1" }}
+              >{briefingBusy ? "generazione..." : "⊕ GENERA NUOVO"}</button>
             </div>
 
+            {/* switch automazione */}
+            <div className="narrator-switches">
+              <label className="narrator-switch-row">
+                <span>Auto-apri finestra</span>
+                <span className={`toggle-pill ${briefingAutoOpen ? "on" : ""}`}
+                  onClick={() => setBriefingAutoOpen(v => !v)} role="switch"
+                  aria-checked={briefingAutoOpen} tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && setBriefingAutoOpen(v => !v)}>
+                  <span className="toggle-knob" />
+                </span>
+              </label>
+              <label className="narrator-switch-row">
+                <span>Play automatico</span>
+                <span className={`toggle-pill ${briefingAutoPlay ? "on" : ""}`}
+                  onClick={() => setBriefingAutoPlay(v => !v)} role="switch"
+                  aria-checked={briefingAutoPlay} tabIndex={0}
+                  onKeyDown={(e) => e.key === "Enter" && setBriefingAutoPlay(v => !v)}>
+                  <span className="toggle-knob" />
+                </span>
+              </label>
+            </div>
+
+            {/* ricerca nel tutorial */}
             <div className="narrator-search-block">
               <label className="narrator-search-label">
                 <span className="icon-lens" aria-hidden="true" />
-                Ricerca libera
+                Ricerca nel tutorial
               </label>
               <div className="narrator-search-row">
                 <input
@@ -3004,7 +3097,6 @@ export default function App() {
               </div>
               <div className="dim narrator-hit">{narratorMatches.length > 0 ? `${narratorMatchIdx + 1}/${narratorMatches.length}` : "0/0"}</div>
             </div>
-
 
             <textarea
               ref={narratorBoxRef}
