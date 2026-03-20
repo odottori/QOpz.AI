@@ -1596,100 +1596,37 @@ def _normalize_ibwr_action(raw: str) -> str:
     raise HTTPException(status_code=400, detail="action must be on/off/status (aliases: start/stop/state)")
 
 
-def _docker_find_ibg_container(containers: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    for c in containers:
-        labels = c.get("Labels") if isinstance(c.get("Labels"), dict) else {}
-        if labels.get("com.docker.compose.service") == "ibg":
-            return c
-    for c in containers:
-        names = c.get("Names") if isinstance(c.get("Names"), list) else []
-        if any("ibg" in str(name).lower() for name in names):
-            return c
-    return None
+def _control_api_json(
+    path: str,
+    *,
+    method: str = "GET",
+    payload: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    base = str(os.environ.get("CONTROL_API_BASE", "http://control-plane:8770")).strip().rstrip("/")
+    token = str(os.environ.get("CONTROL_API_TOKEN", "")).strip()
+    headers: dict[str, str] = {}
+    if token:
+        headers["X-Control-Token"] = token
+    url = f"{base}{path}"
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            if method.upper() == "POST":
+                resp = client.post(url, json=(payload or {}), headers=headers)
+            else:
+                resp = client.get(url, headers=headers)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"control-plane unreachable: {type(exc).__name__}: {exc}") from exc
 
-
-def _docker_ibg_service_action(action: str) -> Dict[str, Any]:
-    sock_path = os.environ.get("DOCKER_SOCK_PATH", "/var/run/docker.sock")
-    if not Path(sock_path).exists():
-        raise HTTPException(status_code=503, detail=f"docker socket not available: {sock_path}")
-
-    def _raise_from_resp(prefix: str, resp: httpx.Response) -> None:
+    if resp.status_code >= 400:
         body = (resp.text or "").strip()
-        detail = f"{prefix} failed ({resp.status_code})"
+        detail = f"control-plane {path} failed ({resp.status_code})"
         if body:
             detail += f": {body[:240]}"
         raise HTTPException(status_code=502, detail=detail)
-
-    transport = httpx.HTTPTransport(uds=sock_path)
-    with httpx.Client(base_url="http://docker", transport=transport, timeout=12.0) as client:
-        list_resp = client.get("/containers/json", params={"all": 1})
-        if list_resp.status_code >= 400:
-            _raise_from_resp("docker list containers", list_resp)
-        data = list_resp.json()
-        containers = data if isinstance(data, list) else []
-        ibg = _docker_find_ibg_container(containers)
-        if not ibg:
-            raise HTTPException(status_code=404, detail="ibg container not found")
-
-        container_id = str(ibg.get("Id") or "")
-        if not container_id:
-            raise HTTPException(status_code=502, detail="ibg container id missing")
-
-        def _inspect() -> Dict[str, Any]:
-            ins = client.get(f"/containers/{container_id}/json")
-            if ins.status_code >= 400:
-                _raise_from_resp("docker inspect ibg", ins)
-            payload = ins.json()
-            if not isinstance(payload, dict):
-                raise HTTPException(status_code=502, detail="invalid docker inspect payload")
-            return payload
-
-        before = _inspect()
-        state_obj = before.get("State") if isinstance(before.get("State"), dict) else {}
-        running_before = bool(state_obj.get("Running"))
-        status_before = str(state_obj.get("Status") or ("running" if running_before else "stopped")).lower()
-
-        applied_action = "status"
-        reason = "RUNNING" if running_before else "STOPPED"
-
-        if action == "on":
-            if running_before:
-                applied_action = "noop"
-                reason = "ALREADY_RUNNING"
-            else:
-                start = client.post(f"/containers/{container_id}/start")
-                if start.status_code >= 400:
-                    _raise_from_resp("docker start ibg", start)
-                applied_action = "start"
-                reason = "STARTED"
-        elif action == "off":
-            if not running_before:
-                applied_action = "noop"
-                reason = "ALREADY_STOPPED"
-            else:
-                stop = client.post(f"/containers/{container_id}/stop", params={"t": 15})
-                if stop.status_code >= 400:
-                    _raise_from_resp("docker stop ibg", stop)
-                applied_action = "stop"
-                reason = "STOPPED"
-
-        after = _inspect()
-        after_state_obj = after.get("State") if isinstance(after.get("State"), dict) else {}
-        running_after = bool(after_state_obj.get("Running"))
-        status_after = str(after_state_obj.get("Status") or ("running" if running_after else "stopped")).lower()
-        ts_now = datetime.now(timezone.utc).isoformat()
-        return {
-            "ok": True,
-            "requested_action": action,
-            "applied_action": applied_action,
-            "service_state": "ON" if running_after else "OFF",
-            "running": running_after,
-            "status_before": status_before,
-            "status_after": status_after,
-            "reason": reason,
-            "container_id": container_id[:12],
-            "ts_utc": ts_now,
-        }
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail=f"invalid control-plane payload for {path}")
+    return data
 
 
 def _ibkr_connected_for_observer() -> tuple[bool, str]:
@@ -1807,7 +1744,23 @@ def execution_observer_switch(req: ObserverSwitchRequest) -> Dict[str, Any]:
 @app.post("/opz/ibwr/service")
 def ibwr_service_switch(req: IbwrServiceRequest) -> Dict[str, Any]:
     action = _normalize_ibwr_action(req.action)
-    result = _docker_ibg_service_action(action)
+    result = _control_api_json(
+        "/control/ibwr",
+        method="POST",
+        payload={"action": action, "source": req.source or "operator_ui"},
+    )
+
+    ks_path = ROOT / "ops" / "kill_switch.trigger"
+    ks_path.parent.mkdir(parents=True, exist_ok=True)
+    ks_forced = False
+    if action == "off":
+        ts_now = datetime.now(timezone.utc).isoformat()
+        ks_path.write_text(
+            json.dumps({"activated_at": ts_now, "source": req.source or "ibwr_service", "ibwr": "OFF"}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        ks_forced = True
+
     service_state = str(result.get("service_state", "OFF"))
     applied_action = str(result.get("applied_action", "status")).upper()
     reason = str(result.get("reason", "UNKNOWN"))
@@ -1823,9 +1776,53 @@ def ibwr_service_switch(req: IbwrServiceRequest) -> Dict[str, Any]:
 
     out = dict(result)
     out["message"] = msg
+    out["kill_switch_active"] = ks_path.exists()
+    out["kill_switch_forced"] = ks_forced
     out["telegram_notified"] = telegram_notified
     out["telegram_error"] = telegram_error
     return out
+
+
+@app.get("/opz/control/status")
+def opz_control_status() -> Dict[str, Any]:
+    ts_now = datetime.now(timezone.utc).isoformat()
+    system = opz_system_status()
+
+    control: dict[str, Any] = {}
+    control_error: Optional[str] = None
+    try:
+        control = _control_api_json("/control/status", method="GET")
+    except HTTPException as exc:
+        control_error = str(exc.detail)
+
+    observer_state = "OFF" if bool(system.get("kill_switch_active")) else "ON"
+    ibwr = control.get("ibwr") if isinstance(control.get("ibwr"), dict) else {}
+    services = control.get("services") if isinstance(control.get("services"), dict) else {}
+
+    return {
+        "ok": True,
+        "timestamp_utc": ts_now,
+        "observer": {
+            "state": observer_state,
+            "kill_switch_active": bool(system.get("kill_switch_active")),
+            "reason": "KILL_SWITCH_ACTIVE" if bool(system.get("kill_switch_active")) else "READY",
+        },
+        "ibwr": ibwr,
+        "ibkr": {
+            "connected": bool(system.get("ibkr_connected")),
+            "port": system.get("ibkr_port"),
+            "source_system": system.get("ibkr_source_system"),
+            "connected_at": system.get("ibkr_connected_at"),
+        },
+        "vm": {
+            "services": services,
+            "control_plane_ok": bool(control.get("ok")) if isinstance(control, dict) and control else False,
+            "control_plane_error": control_error,
+        },
+        "regime": system.get("regime"),
+        "data_mode": system.get("data_mode"),
+        "history_readiness": system.get("history_readiness"),
+    }
 
 
 @app.post("/opz/opportunity/decision")

@@ -32,6 +32,7 @@ class TestTelegramCommandBot(unittest.TestCase):
         self.assertEqual(bot._normalize_command("observer-off"), "OBSERVER OFF")
         self.assertEqual(bot._normalize_command("observer yes"), "OBSERVER ON")
         self.assertEqual(bot._normalize_command("observer no"), "OBSERVER OFF")
+        self.assertEqual(bot._normalize_command("/observer status"), "OBSERVER STATUS")
 
     def test_normalize_ibwr_aliases(self):
         self.assertEqual(bot._normalize_command("/ibwr"), "IBWR STATUS")
@@ -41,8 +42,10 @@ class TestTelegramCommandBot(unittest.TestCase):
 
     def test_build_status_text(self):
         status = {
-            "kill_switch_active": True,
-            "ibkr_connected": False,
+            "observer": {"state": "OFF", "kill_switch_active": True, "reason": "KILL_SWITCH_ACTIVE"},
+            "ibwr": {"service_state": "OFF", "reason": "STOPPED"},
+            "ibkr": {"connected": False, "port": None},
+            "vm": {"services": {"api": {"state": "ON"}, "nginx": {"state": "ON"}, "tg-bot": {"state": "ON"}, "ibg": {"state": "OFF"}}},
             "regime": "CAUTION",
             "data_mode": "VENDOR_REAL_CHAIN",
             "history_readiness": {
@@ -57,6 +60,7 @@ class TestTelegramCommandBot(unittest.TestCase):
         txt = bot._build_status_text(status)
         self.assertIn("OBSERVER: OFF", txt)
         self.assertIn("IBWR/IBG: OFF", txt)
+        self.assertIn("VM: api=ON", txt)
         self.assertIn("REGIME: CAUTION", txt)
         self.assertIn("READINESS: 72.5%", txt)
 
@@ -68,6 +72,7 @@ class TestTelegramCommandBot(unittest.TestCase):
         self.assertIn("/ibwr off", txt)
         self.assertIn("/observer on", txt)
         self.assertIn("/observer off", txt)
+        self.assertIn("/observer status", txt)
         self.assertIn("/help", txt)
 
     def test_observer_on_blocked_message_is_explicit(self):

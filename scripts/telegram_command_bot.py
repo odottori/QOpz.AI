@@ -120,6 +120,8 @@ def _normalize_command(text: str) -> str:
         "IBG OFF": "IBWR OFF",
         "OBSERVER ON": "OBSERVER ON",
         "OBSERVER OFF": "OBSERVER OFF",
+        "OBSERVER STATUS": "OBSERVER STATUS",
+        "OBSERVER": "OBSERVER STATUS",
         "OBSERVERON": "OBSERVER ON",
         "OBSERVEROFF": "OBSERVER OFF",
         "OBSERVER YES": "OBSERVER ON",
@@ -149,46 +151,65 @@ def _build_help_text() -> str:
     return (
         "HELP - COMANDI DISPONIBILI\n\n"
         "/status\n"
-        "- stato OBSERVER, IBWR/IBG, API, regime, readiness\n\n"
+        "- stato unico: OBSERVER + IBWR + IBKR + VM\n\n"
         "/ibwr status\n"
-        "- stato servizio IBWR/IBG (container)\n\n"
+        "- stato servizio IBWR/IBG\n\n"
         "/ibwr on\n"
-        "- avvia servizio IBWR/IBG\n\n"
+        "- avvia servizio IBWR/IBG (non disattiva kill-switch)\n\n"
         "/ibwr off\n"
-        "- ferma servizio IBWR/IBG\n\n"
+        "- ferma servizio IBWR/IBG (forza kill-switch ON)\n\n"
         "/observer on\n"
-        "- richiede IBWR connesso\n"
+        "- richiede IBWR+IBKR connessi\n"
         "- se IBWR non connesso resta OFF\n\n"
         "/observer off\n"
         "- forza kill switch ON\n"
         "- blocca operativita ordini\n\n"
+        "/observer status\n"
+        "- stato observer + kill-switch\n\n"
         "/help\n"
         "- mostra questo elenco\n\n"
-        "Alias supportati: STATUS, HELP, IBWR/IBG ON/OFF/STATUS, OBSERVER ON/OFF, \\status"
+        "Alias supportati: STATUS, HELP, IBWR/IBG ON/OFF/STATUS, OBSERVER ON/OFF/STATUS, \\status"
     )
 
 
 def _build_status_text(status: dict[str, Any]) -> str:
-    ks = bool(status.get("kill_switch_active"))
-    ibkr_connected = bool(status.get("ibkr_connected"))
-    ibkr_port = status.get("ibkr_port")
+    observer_obj = status.get("observer") if isinstance(status.get("observer"), dict) else {}
+    ibwr_obj = status.get("ibwr") if isinstance(status.get("ibwr"), dict) else {}
+    ibkr_obj = status.get("ibkr") if isinstance(status.get("ibkr"), dict) else {}
+    vm_obj = status.get("vm") if isinstance(status.get("vm"), dict) else {}
+    vm_services = vm_obj.get("services") if isinstance(vm_obj.get("services"), dict) else {}
+    ks = bool(observer_obj.get("kill_switch_active", status.get("kill_switch_active")))
+    observer_state = str(observer_obj.get("state") or ("OFF" if ks else "ON"))
+    observer_reason = str(observer_obj.get("reason") or ("KILL_SWITCH_ACTIVE" if ks else "READY"))
+
+    ibwr_state = str(ibwr_obj.get("service_state") or ("ON" if bool(status.get("ibkr_connected")) else "OFF"))
+    ibwr_reason = str(ibwr_obj.get("reason") or "n/d")
+
+    ibkr_connected = bool(ibkr_obj.get("connected", status.get("ibkr_connected")))
+    ibkr_port = ibkr_obj.get("port", status.get("ibkr_port"))
+
     regime = str(status.get("regime") or "UNKNOWN")
     data_mode = str(status.get("data_mode") or "UNKNOWN")
     hr = status.get("history_readiness") if isinstance(status.get("history_readiness"), dict) else {}
-
-    observer_state = "OFF" if ks else "ON"
-    ibwr_state = "ON" if ibkr_connected else "OFF"
     h_score = hr.get("score_pct")
     h_days = f"{hr.get('days_observed', 0)}/{hr.get('target_days', 0)}"
     h_events = f"{hr.get('events_observed', 0)}/{hr.get('target_events', 0)}"
     h_eta = hr.get("eta_days")
     eta_label = "n/d" if h_eta is None else ("oggi" if int(h_eta) == 0 else f"{int(h_eta)}g")
 
+    def _svc(name: str) -> str:
+        item = vm_services.get(name) if isinstance(vm_services.get(name), dict) else {}
+        return str(item.get("state") or "n/d")
+
+    vm_line = f"api={_svc('api')} nginx={_svc('nginx')} tg-bot={_svc('tg-bot')} ibg={_svc('ibg')}"
+
     return (
         "STATUS\n"
-        f"OBSERVER: {observer_state} (KS={'ON' if ks else 'OFF'})\n"
-        f"IBWR/IBG: {ibwr_state}"
+        f"OBSERVER: {observer_state} (KS={'ON' if ks else 'OFF'}) reason={observer_reason}\n"
+        f"IBWR/IBG: {ibwr_state} reason={ibwr_reason}\n"
+        f"IBKR API: {'ON' if ibkr_connected else 'OFF'}"
         f"{f' port {ibkr_port}' if ibkr_connected and ibkr_port is not None else ''}\n"
+        f"VM: {vm_line}\n"
         f"REGIME: {regime}\n"
         f"DATA_MODE: {data_mode}\n"
         f"READINESS: {h_score if h_score is not None else 'n/d'}% | days {h_days} | events {h_events} | ETA {eta_label}"
@@ -202,10 +223,14 @@ def _handle_command(client: httpx.Client, cfg: BotConfig, chat_id: str, cmd: str
 
     if cmd == "STATUS":
         try:
-            status = _api_json(client, cfg.api_base, "/opz/system/status")
+            status = _api_json(client, cfg.api_base, "/opz/control/status")
             text = _build_status_text(status)
         except Exception as exc:
-            text = f"STATUS ERROR: {type(exc).__name__}: {exc}"
+            try:
+                legacy = _api_json(client, cfg.api_base, "/opz/system/status")
+                text = _build_status_text(legacy)
+            except Exception:
+                text = f"STATUS ERROR: {type(exc).__name__}: {exc}"
         _send_message(client, cfg.token, chat_id, text)
         return
 
@@ -235,6 +260,18 @@ def _handle_command(client: httpx.Client, cfg: BotConfig, chat_id: str, cmd: str
             _send_message(client, cfg.token, chat_id, text)
         except Exception as exc:
             _send_message(client, cfg.token, chat_id, f"IBWR ERROR: {type(exc).__name__}: {exc}")
+        return
+
+    if cmd == "OBSERVER STATUS":
+        try:
+            status = _api_json(client, cfg.api_base, "/opz/control/status")
+            observer = status.get("observer", {}) if isinstance(status, dict) else {}
+            obs_state = observer.get("state", "UNKNOWN")
+            ks = "ON" if bool(observer.get("kill_switch_active")) else "OFF"
+            reason = observer.get("reason", "UNKNOWN")
+            _send_message(client, cfg.token, chat_id, f"OBSERVER STATUS\nstate={obs_state}\nkill_switch={ks}\nreason={reason}")
+        except Exception as exc:
+            _send_message(client, cfg.token, chat_id, f"OBSERVER STATUS ERROR: {type(exc).__name__}: {exc}")
         return
 
     if cmd in {"OBSERVER ON", "OBSERVER OFF"}:

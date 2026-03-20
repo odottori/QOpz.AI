@@ -39,6 +39,8 @@ services:
     environment:
       - OPZ_PROFILE=${OPZ_PROFILE:-paper}
       - OPZ_DATA_MODE=${OPZ_DATA_MODE:-VENDOR_REAL_CHAIN}
+      - CONTROL_API_BASE=http://control-plane:8770
+      - CONTROL_API_TOKEN=${CONTROL_API_TOKEN:-qopz-control-local}
       - IBKR_HOST=ibg          # punta al container IBG sulla qopz-net
       - IBKR_PORT=4004         # socat bridge della imagem IBG
       - IBKR_PORTS=4004,4002,7497,7496,4001
@@ -48,7 +50,6 @@ services:
       - qopz-logs:/app/logs
       - ./data:/app/data
       - ./ops:/app/ops
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - qopz-net
     restart: unless-stopped
@@ -58,6 +59,31 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uvicorn", "api.control_plane:app", "--host", "0.0.0.0", "--port", "8770", "--workers", "1", "--log-level", "info"]
+    environment:
+      - CONTROL_API_TOKEN=${CONTROL_API_TOKEN:-qopz-control-local}
+      - CONTROL_COMPOSE_PROJECT=${COMPOSE_PROJECT_NAME:-qopz}
+      - CONTROL_IBWR_SERVICE=ibg
+      - CONTROL_EVENTS_PATH=/app/data/control/ibwr_events.jsonl
+      - CONTROL_STATE_PATH=/app/data/control/ibwr_state.json
+      - DOCKER_SOCK_PATH=/var/run/docker.sock
+    volumes:
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - qopz-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8770/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
   tg-bot:
     build:
