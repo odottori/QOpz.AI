@@ -1955,6 +1955,11 @@ def opz_ibkr_account() -> IbkrAccountOut:
     from execution.ibkr_connection import get_manager
 
     mgr = get_manager()
+    if not mgr.is_connected:
+        try:
+            mgr.try_connect(timeout=1.5)
+        except Exception:
+            pass
 
     if not mgr.is_connected:
         return _empty_account_response(False, "Non connesso a TWS/Gateway — chiama prima /opz/ibkr/status?try_connect=true")
@@ -1963,6 +1968,14 @@ def opz_ibkr_account() -> IbkrAccountOut:
         ib = mgr._ib
         if ib is None or not ib.isConnected():
             raise RuntimeError("IB instance not available")
+
+        timeout_raw = os.environ.get("IBKR_ACCOUNT_TIMEOUT_SEC", "5")
+        try:
+            account_timeout_sec = max(2.0, float(timeout_raw))
+        except (TypeError, ValueError):
+            account_timeout_sec = 5.0
+        prev_timeout = getattr(ib, "RequestTimeout", None)
+        ib.RequestTimeout = account_timeout_sec
 
         # Account summary: tags IBKR standard
         tags = [
@@ -2025,6 +2038,12 @@ def opz_ibkr_account() -> IbkrAccountOut:
     except Exception as exc:
         logger.warning("IBKR account fetch failed: %s", exc)
         return _empty_account_response(True, f"Connesso ma fetch account fallito: {exc}")
+    finally:
+        try:
+            if "ib" in locals() and ib is not None and "prev_timeout" in locals():
+                ib.RequestTimeout = prev_timeout
+        except Exception:
+            pass
 
 
 @app.get("/opz/regime/current")

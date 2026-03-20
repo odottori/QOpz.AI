@@ -42,6 +42,7 @@ services:
       - IBKR_HOST=ibg          # punta al container IBG sulla qopz-net
       - IBKR_PORT=4004         # socat bridge della imagem IBG
       - IBKR_PORTS=4004,4002,7497,7496,4001
+      - IBKR_ACCOUNT_TIMEOUT_SEC=5
     volumes:
       - qopz-db:/app/db
       - qopz-logs:/app/logs
