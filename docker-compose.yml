@@ -50,9 +50,6 @@ services:
       - ./ops:/app/ops
     networks:
       - qopz-net
-    depends_on:
-      ibg:
-        condition: service_started   # non blocca: API degrada gracefully se IBG non è pronto
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
@@ -82,6 +79,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   nginx:

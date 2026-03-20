@@ -102,7 +102,7 @@ def _normalize_command(text: str) -> str:
     t = (text or "").strip().upper()
     if not t:
         return ""
-    if t.startswith("/"):
+    while t.startswith("/") or t.startswith("\\"):
         t = t[1:]
     t = t.replace("_", " ").replace("-", " ")
     t = " ".join(part for part in t.split() if part)
@@ -140,16 +140,17 @@ def _api_json(client: httpx.Client, api_base: str, path: str, *, method: str = "
 def _build_help_text() -> str:
     return (
         "HELP - COMANDI DISPONIBILI\n\n"
-        "STATUS\n"
+        "/status\n"
         "- stato OBSERVER, IBWR/IBG, API, regime, readiness\n\n"
-        "OBSERVER ON\n"
+        "/observer on\n"
         "- richiede IBWR connesso\n"
         "- se IBWR non connesso resta OFF\n\n"
-        "OBSERVER OFF\n"
+        "/observer off\n"
         "- forza kill switch ON\n"
         "- blocca operativita ordini\n\n"
-        "HELP\n"
-        "- mostra questo elenco"
+        "/help\n"
+        "- mostra questo elenco\n\n"
+        "Alias supportati: STATUS, HELP, OBSERVER ON/OFF, \\status"
     )
 
 
@@ -206,13 +207,27 @@ def _handle_command(client: httpx.Client, cfg: BotConfig, chat_id: str, cmd: str
             )
             state = out.get("observer_state", "OFF")
             reason = out.get("reason", "UNKNOWN")
-            msg = out.get("message", f"OBSERVER {state}")
-            _send_message(client, cfg.token, chat_id, f"{msg}\nreason={reason}")
+            requested = "ON" if action == "on" else "OFF"
+            applied = str(out.get("applied_action", "unknown")).upper()
+            if state != requested:
+                text = (
+                    f"OBSERVER {requested} RICHIESTO MA NON ATTIVO\n"
+                    f"state={state}\n"
+                    f"reason={reason}\n"
+                    f"applied={applied}"
+                )
+            else:
+                text = (
+                    f"OBSERVER {state} ATTIVO\n"
+                    f"reason={reason}\n"
+                    f"applied={applied}"
+                )
+            _send_message(client, cfg.token, chat_id, text)
         except Exception as exc:
             _send_message(client, cfg.token, chat_id, f"OBSERVER ERROR: {type(exc).__name__}: {exc}")
         return
 
-    _send_message(client, cfg.token, chat_id, "Comando non riconosciuto. Scrivi HELP.")
+    _send_message(client, cfg.token, chat_id, "Comando non riconosciuto. Scrivi /help.")
 
 
 def run_loop(cfg: BotConfig, once: bool = False) -> int:
@@ -286,4 +301,3 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

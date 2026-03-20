@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +25,7 @@ class TestTelegramCommandBot(unittest.TestCase):
     def test_normalize_status(self):
         self.assertEqual(bot._normalize_command("STATUS"), "STATUS")
         self.assertEqual(bot._normalize_command("/status"), "STATUS")
+        self.assertEqual(bot._normalize_command("\\status"), "STATUS")
 
     def test_normalize_observer_aliases(self):
         self.assertEqual(bot._normalize_command("observer_on"), "OBSERVER ON")
@@ -51,6 +53,60 @@ class TestTelegramCommandBot(unittest.TestCase):
         self.assertIn("IBWR/IBG: OFF", txt)
         self.assertIn("REGIME: CAUTION", txt)
         self.assertIn("READINESS: 72.5%", txt)
+
+    def test_help_uses_slash_commands(self):
+        txt = bot._build_help_text()
+        self.assertIn("/status", txt)
+        self.assertIn("/observer on", txt)
+        self.assertIn("/observer off", txt)
+        self.assertIn("/help", txt)
+
+    def test_observer_on_blocked_message_is_explicit(self):
+        cfg = bot.BotConfig(
+            token="x",
+            allowed_chat_ids={"1"},
+            api_base="http://api",
+            poll_timeout_sec=30,
+            poll_sleep_sec=1.0,
+            offset_path=Path("offset.txt"),
+        )
+        with (
+            mock.patch.object(
+                bot,
+                "_api_json",
+                return_value={"observer_state": "OFF", "reason": "IBKR_DISCONNECTED", "applied_action": "blocked"},
+            ),
+            mock.patch.object(bot, "_send_message") as send,
+        ):
+            bot._handle_command(object(), cfg, "1", "OBSERVER ON")
+        self.assertTrue(send.called)
+        text = send.call_args.args[3]
+        self.assertIn("OBSERVER ON RICHIESTO MA NON ATTIVO", text)
+        self.assertIn("state=OFF", text)
+        self.assertIn("reason=IBKR_DISCONNECTED", text)
+
+    def test_observer_off_message_reports_active(self):
+        cfg = bot.BotConfig(
+            token="x",
+            allowed_chat_ids={"1"},
+            api_base="http://api",
+            poll_timeout_sec=30,
+            poll_sleep_sec=1.0,
+            offset_path=Path("offset.txt"),
+        )
+        with (
+            mock.patch.object(
+                bot,
+                "_api_json",
+                return_value={"observer_state": "OFF", "reason": "MANUAL_OFF", "applied_action": "activate"},
+            ),
+            mock.patch.object(bot, "_send_message") as send,
+        ):
+            bot._handle_command(object(), cfg, "1", "OBSERVER OFF")
+        self.assertTrue(send.called)
+        text = send.call_args.args[3]
+        self.assertIn("OBSERVER OFF ATTIVO", text)
+        self.assertIn("reason=MANUAL_OFF", text)
 
 
 if __name__ == "__main__":
