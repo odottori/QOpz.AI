@@ -296,10 +296,14 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
     steps["events"] = {"ok": True, "symbols": events_results}
 
     # ── Step 5: Universe scan (tramite API) ───────────────────────────────────
+    scan_regime = str(steps["regime"].get("regime") or "NORMAL").strip().upper()
+    if scan_regime not in {"NORMAL", "CAUTION", "SHOCK"}:
+        scan_regime = "NORMAL"
+
     ok, data = _post_json(api_base, "/opz/universe/scan", {
         "profile": profile,
         "source": "auto",
-        "regime": steps["regime"].get("regime") or "NORMAL",
+        "regime": scan_regime,
         "top_n": 6,
     })
     steps["universe_scan"] = {
