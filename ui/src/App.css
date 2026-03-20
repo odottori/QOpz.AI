@@ -1263,7 +1263,7 @@ select:focus {
 
 .tt-box {
   position: absolute;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   background: var(--p2);
@@ -1299,16 +1299,16 @@ select:focus {
   transition: opacity 150ms ease;
 }
 
-/* Downward-pointing arrow */
+/* Upward-pointing arrow (tooltip below element) */
 .tt-box::after {
   content: "";
   position: absolute;
-  bottom: -5px;
+  top: -5px;
   left: 50%;
   transform: translateX(-50%) rotate(45deg);
   width: 8px;
   height: 8px;
   background: var(--p2);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
 }
