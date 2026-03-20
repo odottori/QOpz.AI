@@ -1514,6 +1514,78 @@ class KillSwitchRequest(BaseModel):
     action: str = Field(..., description="'activate' oppure 'deactivate'")
 
 
+class ObserverSwitchRequest(BaseModel):
+    action: str = Field(..., description="'on' oppure 'off' (alias: yes/no, activate/deactivate)")
+    notify_telegram: bool = Field(default=True, description="Invia conferma su Telegram")
+    telegram_chat_id: Optional[str] = Field(default=None, description="Override chat id telegram")
+    source: str = Field(default="operator_ui")
+
+
+def _load_telegram_cfg() -> dict:
+    cfg_path = ROOT / "config" / "telegram.toml"
+    if not cfg_path.exists():
+        return {}
+    try:
+        import tomllib
+        with open(cfg_path, "rb") as f:
+            data = tomllib.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _telegram_target(chat_id_override: Optional[str] = None) -> tuple[str, str]:
+    cfg = _load_telegram_cfg()
+    tg = cfg.get("telegram", {}) if isinstance(cfg.get("telegram"), dict) else {}
+    token = str(tg.get("bot_token") or os.environ.get("TG_BOT_TOKEN", "")).strip()
+    chat_id = str(chat_id_override or tg.get("chat_id") or os.environ.get("TG_CHAT_ID", "")).strip()
+    return token, chat_id
+
+
+def _send_telegram_text(text: str, chat_id_override: Optional[str] = None) -> tuple[bool, Optional[str]]:
+    token, chat_id = _telegram_target(chat_id_override)
+    if not token or not chat_id:
+        return False, "telegram target missing (bot_token/chat_id)"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        resp = httpx.post(url, data={"chat_id": chat_id, "text": text}, timeout=10.0)
+    except Exception as exc:
+        return False, str(exc)
+
+    if resp.status_code >= 400:
+        return False, f"http {resp.status_code}: {resp.text[:200]}"
+
+    try:
+        payload = resp.json()
+    except ValueError:
+        return True, None
+    if isinstance(payload, dict) and payload.get("ok") is False:
+        return False, str(payload.get("description") or "telegram api error")
+    return True, None
+
+
+def _normalize_observer_action(raw: str) -> str:
+    action = str(raw or "").strip().lower()
+    on_aliases = {"on", "yes", "enable", "enabled", "start", "deactivate", "1"}
+    off_aliases = {"off", "no", "disable", "disabled", "stop", "activate", "0"}
+    if action in on_aliases:
+        return "on"
+    if action in off_aliases:
+        return "off"
+    raise HTTPException(status_code=400, detail="action must be on/off (aliases: yes/no, activate/deactivate)")
+
+
+def _ibkr_connected_for_observer() -> tuple[bool, str]:
+    try:
+        from execution.ibkr_connection import get_manager
+        info = get_manager().connection_info()
+        connected = bool(info.get("connected"))
+        detail = f"ibkr={'CONNECTED' if connected else 'DISCONNECTED'}"
+        return connected, detail
+    except Exception as exc:
+        return False, f"ibkr=DISCONNECTED manager_error={type(exc).__name__}"
+
+
 @app.post("/opz/execution/kill_switch")
 def execution_kill_switch(req: KillSwitchRequest) -> Dict[str, Any]:
     """Attiva o disattiva il kill switch operativo.
@@ -1541,6 +1613,78 @@ def execution_kill_switch(req: KillSwitchRequest) -> Dict[str, Any]:
             ks_path.unlink()
         logger.warning("Kill switch disattivato via API — %s", ts_now)
         return {"ok": True, "kill_switch_active": False, "action": "deactivate", "ts_utc": ts_now, "was_active": removed}
+
+
+@app.post("/opz/execution/observer")
+def execution_observer_switch(req: ObserverSwitchRequest) -> Dict[str, Any]:
+    """
+    OBSERVER ON/OFF command surface with Telegram acknowledgement.
+
+    - OFF -> forza kill switch attivo (trading bloccato)
+    - ON  -> consente sblocco solo se IBKR connesso, altrimenti resta OFF
+    """
+    action = _normalize_observer_action(req.action)
+    ks_path = ROOT / "ops" / "kill_switch.trigger"
+    ks_path.parent.mkdir(parents=True, exist_ok=True)
+    ts_now = datetime.now(timezone.utc).isoformat()
+    ibkr_connected, ibkr_detail = _ibkr_connected_for_observer()
+
+    result_ok = True
+    reason = "OK"
+    applied_action = "noop"
+    observer_state = "OFF"
+
+    if action == "off":
+        ks_path.write_text(
+            json.dumps({"activated_at": ts_now, "source": req.source or "observer_api", "observer": "OFF"}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        applied_action = "activate"
+        observer_state = "OFF"
+        reason = "MANUAL_OFF"
+    else:
+        if not ibkr_connected:
+            if not ks_path.exists():
+                ks_path.write_text(
+                    json.dumps({"activated_at": ts_now, "source": req.source or "observer_api", "observer": "OFF"}, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            applied_action = "blocked"
+            observer_state = "OFF"
+            reason = "IBKR_DISCONNECTED"
+            result_ok = False
+        else:
+            if ks_path.exists():
+                ks_path.unlink()
+            applied_action = "deactivate"
+            observer_state = "ON"
+            reason = "READY"
+
+    kill_switch_active = ks_path.exists()
+    if observer_state == "ON":
+        msg = f"OBSERVER ON | kill_switch=OFF | {ibkr_detail} | ts={ts_now}"
+    else:
+        msg = f"OBSERVER OFF | kill_switch=ON | reason={reason} | {ibkr_detail} | ts={ts_now}"
+
+    telegram_notified = False
+    telegram_error: Optional[str] = None
+    if req.notify_telegram:
+        telegram_notified, telegram_error = _send_telegram_text(msg, req.telegram_chat_id)
+
+    logger.warning("OBSERVER_SWITCH action=%s applied=%s state=%s reason=%s", action, applied_action, observer_state, reason)
+    return {
+        "ok": result_ok,
+        "requested_action": action,
+        "applied_action": applied_action,
+        "observer_state": observer_state,
+        "kill_switch_active": kill_switch_active,
+        "ibkr_connected": ibkr_connected,
+        "reason": reason,
+        "message": msg,
+        "ts_utc": ts_now,
+        "telegram_notified": telegram_notified,
+        "telegram_error": telegram_error,
+    }
 
 
 @app.post("/opz/opportunity/decision")

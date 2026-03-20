@@ -61,6 +61,29 @@ services:
       retries: 3
       start_period: 15s
 
+  tg-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "scripts/telegram_command_bot.py"]
+    environment:
+      - TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
+      - TG_CHAT_ID=${TG_CHAT_ID:-}
+      - TG_CHAT_IDS=${TG_CHAT_IDS:-}
+      - TG_COMMAND_API_BASE=http://api:8765
+      - TG_POLL_TIMEOUT_SEC=30
+      - TG_POLL_SLEEP_SEC=1.0
+      - TG_OFFSET_PATH=/app/data/telegram/offset.txt
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    networks:
+      - qopz-net
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
   nginx:
     build:
       context: .
