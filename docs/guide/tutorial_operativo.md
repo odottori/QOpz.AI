@@ -160,6 +160,33 @@ Se IBKR non è connesso, il sistema usa dati sintetici (watermark **SYNTHETIC** 
 
 ---
 
+## Il tuo percorso paper — dove sei adesso
+
+Il sistema è in modalità paper. Non è un limite — è la fase più importante.
+
+### Prima settimana: manuale
+
+Opera in manuale. Fai il ciclo completo ogni giorno (briefing → regime → scan → anteprima → conferma). L'obiettivo è imparare il flusso, non fare profitto.
+
+### Dalla seconda settimana: Auto-Paper
+
+Quando il ciclo ti è chiaro, attiva **Auto-Paper**. Il sistema opera da solo — scan, valutazione, apertura, chiusura. Il tuo ruolo diventa osservare il **Paper Countdown** nella WAR ROOM:
+
+| Cosa mostra | Perché ti serve |
+|-------------|-----------------|
+| Operazioni chiuse su 50 | Quanto manca alla verifica |
+| Rendimento/rischio, perdita massima | Le metriche convergono? |
+| Regimi attraversati | Hai visto almeno un cambio di mercato? |
+| Stima di quando sarai pronto | Per pianificare il passaggio al vivo |
+
+**Ogni settimana** (10 minuti): guarda il countdown. Se il rapporto rendimento/rischio crolla o la perdita massima sale, è un segnale — non ignorarlo.
+
+**Ogni mese** (1 ora): rivedi le metriche aggregate. Chiediti: *"Se questi fossero soldi veri, sarei sereno?"*
+
+> Per approfondire: leggi il **Capitolo 8 — Il Periodo Paper** nella guida completa.
+
+---
+
 ## Riferimenti rapidi
 
 | Azione | Dove |

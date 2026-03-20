@@ -1,5 +1,5 @@
 # QOpz.AI — Guida Completa
-*Prefazione + Capitoli 0–7 + Appendice A*
+*Prefazione + Capitoli 0–8 + Appendice A*
 
 ---
 
@@ -727,7 +727,7 @@ In regime **SHOCK**, nessuna nuova proposta. La gestione dell'esistente resta at
 
 ### I gate di avanzamento
 
-Passare da MICRO a SMALL non è automatico. Il sistema richiede di dimostrare che ha funzionato — non in teoria, ma su trade reali. I criteri principali: almeno 50 operazioni chiuse, Sharpe out-of-sample ≥ 0.6, drawdown massimo ≤ 15% in qualsiasi finestra temporale, nessuna violazione delle regole operative, e DATA_MODE impostato su dati reali (non sintetici).
+Passare da MICRO a SMALL non è automatico. Il sistema richiede di dimostrare che ha funzionato — non in teoria, ma su operazioni reali. I criteri principali: almeno 50 operazioni chiuse, rapporto rendimento/rischio sopra soglia minima su dati che il sistema non ha mai visto durante la calibrazione, perdita massima mai superiore al 15% del capitale, nessuna violazione delle regole operative, e dati provenienti da fonti di mercato reali (non sintetiche).
 
 Non puoi accelerare questi gate. Servono trade veri su dati veri — è l'unico modo per sapere che il sistema funziona nel tuo contesto specifico, non solo nei backtest. Chi brucia le tappe di solito scopre perché esistono.
 
@@ -741,4 +741,91 @@ Questo è più importante di quanto sembri. La Wheel può durare settimane. Le a
 
 ---
 
-*Il ciclo completo di un trade — dalla catena di opzioni al profitto incassato — è documentato in dettaglio nel capitolo [Il Viaggio di un Trade](trade_lifecycle.md).*
+*Nel prossimo capitolo affrontiamo la domanda più importante: quanto dura il periodo paper, perché non si può accorciare, e cosa fare nel frattempo per arrivare preparati al trading reale.*
+
+---
+
+## Capitolo 8 — Il Periodo Paper
+### Perché i primi mesi sono i più importanti
+
+---
+
+### Non stai aspettando. Stai costruendo.
+
+Quando attivi QOpz.AI per la prima volta, il sistema è in modalità paper — opera su un conto simulato, con denaro virtuale, ma con dati di mercato reali. Nessun euro è a rischio.
+
+La reazione naturale è: *"Quanto dura questa fase? Quando posso passare al vivo?"*
+
+La risposta onesta: **dai tre ai cinque mesi**. E non è un'attesa — è il lavoro più importante che farai con questo sistema.
+
+---
+
+### Perché non si può accorciare
+
+Immagina di lanciare una moneta dieci volte e ottenere otto teste. La moneta è truccata? No. Con dieci lanci, otto teste è perfettamente compatibile con una moneta equilibrata.
+
+Il trading funziona allo stesso modo. Dopo 5 operazioni in profitto potresti pensare che il sistema sia infallibile. Dopo 3 perdite consecutive potresti pensare che sia rotto. In entrambi i casi, **non hai abbastanza dati per sapere nulla**.
+
+Il sistema richiede un minimo di **50 operazioni chiuse** su dati reali prima di sbloccare il dimensionamento ottimale. Con meno di 50 osservazioni:
+
+- Il **rapporto rendimento/rischio** può oscillare tra 0.2 e 3.0 per puro caso
+- La **perdita massima** può essere zero — non hai ancora incontrato il mercato sbagliato
+- La **percentuale di successo** può sembrare 80% e convergere al 55% con più dati
+
+---
+
+### Cosa succede durante il periodo paper
+
+**Le prime due settimane — Familiarizzazione.** Impari il ciclo operativo: briefing, regime, scan, anteprima, conferma, registro. L'obiettivo è fare il ciclo completo senza esitazioni.
+
+**Dal primo al terzo mese — Accumulo.** Ogni operazione chiusa è un dato in più. Il contatore sale. Le metriche oscillano — è normale. La coerenza conta più del profitto.
+
+**Dal terzo al quinto mese — Attraversare un cambio di regime.** Il sistema deve aver operato attraverso almeno un passaggio da mercato tranquillo a mercato volatile (o shock). Fino ad allora, le statistiche descrivono solo condizioni favorevoli — come testare un ombrello col sole.
+
+---
+
+### Due modi di affrontare il periodo paper
+
+**Modalità manuale — la prima settimana è sempre così.** Ogni giorno 15 minuti: briefing, regime, scan, anteprima → conferma. Ritmo: ~4-8 chiusure al mese → 6-12 mesi per 50 operazioni.
+
+**Auto-Paper — dalla seconda settimana, lascialo girare da solo.** Il sistema opera in autonomia 24 ore su 24 nei giorni di mercato. Ritmo: ~12-20 chiusure al mese → 2-3 mesi per 50 operazioni. Le soglie di passaggio restano identiche; il pulsante di arresto funziona sempre.
+
+**Il Paper Countdown** nella WAR ROOM mostra: operazioni chiuse su 50, metriche rispetto alle soglie, regimi attraversati, stima di quando potresti essere pronto. In auto, controllalo una volta alla settimana.
+
+---
+
+### Le tappe verso il trading reale
+
+| Tappa | Cosa significa per te |
+|-------|----------------------|
+| **Operativo in simulazione** | Sistema configurato, conto simulato attivo, ciclo funzionante. Sei qui. |
+| **Coperture validate** | Abbastanza operazioni per testare le strategie di protezione. |
+| **Pronti per il vivo** | 50+ operazioni, rendimento/rischio sopra soglia, perdita massima sotto il 15%, zero violazioni. |
+| **Trading reale attivo** | Dimensionamento ottimale sbloccato. Capitale reale. |
+
+Non puoi saltare una tappa. Non puoi forzare il passaggio.
+
+---
+
+### Le domande che ti farai
+
+**"Il dimensionamento ottimale è bloccato — è un problema?"**
+No. Il sistema usa un dimensionamento conservativo (1-2% per operazione) finché non ha abbastanza dati. Non stai perdendo — stai evitando di rischiare troppo.
+
+**"Le metriche sembrano troppo buone."**
+Con poche operazioni possono sembrare eccezionali per caso. Finché i dati non sono reali e verificati con almeno 50 chiusure, ogni metrica è provvisoria.
+
+**"E se dopo 5 mesi non passo la verifica?"**
+Allora il sistema ha fatto il suo lavoro. Meglio 5 mesi di simulazione che 5 mesi di capitale bruciato.
+
+---
+
+### Il giorno in cui la porta si apre
+
+Quando raggiungi tutti i criteri — 50+ operazioni, rendimento/rischio sopra soglia, perdita massima sotto il 15%, nessuna violazione — il sistema ti notifica e ti chiede una conferma esplicita. Hai tre scelte: passare al vivo, restare in simulazione, o ripartire con parametri diversi.
+
+La scelta è tua. Il sistema non ha fretta. I mercati ci saranno anche domani.
+
+---
+
+*Il ciclo completo di un'operazione — dalla catena di opzioni al profitto incassato — è documentato nel capitolo [Il Viaggio di un Trade](trade_lifecycle.md).*

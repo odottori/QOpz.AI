@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QOpz.AI — Il Periodo Paper</title>
+<style>
+  :root {
+    --bg:       #0d0d14;
+    --card:     #13131f;
+    --card2:    #1a1a2a;
+    --border:   #2a2a40;
+    --orange:   #ff6d00;
+    --orange2:  #ff8f00;
+    --green:    #00c853;
+    --yellow:   #ffd740;
+    --red:      #ff1744;
+    --blue:     #448aff;
+    --teal:     #00bcd4;
+    --text:     #e8e8f0;
+    --muted:    #8888aa;
+    --radius:   12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(13,13,20,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .header-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--orange);
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .progress-wrap {
+    flex: 1;
+    max-width: 480px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--orange), var(--orange2));
+    border-radius: 2px;
+    transition: width 0.5s cubic-bezier(.4,0,.2,1);
+  }
+  .step-counter {
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 60px;
+    text-align: right;
+  }
+  .step-counter span { color: var(--text); font-weight: 600; }
+
+  /* ── TOC panel (right) ── */
+  .toc-panel {
+    position: fixed;
+    right: 0;
+    top: 56px;
+    bottom: 64px;
+    width: 190px;
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 50;
+  }
+  .toc-header {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .toc-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 14px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12px;
+    border-left: 2px solid transparent;
+    transition: all 0.18s;
+    user-select: none;
+  }
+  .toc-item:hover { color: var(--text); background: var(--card2); }
+  .toc-item.active {
+    color: var(--orange);
+    border-left-color: var(--orange);
+    background: var(--card2);
+    font-weight: 600;
+  }
+  .toc-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .toc-item.active .toc-dot { background: var(--orange); }
+
+  /* ── Slides viewport ── */
+  .viewport {
+    margin: 56px 190px 64px 0;
+    height: calc(100vh - 56px - 64px);
+    position: relative;
+    overflow: hidden;
+  }
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 40px 60px;
+    opacity: 0;
+    transform: translateX(40px);
+    pointer-events: none;
+    transition: opacity 0.45s, transform 0.45s;
+    overflow-y: auto;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  /* ── Footer nav ── */
+  footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 190px;
+    height: 64px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    z-index: 100;
+  }
+  .nav-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .nav-btn:hover { border-color: var(--orange); color: var(--orange); }
+  .nav-btn:disabled { opacity: 0.3; pointer-events: none; }
+  .key-hint {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Slide content styles ── */
+  .slide h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--orange);
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+  .slide h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+  .slide h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--teal);
+    margin-bottom: 10px;
+    margin-top: 16px;
+  }
+  .slide p {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text);
+    margin-bottom: 12px;
+    max-width: 680px;
+  }
+  .slide .muted { color: var(--muted); }
+  .slide .accent { color: var(--orange); font-weight: 600; }
+  .slide em { color: var(--muted); font-style: italic; }
+  .slide strong { color: var(--text); font-weight: 600; }
+
+  /* big number callouts */
+  .big-num {
+    display: flex;
+    gap: 40px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+  }
+  .big-num-item {
+    text-align: center;
+  }
+  .big-num-item .num {
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .big-num-item .label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 6px;
+  }
+
+  /* cards grid */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .card-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card-item h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+  .card-item p {
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 0;
+  }
+
+  /* timeline */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 16px 0;
+    position: relative;
+    padding-left: 24px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: linear-gradient(180deg, var(--orange), var(--teal), var(--green));
+  }
+  .tl-item {
+    position: relative;
+    padding: 12px 0 12px 20px;
+  }
+  .tl-item::before {
+    content: '';
+    position: absolute;
+    left: -21px;
+    top: 18px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid var(--orange);
+    background: var(--bg);
+  }
+  .tl-item:nth-child(2)::before { border-color: var(--teal); }
+  .tl-item:nth-child(3)::before { border-color: var(--green); }
+  .tl-item .tl-period {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--orange);
+    margin-bottom: 4px;
+  }
+  .tl-item:nth-child(2) .tl-period { color: var(--teal); }
+  .tl-item:nth-child(3) .tl-period { color: var(--green); }
+  .tl-item .tl-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .tl-item .tl-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* milestone table */
+  .ms-table {
+    width: 100%;
+    max-width: 680px;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  .ms-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ms-table td {
+    padding: 10px 12px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .ms-table .ms-name {
+    font-weight: 700;
+    color: var(--orange);
+    white-space: nowrap;
+  }
+  .ms-table .ms-here {
+    background: rgba(255,109,0,0.08);
+  }
+
+  /* FAQ */
+  .faq {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 12px 0;
+  }
+  .faq-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .faq-q {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--yellow);
+    margin-bottom: 6px;
+  }
+  .faq-a {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.65;
+  }
+
+  /* bullet list */
+  .bullet-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+  }
+  .bullet-list li {
+    padding: 4px 0 4px 20px;
+    position: relative;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .bullet-list li::before {
+    content: '›';
+    position: absolute;
+    left: 4px;
+    color: var(--orange);
+    font-weight: 700;
+  }
+
+  /* checklist */
+  .checklist {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0;
+  }
+  .checklist li {
+    padding: 6px 0 6px 28px;
+    position: relative;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .checklist li::before {
+    content: '☐';
+    position: absolute;
+    left: 4px;
+    color: var(--teal);
+    font-size: 15px;
+  }
+
+  /* quote */
+  .quote-block {
+    border-left: 3px solid var(--orange);
+    padding: 12px 20px;
+    margin: 16px 0;
+    background: rgba(255,109,0,0.04);
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .quote-block p {
+    font-style: italic;
+    color: var(--muted);
+    font-size: 15px;
+    margin: 0;
+  }
+
+  /* responsive */
+  @media (max-width: 900px) {
+    .toc-panel { display: none; }
+    .viewport { margin-right: 0; }
+    footer { right: 0; }
+    .slide { padding: 28px 24px; }
+    .big-num { gap: 24px; }
+    .big-num-item .num { font-size: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-title">Il Periodo Paper</div>
+  <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+  <div class="step-counter"><span id="curStep">1</span> / <span id="totSteps">9</span></div>
+</header>
+
+<!-- ── TOC ───────────────────────────────────────────────────────── -->
+<div class="toc-panel" id="toc"></div>
+
+<!-- ── Slides ────────────────────────────────────────────────────── -->
+<div class="viewport">
+
+  <!-- SLIDE 1 — Title -->
+  <div class="slide" data-title="Intro">
+    <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;">Capitolo 8</p>
+    <h1>Il Periodo Paper</h1>
+    <h2>Perché i primi mesi sono i più importanti</h2>
+    <p style="margin-top:24px;max-width:560px;">
+      Quando attivi QOpz.AI per la prima volta, il sistema opera su un conto simulato — denaro virtuale, dati di mercato reali. Nessun euro è a rischio.
+    </p>
+    <p><em>"Quanto dura questa fase?"</em></p>
+    <div class="big-num" style="margin-top:20px;">
+      <div class="big-num-item">
+        <div class="num" style="color:var(--orange)">3–5</div>
+        <div class="label">mesi</div>
+      </div>
+      <div class="big-num-item">
+        <div class="num" style="color:var(--teal)">50+</div>
+        <div class="label">trade chiusi</div>
+      </div>
+      <div class="big-num-item">
+        <div class="num" style="color:var(--green)">≥1</div>
+        <div class="label">cambio regime</div>
+      </div>
+    </div>
+    <p class="muted" style="font-size:13px;margin-top:16px;">Non è un'attesa. È il lavoro più importante che farai con questo sistema.</p>
+  </div>
+
+  <!-- SLIDE 2 — Perché non si accorcia -->
+  <div class="slide" data-title="Perché non si accorcia">
+    <h1>Perché non si può accorciare</h1>
+    <p>Lancia una moneta 10 volte e ottieni 8 teste. La moneta è truccata? <strong>No.</strong> Con 10 lanci, 8 teste è compatibile con una moneta equilibrata.</p>
+    <p>Il trading funziona allo stesso modo. Con pochi trade, <strong>non sai nulla</strong>.</p>
+    <h3>Con meno di 50 osservazioni:</h3>
+    <ul class="bullet-list">
+      <li>Lo <strong>Sharpe ratio</strong> può oscillare tra 0.2 e 3.0 per puro caso</li>
+      <li>Il <strong>drawdown massimo</strong> può essere zero — non hai ancora incontrato il mercato sbagliato</li>
+      <li>Il <strong>win rate</strong> può sembrare 80% e convergere al 55% con più dati</li>
+    </ul>
+    <div class="quote-block" style="margin-top:20px;">
+      <p>Un chirurgo non opera dopo aver letto un libro. Un pilota non vola dopo un simulatore. Tu non rischi capitale vero dopo cinque trade simulati.</p>
+    </div>
+  </div>
+
+  <!-- SLIDE 3 — La timeline -->
+  <div class="slide" data-title="Le tre fasi">
+    <h1>Cosa succede durante il periodo paper</h1>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-period">Settimane 1–2 — Familiarizzazione</div>
+        <div class="tl-title">Imparare il ciclo operativo</div>
+        <div class="tl-desc">Briefing → Regime → Scan → Anteprima → Conferma → Registro. L'obiettivo non è fare operazioni perfette — è fare il ciclo completo senza esitazioni.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-period">Mesi 1–3 — Accumulo</div>
+        <div class="tl-title">Costruire la base statistica</div>
+        <div class="tl-desc">Ogni operazione chiusa è un dato in più. Il contatore sale. Le metriche oscillano — è normale. La coerenza conta più del profitto.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-period">Mesi 3–5 — Attraversare un regime</div>
+        <div class="tl-title">Il test che non puoi controllare</div>
+        <div class="tl-desc">Il sistema deve aver operato attraverso almeno un cambio di regime reale. È come testare un ombrello — devi aspettare la pioggia.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4 — Le tappe -->
+  <div class="slide" data-title="Le tappe">
+    <h1>Le tappe verso il trading reale</h1>
+    <p>Ogni tappa rappresenta un livello di maturazione — dall'installazione al capitale reale.</p>
+    <table class="ms-table">
+      <thead><tr><th>Tappa</th><th>Cosa significa per te</th></tr></thead>
+      <tbody>
+        <tr class="ms-here"><td class="ms-name">Operativo in simulazione</td><td>Sistema configurato, conto simulato attivo, ciclo funzionante. <strong>Sei qui.</strong></td></tr>
+        <tr><td class="ms-name">Coperture validate</td><td>Abbastanza operazioni per validare le strategie di protezione.</td></tr>
+        <tr><td class="ms-name">Pronti per il vivo</td><td>Verifica finale. 50+ operazioni chiuse, rendimento/rischio sopra soglia, perdita massima sotto il 15%, zero violazioni.</td></tr>
+        <tr><td class="ms-name">Trading reale attivo</td><td>Dimensionamento ottimale sbloccato. Capitale reale.</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:13px;margin-top:12px;">Non puoi saltare una tappa. Non puoi forzare il passaggio. Il sistema ti protegge dalla fretta.</p>
+  </div>
+
+  <!-- SLIDE 5 — Scenari temporali -->
+  <div class="slide" data-title="Scenari temporali">
+    <h1>Quanto ci vuole — i numeri</h1>
+    <p>Dipende da quante posizioni gestisci in parallelo.</p>
+    <div class="cards">
+      <div class="card-item">
+        <h4>Conservativo</h4>
+        <p>2–3 posizioni parallele<br>Scadenza media 45 giorni<br>~4–5 chiusure/mese</p>
+        <p style="color:var(--orange);font-weight:700;font-size:20px;margin-top:8px;">10–12 mesi</p>
+      </div>
+      <div class="card-item">
+        <h4>Moderato</h4>
+        <p>4–6 posizioni parallele<br>Scadenza media 30 giorni<br>~8–12 chiusure/mese</p>
+        <p style="color:var(--teal);font-weight:700;font-size:20px;margin-top:8px;">4–6 mesi</p>
+      </div>
+      <div class="card-item">
+        <h4>Aggressivo</h4>
+        <p>8–10 posizioni parallele<br>Scadenza media 21 giorni<br>~15–20 chiusure/mese</p>
+        <p style="color:var(--green);font-weight:700;font-size:20px;margin-top:8px;">2.5–3 mesi</p>
+      </div>
+    </div>
+    <p class="muted" style="font-size:13px;">Con un capitale iniziale di €1–2k e scadenze tra 14 e 60 giorni, lo scenario moderato è il più realistico.</p>
+  </div>
+
+  <!-- SLIDE 6 — Routine operativa -->
+  <div class="slide" data-title="Routine operativa">
+    <h1>Cosa fare nel frattempo</h1>
+    <p>Il periodo paper non è tempo morto. È apprendimento attivo.</p>
+    <div class="cards" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="card-item" style="border-top:3px solid var(--orange);">
+        <h4>Ogni giorno — 15 min</h4>
+        <ul class="checklist">
+          <li>Ascolta il briefing</li>
+          <li>Controlla il regime</li>
+          <li>Esegui lo scan</li>
+          <li>Anteprima → Conferma se ok</li>
+        </ul>
+      </div>
+      <div class="card-item" style="border-top:3px solid var(--teal);">
+        <h4>Ogni settimana — 30 min</h4>
+        <ul class="checklist">
+          <li>Equity curve: trend?</li>
+          <li>Operazioni chiuse: quante?</li>
+          <li>Registro operazioni: pattern?</li>
+        </ul>
+      </div>
+      <div class="card-item" style="border-top:3px solid var(--green);">
+        <h4>Ogni mese — 1 ora</h4>
+        <ul class="checklist">
+          <li>Rendimento/rischio, successo, perdita max</li>
+          <li>Confronto mese precedente</li>
+          <li>"Soldi veri — sarei sereno?"</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 7 — Auto-Paper Mode -->
+  <div class="slide" data-title="Auto-Paper">
+    <h1>Auto-Paper Mode</h1>
+    <p>Dopo la prima settimana in manuale, puoi lasciare che il sistema operi da solo.</p>
+    <div class="cards" style="grid-template-columns: 1fr 1fr; margin-top:16px;">
+      <div class="card-item" style="border-top:3px solid var(--muted);">
+        <h4 style="color:var(--muted);">Manuale</h4>
+        <ul class="bullet-list">
+          <li>Tu confermi ogni operazione</li>
+          <li>~4-8 chiusure/mese</li>
+          <li>50 operazioni in 6-12 mesi</li>
+          <li>Bias umano nei dati</li>
+        </ul>
+      </div>
+      <div class="card-item" style="border-top:3px solid var(--green);">
+        <h4 style="color:var(--green);">Auto-Paper</h4>
+        <ul class="bullet-list">
+          <li>Il sistema auto-conferma</li>
+          <li>~12-20 chiusure/mese</li>
+          <li>50 operazioni in 2-3 mesi</li>
+          <li>Zero bias, regole pure</li>
+        </ul>
+      </div>
+    </div>
+    <h3 style="margin-top:20px;">Paper Countdown — WAR ROOM</h3>
+    <div class="card-item" style="background:var(--card2);font-family:monospace;font-size:13px;line-height:1.8;margin-top:8px;">
+      <span style="color:var(--orange);font-weight:700;">PAPER COUNTDOWN</span> <span style="color:var(--green);">AUTO ●</span><br>
+      <span style="color:var(--orange);">████████████████</span><span style="color:var(--border);">░░░░░░░░░░</span> <strong>32 / 50</strong> operazioni<br>
+      Rendimento/rischio <span style="color:var(--green);">1.12</span> (sopra soglia ✓) &nbsp; Perdita max <span style="color:var(--green);">-8.2%</span> (sotto il 15% ✓)<br>
+      Regimi: Tranquillo <span style="color:var(--green);">✓</span> &nbsp; Volatile <span style="color:var(--green);">✓</span> &nbsp; Shock <span style="color:var(--muted);">○</span><br>
+      Ritmo ~9/mese &nbsp; ETA <span style="color:var(--teal);">fine maggio 2026</span>
+    </div>
+    <p class="muted" style="font-size:13px;margin-top:12px;">Il tuo ruolo: controllare il countdown una volta alla settimana. Non per decidere — per capire.</p>
+  </div>
+
+  <!-- SLIDE 8 — FAQ (era 7) -->
+  <div class="slide" data-title="FAQ">
+    <h1>Le domande che ti farai</h1>
+    <div class="faq">
+      <div class="faq-item">
+        <div class="faq-q">"Il dimensionamento ottimale è bloccato — è un problema?"</div>
+        <div class="faq-a">No. È una protezione. Il sistema usa un dimensionamento conservativo (1–2% per operazione) finché non ha dati sufficienti. Non stai perdendo — stai evitando di rischiare troppo.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">"Le metriche sembrano troppo buone. Mi posso fidare?"</div>
+        <div class="faq-a">No. Con poche operazioni possono sembrare eccezionali per caso. Finché i dati non sono reali e verificati con almeno 50 chiusure, ogni metrica è provvisoria.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">"Posso accelerare facendo più operazioni?"</div>
+        <div class="faq-a">Puoi avere più posizioni parallele, ma non sacrificare qualità per quantità. Operazioni mediocri inquinano le statistiche — e le statistiche decidono se sei pronto per il vivo.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">"E se dopo 5 mesi non passo la verifica?"</div>
+        <div class="faq-a">Allora il sistema ha fatto il suo lavoro. Meglio 5 mesi di simulazione buttati che 5 mesi di capitale bruciato.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">"Posso attivare Auto-Paper e dimenticarmi?"</div>
+        <div class="faq-a">Quasi. Il sistema gira da solo, ma controlla il countdown almeno una volta alla settimana. Se il rapporto rendimento/rischio crolla o la perdita massima sale, è un segnale importante. Automatico non significa "ignora" — significa "osserva senza interferire".</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 8 — Chiusura -->
+  <div class="slide" data-title="La porta si apre">
+    <h1>Il giorno in cui la porta si apre</h1>
+    <p>Quando raggiungi tutti i criteri — 50+ operazioni chiuse, rendimento/rischio sopra soglia, perdita massima sotto il 15%, nessuna violazione — il sistema ti notifica.</p>
+    <h3>A quel punto hai tre scelte:</h3>
+    <div class="cards" style="margin-top:12px;">
+      <div class="card-item" style="border-left:3px solid var(--green);">
+        <h4 style="color:var(--green);">1 — Passare al vivo</h4>
+        <p>Il sistema si riconfigura su dati reali con dimensionamento ottimale.</p>
+      </div>
+      <div class="card-item" style="border-left:3px solid var(--teal);">
+        <h4 style="color:var(--teal);">2 — Restare in paper</h4>
+        <p>Se non ti senti pronto, nessuno ti obbliga.</p>
+      </div>
+      <div class="card-item" style="border-left:3px solid var(--yellow);">
+        <h4 style="color:var(--yellow);">3 — Ripartire</h4>
+        <p>Nuova serie di test con parametri diversi.</p>
+      </div>
+    </div>
+    <div class="quote-block" style="margin-top:24px;">
+      <p>La scelta è tua. Il sistema non ha fretta. I mercati ci saranno anche domani.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Footer ────────────────────────────────────────────────────── -->
+<footer>
+  <button class="nav-btn" id="btnPrev" disabled>‹ Indietro</button>
+  <span class="key-hint">← → oppure swipe per navigare</span>
+  <button class="nav-btn" id="btnNext">Avanti ›</button>
+</footer>
+
+<script>
+(function(){
+  const slides = document.querySelectorAll('.slide');
+  const total  = slides.length;
+  let cur = 0;
+
+  const tocPanel = document.getElementById('toc');
+  const bar      = document.getElementById('progressBar');
+  const curEl    = document.getElementById('curStep');
+  const totEl    = document.getElementById('totSteps');
+  const btnPrev  = document.getElementById('btnPrev');
+  const btnNext  = document.getElementById('btnNext');
+
+  totEl.textContent = total;
+
+  // Build TOC
+  const tocHdr = document.createElement('div');
+  tocHdr.className = 'toc-header';
+  tocHdr.textContent = 'Indice';
+  tocPanel.appendChild(tocHdr);
+  slides.forEach((s,i) => {
+    const item = document.createElement('div');
+    item.className = 'toc-item';
+    item.innerHTML = `<span class="toc-dot"></span>${s.dataset.title}`;
+    item.addEventListener('click', () => goTo(i));
+    tocPanel.appendChild(item);
+  });
+
+  function goTo(n) {
+    if (n < 0 || n >= total) return;
+    slides[cur].classList.remove('active');
+    cur = n;
+    slides[cur].classList.add('active');
+    bar.style.width = ((cur+1)/total*100) + '%';
+    curEl.textContent = cur + 1;
+    btnPrev.disabled = cur === 0;
+    btnNext.disabled = cur === total - 1;
+    // update toc
+    tocPanel.querySelectorAll('.toc-item').forEach((t,i) => {
+      t.classList.toggle('active', i === cur);
+    });
+  }
+
+  goTo(0);
+
+  btnPrev.addEventListener('click', () => goTo(cur - 1));
+  btnNext.addEventListener('click', () => goTo(cur + 1));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goTo(cur + 1); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); goTo(cur - 1); }
+  });
+
+  // Touch swipe
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.changedTouches[0].clientX; });
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 50) goTo(cur + (dx < 0 ? 1 : -1));
+  });
+})();
+</script>
+</body>
+</html>

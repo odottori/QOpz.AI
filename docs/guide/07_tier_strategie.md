@@ -75,4 +75,4 @@ Questo è più importante di quanto sembri. La Wheel può durare settimane. Le a
 
 ---
 
-*Nel prossimo capitolo vediamo come leggere la WAR ROOM — il pannello operativo che raccoglie in un unico posto tutto quello che serve per decidere.*
+*Nel prossimo capitolo affrontiamo la domanda più importante: quanto dura il periodo paper, perché non si può accorciare, e cosa fare nel frattempo per arrivare preparati al trading reale.*
