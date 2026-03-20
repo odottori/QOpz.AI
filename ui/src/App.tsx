@@ -375,6 +375,125 @@ const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 /** Profilo attivo — unico punto di modifica per dev/paper/live */
 const ACTIVE_PROFILE = (import.meta.env.VITE_PROFILE as string | undefined) ?? "paper";
 
+// ── Tooltip dictionary (30+ voci) ─────────────────────────────────────────
+const TOOLTIPS: Record<string, string> = {
+  // Topbar
+  regime_normal: "Il mercato è stabile. Il sistema può operare a piena capacità con sizing al 100%.",
+  regime_caution: "Il mercato è in tensione. Sizing ridotto al 50%, solo spread stretti e filtro direzionale attivo.",
+  regime_shock: "Evento di mercato estremo. Tutti i nuovi trade sono bloccati. Sizing 0%.",
+  regime_offline: "Stato regime non disponibile. Il sistema non ha ricevuto dati recenti dal classificatore.",
+  ibkr_connected: "Connesso a Interactive Brokers. I dati di mercato e le opzioni chain arrivano in tempo reale.",
+  ibkr_disconnected: "Non connesso a Interactive Brokers. Il sistema usa dati storici da yfinance come alternativa.",
+  data_mode_synthetic: "I dati usati sono sintetici (simulati). I risultati non sono reali e Kelly è disabilitato.",
+  data_mode_real: "I dati provengono da fonti reali. Kelly può essere abilitato se hai almeno 50 operazioni chiuse.",
+  stale: "Alcuni aggiornamenti non sono riusciti. I dati mostrati potrebbero non essere aggiornati.",
+
+  // Metriche principali
+  trades: "Numero totale di operazioni registrate nel journal. Ogni trade chiuso aumenta questo contatore.",
+  sharpe: "Rapporto tra rendimento medio e rischio. Sopra 0.6 il sistema considera i risultati sufficienti per passare al trading reale.",
+  max_dd: "La perdita massima dal picco del portafoglio. Deve restare sotto il 15% per superare la verifica finale.",
+  win_rate: "Percentuale di operazioni chiuse in profitto. Sopra il 50% indica una strategia redditizia.",
+  profit_factor: "Rapporto tra profitti totali e perdite totali. Sopra 1.0 significa che guadagni più di quanto perdi.",
+  compliance: "Numero di violazioni delle regole operative (es. ordini fuori finestra, sizing eccessivo).",
+  tier: "Livello operativo attuale basato sul capitale disponibile. Determina quali strategie sono accessibili.",
+
+  // Kelly
+  kelly_sizing: "Formula che calcola la percentuale ottimale del capitale da rischiare per operazione. Bloccato finché non hai 50 operazioni su dati reali.",
+  kelly_half: "Dimensionamento Half-Kelly: metà del valore teorico ottimale, per ridurre la volatilità del portafoglio.",
+  avg_slippage: "Differenza media tra il prezzo atteso e quello eseguito, in tick. Più basso è meglio.",
+
+  // Gate
+  go_nogo: "Verifica complessiva che determina se il sistema è pronto per avanzare alla fase successiva.",
+  f6_t1: "Gate che verifica il completamento accettabile della pipeline di accettazione delle operazioni.",
+  f6_t2: "Gate che verifica la completezza del journal di trading. Tutti i campi obbligatori devono essere compilati.",
+  f6_t2_ratio: "Percentuale di completezza del journal: quanti campi obbligatori sono stati compilati correttamente.",
+
+  // Equity & Drawdown
+  equity_curve: "L'andamento del valore del portafoglio nel tempo. Una curva crescente indica una strategia profittevole.",
+  drawdown_gauge: "Indicatore visivo della perdita massima attuale rispetto al limite operativo del 20%.",
+
+  // History Readiness
+  history_readiness: "Verifica se il sistema ha accumulato abbastanza dati storici per essere certificato per il trading reale.",
+  history_window: "Finestra temporale analizzata per la verifica di idoneità, espressa in giorni.",
+  history_days: "Giorni di dati effettivamente coperti rispetto all'obiettivo richiesto dal sistema.",
+  history_events: "Numero di eventi registrati (snapshot equity, trade, decisioni) rispetto all'obiettivo.",
+  history_quality: "Completezza del journal: percentuale di campi obbligatori compilati correttamente.",
+  history_violations: "Numero di violazioni delle regole operative nella finestra analizzata. Zero è l'obiettivo.",
+  history_eta: "Stima del tempo mancante per raggiungere il numero di dati sufficiente per la certificazione.",
+
+  // Paper countdown
+  paper_countdown: "Operazioni chiuse su 50 richieste. Raggiunte 50 su dati reali, il sistema verifica se sei pronto per il trading reale.",
+
+  // Universe Scanner
+  score_composito: "Punteggio da 0 a 1 basato su 4 pilastri: liquidità, timing, struttura e allineamento al regime.",
+  ivr: "Rango di volatilità implicita: percentile rispetto all'ultimo anno. Sopra 20 il premio venduto è interessante.",
+  oi: "Open Interest: numero di contratti aperti. Misura la liquidità dell'opzione sul mercato.",
+  dte: "Giorni alla scadenza dell'opzione. Il sistema accetta solo opzioni con scadenza tra 14 e 60 giorni.",
+  spread_pct: "Costo dello spread denaro/lettera in percentuale del prezzo. Più basso significa meno costoso da eseguire.",
+  source_api: "Il dato proviene direttamente dall'API di Interactive Brokers (qualità alta).",
+  source_ocr: "Il dato è stato estratto tramite riconoscimento ottico da uno screenshot di TWS (qualità media).",
+  source_mixed: "Il dato combina fonti API e OCR. Verificare la coerenza prima di operare.",
+  source_none: "Nessuna fonte disponibile per questo simbolo. Il dato non è affidabile.",
+
+  // Opportunity Scanner
+  score_opp: "Punteggio composito 0–100 basato su 4 pilastri. Sopra 75 il candidato è considerato di alta qualità.",
+  ivz_30: "Z-score della volatilità implicita a 30 giorni: quanto è sopra o sotto la media storica.",
+  em_pct: "Expected Move: variazione percentuale attesa dal mercato entro la scadenza dell'opzione.",
+  vol_edge: "Vantaggio di volatilità: misura quanto la volatilità implicita supera quella realizzata.",
+  liquidity_score: "Punteggio di liquidità basato su Open Interest, volume e spread denaro/lettera.",
+  risk_reward: "Rapporto tra premio incassato e perdita massima possibile. Più alto è, meglio è.",
+  regime_align: "Misura quanto la strategia si adatta al regime di mercato corrente (NORMAL/CAUTION/SHOCK).",
+  events_flag: "Segnale di eventi societari imminenti (earnings, dividendi) che aumentano il rischio.",
+
+  // Regime Matrix
+  regime_matrix_sizing: "Moltiplicatore applicato al sizing calcolato da Kelly in base al regime di mercato corrente.",
+  regime_matrix_hedge: "Indica se la copertura del portafoglio è attiva, monitorata o disattivata.",
+
+  // Wheel states
+  state_idle: "Nessuna posizione aperta per questo sottostante.",
+  state_open_csp: "Cash Secured Put aperta: hai venduto il diritto di comprare azioni a un prezzo prefissato.",
+  state_assigned: "La Put è stata esercitata: hai acquistato le azioni al prezzo dello strike.",
+  state_open_cc: "Covered Call aperta: hai venduto il diritto di acquistare le azioni che già possiedi.",
+  state_closed: "Ciclo completato: tutte le posizioni sono state chiuse.",
+
+  // Pipeline
+  pipe_data: "Raccolta dati di mercato da fonti esterne (yfinance, IBKR, FRED).",
+  pipe_ivr: "Calcolo del rango di volatilità implicita per ogni sottostante del portafoglio.",
+  pipe_regime: "Classificazione del regime di mercato corrente (NORMAL, CAUTION o SHOCK).",
+  pipe_score: "Calcolo del punteggio composito per i candidati all'operazione.",
+  pipe_kelly: "Calcolo del dimensionamento ottimale tramite la formula di Kelly. Richiede dati reali e 50 trade.",
+};
+
+// ── Tooltip component ──────────────────────────────────────────────────────
+function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [open]);
+
+  if (!text) return <>{children}</>;
+
+  return (
+    <span
+      ref={wrapRef}
+      className={`tt-wrap${open ? " tt-open" : ""}`}
+      onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+    >
+      {children}
+      <span className="tt-box">{text}</span>
+    </span>
+  );
+}
+
 function fmtPct(v: number | null): string {
   if (v === null) return "-";
   return `${(v * 100).toFixed(2)}%`;
@@ -1763,19 +1882,25 @@ export default function App() {
       <header className="topbar">
         <div className="logo">QuantOPTION<span className="logo-ai">.AI</span></div>
         <div className="topbar-center">
-          <span className={`regime-pill ${regimeView.cls}`}>REGIME: {regimeView.text}</span>
+          <Tooltip text={TOOLTIPS[`regime_${regimeView.text.toLowerCase()}`] ?? ""}>
+            <span className={`regime-pill ${regimeView.cls}`}>REGIME: {regimeView.text}</span>
+          </Tooltip>
           {apiOnline && <span className="top-mini">XGBoost: {(stateObj as any)?.model_scores?.xgboost ?? "—"}</span>}
           {apiOnline && <span className="top-mini">HMM P(shock): {(stateObj as any)?.model_scores?.hmm_p_shock ?? "—"}</span>}
           <span className="top-mini">Sizing: {regimeView.text === "NORMAL" ? "100%" : regimeView.text === "CAUTION" ? "50%" : regimeView.text === "SHOCK" ? "0%" : "—"}</span>
         </div>
         <div className="topbar-right">
           {fetchErrors.size > 0 && (
-            <span style={{ color: "#f97316", fontSize: "0.7rem" }} title={`Fetch falliti: ${Array.from(fetchErrors).join(", ")}`}>
-              ⚠ {fetchErrors.size} stale
-            </span>
+            <Tooltip text={TOOLTIPS.stale}>
+              <span style={{ color: "#f97316", fontSize: "0.7rem" }} title={`Fetch falliti: ${Array.from(fetchErrors).join(", ")}`}>
+                ⚠ {fetchErrors.size} stale
+              </span>
+            </Tooltip>
           )}
           <span className="clock">{clockText}</span>
-          <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API LIVE" : "API DOWN"}</span>
+          <Tooltip text={apiOnline ? TOOLTIPS.ibkr_connected : TOOLTIPS.ibkr_disconnected}>
+            <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API LIVE" : "API DOWN"}</span>
+          </Tooltip>
           <button className="btn btn-primary" onClick={refreshAll} disabled={busy}>{busy ? "REFRESHING" : "REFRESH"}</button>
           <a className="btn btn-ghost" href={`${API_BASE}/guide`} target="_blank" rel="noreferrer">GUIDA</a>
           <a className="btn btn-ghost" href={`${API_BASE}/health`} target="_blank" rel="noreferrer">API /HEALTH</a>
@@ -1826,11 +1951,11 @@ export default function App() {
           </div>
         </aside><section className="centerpane">
           <div className="metrics-row">
-            <div className="metric-box"><div className="metric-label">TRADES</div><div className="metric-val">{paperSummary?.trades ?? "-"}</div></div>
-            <div className="metric-box"><div className="metric-label">SHARPE</div><div className="metric-val">{fmtNum(paperSummary?.sharpe_annualized ?? null)}</div></div>
-            <div className="metric-box"><div className="metric-label">MAX DD</div><div className="metric-val amber">{fmtPct(paperSummary?.max_drawdown ?? null)}</div></div>
-            <div className="metric-box"><div className="metric-label">WIN RATE</div><div className="metric-val">{fmtPct(paperSummary?.win_rate ?? null)}</div></div>
-            <div className="metric-box"><div className="metric-label">COMPLIANCE</div><div className="metric-val red">{paperSummary?.compliance_violations ?? "-"}</div></div>
+            <div className="metric-box"><div className="metric-label"><Tooltip text={TOOLTIPS.trades}>TRADES</Tooltip></div><div className="metric-val">{paperSummary?.trades ?? "-"}</div></div>
+            <div className="metric-box"><div className="metric-label"><Tooltip text={TOOLTIPS.sharpe}>SHARPE</Tooltip></div><div className="metric-val">{fmtNum(paperSummary?.sharpe_annualized ?? null)}</div></div>
+            <div className="metric-box"><div className="metric-label"><Tooltip text={TOOLTIPS.max_dd}>MAX DD</Tooltip></div><div className="metric-val amber">{fmtPct(paperSummary?.max_drawdown ?? null)}</div></div>
+            <div className="metric-box"><div className="metric-label"><Tooltip text={TOOLTIPS.win_rate}>WIN RATE</Tooltip></div><div className="metric-val">{fmtPct(paperSummary?.win_rate ?? null)}</div></div>
+            <div className="metric-box"><div className="metric-label"><Tooltip text={TOOLTIPS.compliance}>COMPLIANCE</Tooltip></div><div className="metric-val red">{paperSummary?.compliance_violations ?? "-"}</div></div>
             {tierInfo && (() => {
               const tierColor: Record<string, string> = {
                 MICRO: "#60a5fa", SMALL: "#a78bfa", MEDIUM: "#4ade80", ADVANCED: "#f97316",
@@ -1838,7 +1963,7 @@ export default function App() {
               const col = tierColor[tierInfo.active_mode] ?? "#888";
               return (
                 <div className="metric-box" style={{ borderLeft: `3px solid ${col}` }}>
-                  <div className="metric-label" style={{ color: col }}>TIER</div>
+                  <div className="metric-label" style={{ color: col }}><Tooltip text={TOOLTIPS.tier}>TIER</Tooltip></div>
                   <div className="metric-val" style={{ color: col, fontSize: "0.9rem" }}>{tierInfo.active_mode}</div>
                   <div style={{ fontSize: "0.6rem", color: "#555", marginTop: 2 }}>{tierInfo.tier_detail.capital}</div>
                 </div>
@@ -1938,7 +2063,7 @@ export default function App() {
               <article className="panel">
                 {/* ── ROC10: equity sparkline header ── */}
                 <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>EQUITY CURVE</span>
+                  <Tooltip text={TOOLTIPS.equity_curve}><span>EQUITY CURVE</span></Tooltip>
                   {equityHistory && equityHistory.n_points > 0 && (() => {
                     const init = equityHistory.initial_equity!;
                     const last = equityHistory.latest_equity!;
@@ -1955,7 +2080,7 @@ export default function App() {
 
                 <EqSparkline points={equityHistory?.points ?? []} w={240} h={56} />
 
-                <div className="panel-title mt10">DRAWDOWN - 3 LAYER</div>
+                <div className="panel-title mt10"><Tooltip text={TOOLTIPS.drawdown_gauge}>DRAWDOWN - 3 LAYER</Tooltip></div>
                 <div className="dd-gauge">
                   <div className="dd-track">
                     <div className="dd-fill" style={{ width: `${ddFill}%` }} />
@@ -1968,12 +2093,12 @@ export default function App() {
                 </div>
                 <div className="dim">DD attuale: {fmtPct(paperSummary?.max_drawdown ?? null)} / limite 20%</div>
                 <div className="panel-title mt10">GATE STATUS</div>
-                <div className="gate-line"><span>GO/NO-GO</span>{goGate ? <GateBadge pass={goGate.pass} /> : <span className="dim">-</span>}</div>
+                <div className="gate-line"><span><Tooltip text={TOOLTIPS.go_nogo}>GO/NO-GO</Tooltip></span>{goGate ? <GateBadge pass={goGate.pass} /> : <span className="dim">-</span>}</div>
                 {goGate?.reasons.map((r) => <div key={`go-${r}`} className="reason">- {r}</div>)}
-                <div className="gate-line"><span>F6-T1 acceptance</span>{f6Gate ? <GateBadge pass={f6Gate.pass} /> : <span className="dim">-</span>}</div>
+                <div className="gate-line"><span><Tooltip text={TOOLTIPS.f6_t1}>F6-T1 acceptance</Tooltip></span>{f6Gate ? <GateBadge pass={f6Gate.pass} /> : <span className="dim">-</span>}</div>
                 {f6Gate?.reasons.map((r) => <div key={`f6-${r}`} className="reason">- {r}</div>)}
-                <div className="gate-line"><span>F6-T2 completeness</span>{f6t2Gate ? <GateBadge pass={f6t2Gate.pass} /> : <span className="dim">-</span>}</div>
-                {f6t2Gate && <div className="dim">completeness: {(f6t2Gate.completeness_ratio * 100).toFixed(0)}%</div>}
+                <div className="gate-line"><span><Tooltip text={TOOLTIPS.f6_t2}>F6-T2 completeness</Tooltip></span>{f6t2Gate ? <GateBadge pass={f6t2Gate.pass} /> : <span className="dim">-</span>}</div>
+                {f6t2Gate && <div className="dim">completeness: <Tooltip text={TOOLTIPS.f6_t2_ratio}>{(f6t2Gate.completeness_ratio * 100).toFixed(0)}%</Tooltip></div>}
               </article>
 
               <article className="panel">
@@ -2016,19 +2141,19 @@ export default function App() {
                   <span style={{ color: apiOnline ? "#4ade80" : "#f87171", fontWeight: 700 }}>{apiOnline ? "OK" : "ALERT"}</span>
                 </div>
 
-                <div className="panel-title mt10">HISTORY READINESS</div>
+                <div className="panel-title mt10"><Tooltip text={TOOLTIPS.history_readiness}>HISTORY READINESS</Tooltip></div>
                 {historyReadiness ? (
                   <div className={`history-readiness-box ${historyStatusClass}`}>
                     <div className="history-readiness-head">
                       <span>{historyReadiness.ready ? "READY" : "BUILDING"}</span>
                       <span>{historyReadiness.score_pct.toFixed(1)}%</span>
                     </div>
-                    <div className="checklist-item"><span className="ci-label">Finestra</span><span>{historyReadiness.window_days}g</span></div>
-                    <div className="checklist-item"><span className="ci-label">Giorni coperti</span><span>{historyReadiness.days_observed}/{historyReadiness.target_days}</span></div>
-                    <div className="checklist-item"><span className="ci-label">Eventi</span><span>{historyReadiness.events_observed}/{historyReadiness.target_events}</span></div>
-                    <div className="checklist-item"><span className="ci-label">Qualita journal</span><span>{(historyReadiness.quality_completeness * 100).toFixed(1)}%</span></div>
-                    <div className="checklist-item"><span className="ci-label">Violazioni window</span><span>{historyReadiness.compliance_violations_window}</span></div>
-                    <div className="checklist-item"><span className="ci-label">ETA</span><span>{historyEtaLabel}</span></div>
+                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_window}>Finestra</Tooltip></span><span>{historyReadiness.window_days}g</span></div>
+                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_days}>Giorni coperti</Tooltip></span><span>{historyReadiness.days_observed}/{historyReadiness.target_days}</span></div>
+                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_events}>Eventi</Tooltip></span><span>{historyReadiness.events_observed}/{historyReadiness.target_events}</span></div>
+                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_quality}>Qualita journal</Tooltip></span><span>{(historyReadiness.quality_completeness * 100).toFixed(1)}%</span></div>
+                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_violations}>Violazioni window</Tooltip></span><span>{historyReadiness.compliance_violations_window}</span></div>
+                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_eta}>ETA</Tooltip></span><span>{historyEtaLabel}</span></div>
                     {!historyReadiness.ready && historyReadiness.blockers.length > 0 && (
                       <div className="history-blockers">
                         {historyReadiness.blockers.join(" | ")}
@@ -2099,15 +2224,15 @@ export default function App() {
 
                 <div className="panel-title mt10">AUTOMATION PIPELINE</div>
                 <div className="pipeline-row">
-                  <span className="pipe-step done">DATA</span>
+                  <Tooltip text={TOOLTIPS.pipe_data}><span className="pipe-step done">DATA</span></Tooltip>
                   <span className="pipe-arrow">→</span>
-                  <span className="pipe-step done">IVR</span>
+                  <Tooltip text={TOOLTIPS.pipe_ivr}><span className="pipe-step done">IVR</span></Tooltip>
                   <span className="pipe-arrow">→</span>
-                  <span className={`pipe-step ${pipeRegimeStep}`}>REGIME</span>
+                  <Tooltip text={TOOLTIPS.pipe_regime}><span className={`pipe-step ${pipeRegimeStep}`}>REGIME</span></Tooltip>
                   <span className="pipe-arrow">→</span>
-                  <span className={`pipe-step ${pipeScoreStep}`}>SCORE</span>
+                  <Tooltip text={TOOLTIPS.pipe_score}><span className={`pipe-step ${pipeScoreStep}`}>SCORE</span></Tooltip>
                   <span className="pipe-arrow">→</span>
-                  <span className={`pipe-step ${pipeKellyStep}`} title={pipeKellyReady ? "Kelly abilitato" : "Kelly disabilitato (VENDOR_REAL_CHAIN + N≥50 richiesti)"}>KELLY</span>
+                  <Tooltip text={TOOLTIPS.pipe_kelly}><span className={`pipe-step ${pipeKellyStep}`}>KELLY</span></Tooltip>
                 </div>
                 <div className="dim" style={{ fontSize: "0.65rem", marginTop: 3 }}>
                   {pipeHasRegime
@@ -2650,9 +2775,9 @@ export default function App() {
                         <th>#</th>
                         <th>Symbol</th>
                         <th>Strategy</th>
-                        <th>Score</th>
-                        <th>IVR</th>
-                        <th>Spread</th>
+                        <th><Tooltip text={TOOLTIPS.score_composito}>Score</Tooltip></th>
+                        <th><Tooltip text={TOOLTIPS.ivr}>IVR</Tooltip></th>
+                        <th><Tooltip text={TOOLTIPS.spread_pct}>Spread</Tooltip></th>
                         <th>Source</th>
                         <th>Action</th>
                       </tr>
@@ -2760,18 +2885,20 @@ export default function App() {
 
                 {/* ── IBKR connection badge ──────────────────────────────── */}
                 <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "6px" }}>
-                  <span
-                    style={{
-                      padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 600,
-                      background: ibkrStatus?.connected ? "#1a4a1a" : "#3a2a10",
-                      color: ibkrStatus?.connected ? "#4ade80" : "#fbbf24",
-                      border: `1px solid ${ibkrStatus?.connected ? "#4ade80" : "#fbbf24"}`,
-                    }}
-                  >
-                    {ibkrStatus?.connected
-                      ? `IBKR ● :${ibkrStatus.port}`
-                      : ibkrStatus ? "IBKR ○ yfinance" : "IBKR ?"}
-                  </span>
+                  <Tooltip text={ibkrStatus?.connected ? TOOLTIPS.ibkr_connected : TOOLTIPS.ibkr_disconnected}>
+                    <span
+                      style={{
+                        padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 600,
+                        background: ibkrStatus?.connected ? "#1a4a1a" : "#3a2a10",
+                        color: ibkrStatus?.connected ? "#4ade80" : "#fbbf24",
+                        border: `1px solid ${ibkrStatus?.connected ? "#4ade80" : "#fbbf24"}`,
+                      }}
+                    >
+                      {ibkrStatus?.connected
+                        ? `IBKR ● :${ibkrStatus.port}`
+                        : ibkrStatus ? "IBKR ○ yfinance" : "IBKR ?"}
+                    </span>
+                  </Tooltip>
                   <button
                     className="btn-small"
                     disabled={ibkrChecking}
@@ -2806,8 +2933,12 @@ export default function App() {
                 <table className="data-table shortlist-table" style={{ marginTop: "8px" }}>
                   <thead>
                     <tr>
-                      <th>#</th><th>Symbol</th><th>Strat</th><th>Score</th>
-                      <th>IVZ-30</th><th>EM%</th><th>DTE</th><th>Flag</th><th></th>
+                      <th>#</th><th>Symbol</th><th>Strat</th>
+                      <th><Tooltip text={TOOLTIPS.score_opp}>Score</Tooltip></th>
+                      <th><Tooltip text={TOOLTIPS.ivz_30}>IVZ-30</Tooltip></th>
+                      <th><Tooltip text={TOOLTIPS.em_pct}>EM%</Tooltip></th>
+                      <th><Tooltip text={TOOLTIPS.dte}>DTE</Tooltip></th>
+                      <th><Tooltip text={TOOLTIPS.events_flag}>Flag</Tooltip></th><th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2881,13 +3012,13 @@ export default function App() {
                         </span> &nbsp;|&nbsp; Max Loss: {selectedScanCandidate.max_loss.toFixed(2)} ({selectedScanCandidate.max_loss_pct.toFixed(2)}%)
                       </li>
                       <li>Breakeven: {selectedScanCandidate.breakeven.toFixed(2)} ({selectedScanCandidate.breakeven_pct > 0 ? "+" : ""}{selectedScanCandidate.breakeven_pct.toFixed(2)}%)</li>
-                      <li>Sizing: {selectedScanCandidate.sizing_suggested.toFixed(1)}% &nbsp;|&nbsp; OI: {selectedScanCandidate.open_interest} &nbsp;|&nbsp; Vol: {selectedScanCandidate.volume}</li>
+                      <li>Sizing: {selectedScanCandidate.sizing_suggested.toFixed(1)}% &nbsp;|&nbsp; <Tooltip text={TOOLTIPS.oi}>OI</Tooltip>: {selectedScanCandidate.open_interest} &nbsp;|&nbsp; Vol: {selectedScanCandidate.volume}</li>
                       <li>Stress base: {selectedScanCandidate.stress_base.toFixed(2)} &nbsp;|&nbsp; Stress shock: {selectedScanCandidate.stress_shock.toFixed(2)}</li>
                     </ul>
                     <div className="panel-title mt10">SCORE BREAKDOWN</div>
                     <ul className="activity-list">
-                      <li>Vol Edge: {selectedScanCandidate.score_breakdown.vol_edge.toFixed(1)} &nbsp;|&nbsp; Liquidità: {selectedScanCandidate.score_breakdown.liquidity.toFixed(1)}</li>
-                      <li>Risk/Reward: {selectedScanCandidate.score_breakdown.risk_reward.toFixed(1)} &nbsp;|&nbsp; Regime Align: {selectedScanCandidate.score_breakdown.regime_align.toFixed(1)}</li>
+                      <li><Tooltip text={TOOLTIPS.vol_edge}>Vol Edge</Tooltip>: {selectedScanCandidate.score_breakdown.vol_edge.toFixed(1)} &nbsp;|&nbsp; <Tooltip text={TOOLTIPS.liquidity_score}>Liquidità</Tooltip>: {selectedScanCandidate.score_breakdown.liquidity.toFixed(1)}</li>
+                      <li><Tooltip text={TOOLTIPS.risk_reward}>Risk/Reward</Tooltip>: {selectedScanCandidate.score_breakdown.risk_reward.toFixed(1)} &nbsp;|&nbsp; <Tooltip text={TOOLTIPS.regime_align}>Regime Align</Tooltip>: {selectedScanCandidate.score_breakdown.regime_align.toFixed(1)}</li>
                     </ul>
                     {(selectedScanCandidate.events_flag || selectedScanCandidate.human_review_required) && (
                       <>
@@ -3023,7 +3154,7 @@ export default function App() {
               <article className="panel">
                 <div className="panel-title">REGIME MATRIX</div>
                 <div className="matrix-grid">
-                  <div className="matrix-head">Regime</div><div className="matrix-head">Iron Condor</div><div className="matrix-head">Bull Put</div><div className="matrix-head">Sizing</div><div className="matrix-head">Hedge</div>
+                  <div className="matrix-head">Regime</div><div className="matrix-head">Iron Condor</div><div className="matrix-head">Bull Put</div><div className="matrix-head"><Tooltip text={TOOLTIPS.regime_matrix_sizing}>Sizing</Tooltip></div><div className="matrix-head"><Tooltip text={TOOLTIPS.regime_matrix_hedge}>Hedge</Tooltip></div>
                   <div className="matrix-cell cell-act">NORMAL</div><div className="matrix-cell cell-yes">YES</div><div className="matrix-cell cell-yes">YES</div><div className="matrix-cell cell-yes">1.0x</div><div className="matrix-cell">OFF</div>
                   <div className="matrix-cell cell-warn">CAUTION</div><div className="matrix-cell cell-warn">LIMIT</div><div className="matrix-cell cell-yes">YES</div><div className="matrix-cell cell-warn">0.5x</div><div className="matrix-cell cell-warn">MONITOR</div>
                   <div className="matrix-cell cell-no">SHOCK</div><div className="matrix-cell cell-no">STOP</div><div className="matrix-cell cell-no">STOP</div><div className="matrix-cell cell-no">0x</div><div className="matrix-cell cell-no">ON</div>
@@ -3035,8 +3166,8 @@ export default function App() {
                   <li>GO/NO-GO: {goGate === undefined ? <span className="dim">–</span> : <GateBadge pass={goGate.pass} />}</li>
                   <li>F6-T1: {f6Gate === undefined ? <span className="dim">–</span> : <GateBadge pass={f6Gate.pass} />}</li>
                   <li>F6-T2 ratio: {f6t2Gate ? `${(f6t2Gate.completeness_ratio * 100).toFixed(2)}%` : "-"}</li>
-                  <li>MaxDD: {fmtPct(paperSummary?.max_drawdown ?? null)}</li>
-                  <li>Win rate: {fmtPct(paperSummary?.win_rate ?? null)}</li>
+                  <li><Tooltip text={TOOLTIPS.max_dd}>MaxDD</Tooltip>: {fmtPct(paperSummary?.max_drawdown ?? null)}</li>
+                  <li><Tooltip text={TOOLTIPS.win_rate}>Win rate</Tooltip>: {fmtPct(paperSummary?.win_rate ?? null)}</li>
                 </ul>
               </article>
             </div>
@@ -3088,14 +3219,14 @@ export default function App() {
         <aside className="rightpanel">
           {blk("kelly_sizing").visible ? (
             <section className="rp-section">
-              <div className="rp-title">KELLY SIZING LIVE</div>
+              <div className="rp-title"><Tooltip text={TOOLTIPS.kelly_sizing}>KELLY SIZING LIVE</Tooltip></div>
               <div className="kelly-result">
                 <div className="kelly-val">{kellyHalf === null ? "-" : `${(kellyHalf * 100).toFixed(2)}%`}</div>
-                <div className="kelly-label">Half-Kelly target</div>
+                <div className="kelly-label"><Tooltip text={TOOLTIPS.kelly_half}>Half-Kelly target</Tooltip></div>
               </div>
-              <div className="kelly-row"><span className="kelly-key">Win rate</span><span className="kelly-v">{fmtPct(paperSummary?.win_rate ?? null)}</span></div>
-              <div className="kelly-row"><span className="kelly-key">Profit factor</span><span className="kelly-v">{fmtNum(paperSummary?.profit_factor ?? null)}</span></div>
-              <div className="kelly-row"><span className="kelly-key">Avg slippage</span><span className="kelly-v">{fmtNum(paperSummary?.avg_slippage_ticks ?? null)}</span></div>
+              <div className="kelly-row"><span className="kelly-key"><Tooltip text={TOOLTIPS.win_rate}>Win rate</Tooltip></span><span className="kelly-v">{fmtPct(paperSummary?.win_rate ?? null)}</span></div>
+              <div className="kelly-row"><span className="kelly-key"><Tooltip text={TOOLTIPS.profit_factor}>Profit factor</Tooltip></span><span className="kelly-v">{fmtNum(paperSummary?.profit_factor ?? null)}</span></div>
+              <div className="kelly-row"><span className="kelly-key"><Tooltip text={TOOLTIPS.avg_slippage}>Avg slippage</Tooltip></span><span className="kelly-v">{fmtNum(paperSummary?.avg_slippage_ticks ?? null)}</span></div>
             </section>
           ) : (
             <section className="rp-section">

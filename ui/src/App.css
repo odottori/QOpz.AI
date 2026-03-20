@@ -1252,3 +1252,63 @@ select:focus {
 .row-selected td:first-child {
   box-shadow: inset 2px 0 0 var(--g3);
 }
+
+/* ── Tooltip component ──────────────────────────────────────────────────── */
+.tt-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: default;
+}
+
+.tt-box {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--p2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  max-width: 280px;
+  width: max-content;
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0;
+  /* fade-out: 150ms duration, 100ms delay after mouseout */
+  transition: opacity 150ms 100ms ease;
+  z-index: 2000;
+  white-space: normal;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+/* Desktop hover: fade-in immediately, no delay */
+.tt-wrap:hover .tt-box {
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+
+/* Mobile tap / pinned open */
+.tt-wrap.tt-open .tt-box {
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+
+/* Downward-pointing arrow */
+.tt-box::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 8px;
+  height: 8px;
+  background: var(--p2);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
