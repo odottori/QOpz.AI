@@ -149,14 +149,174 @@ _TTS_FALLBACK_STATE_MEM: str = ""
 _TTS_LOCK = threading.Lock()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Session scheduler — asyncio-based, no external deps
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SESSION_STATE: dict[str, Any] = {
+    "last_morning":  None,   # ISO timestamp ultima morning session
+    "last_eod":      None,   # ISO timestamp ultima eod session
+    "next_morning":  None,   # ISO timestamp prossima morning session
+    "next_eod":      None,   # ISO timestamp prossima eod session
+    "last_result":   None,   # dict risultato ultima sessione eseguita
+    "running":       False,  # True durante esecuzione
+    "enabled":       False,  # True se scheduler attivo
+}
+_SESSION_TASK: Optional[asyncio.Task] = None  # type: ignore[type-arg]
+
+
+def _load_sessions_config() -> dict[str, Any]:
+    """
+    Legge [sessions] dal file di config attivo (paper > dev).
+    Restituisce dict con valori di default se sezione assente.
+    """
+    defaults: dict[str, Any] = {
+        "enabled": False,
+        "morning_time": "09:00",
+        "eod_time": "16:30",
+        "timezone": "America/New_York",
+        "duration_max_min": 10,
+        "skip_weekends": True,
+        "skip_holidays": True,
+        "profile": "paper",
+        "api_base": "http://localhost:8765",
+    }
+    for profile in ("paper", "dev"):
+        cfg_path = ROOT / "config" / f"{profile}.toml"
+        if cfg_path.exists():
+            try:
+                import tomllib
+                with open(cfg_path, "rb") as f:
+                    data = tomllib.load(f)
+                sess = data.get("sessions", {})
+                return {**defaults, **sess}
+            except Exception as exc:
+                logger.warning("SESSION_CFG_WARN %s: %s", cfg_path, exc)
+    return defaults
+
+
+def _parse_session_time(time_str: str, tz_name: str) -> "time_cls":
+    """Converte '09:00' → time object."""
+    h, m = (int(x) for x in time_str.split(":"))
+    return time_cls(h, m, tzinfo=None)
+
+
+def _next_session_dt(
+    now: datetime,
+    morning_time: "time_cls",
+    eod_time: "time_cls",
+    tz_name: str,
+) -> tuple[datetime, str]:
+    """Delega a scripts.session_runner._next_session_dt (unica implementazione)."""
+    from scripts.session_runner import _next_session_dt as _sr_next
+    return _sr_next(now, morning_time, eod_time, tz_name)
+
+
+async def _run_session_subprocess(session_type: str, cfg: dict[str, Any]) -> dict[str, Any]:
+    """Esegue session_runner.py come subprocess asyncio."""
+    script = ROOT / "scripts" / "session_runner.py"
+    cmd = [
+        sys.executable, str(script),
+        "--type", session_type,
+        "--profile", cfg.get("profile", "paper"),
+        "--api-base", cfg.get("api_base", "http://localhost:8765"),
+        "--format", "json",
+    ]
+    timeout_sec = int(cfg.get("duration_max_min", 10)) * 60
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(ROOT),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
+        raw = (stdout or b"").decode(errors="replace").strip()
+        try:
+            result = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            result = {"ok": False, "raw": raw[:500]}
+        result["returncode"] = proc.returncode
+        result["stderr"] = (stderr or b"").decode(errors="replace")[-500:]
+        return result
+    except asyncio.TimeoutError:
+        return {"ok": False, "reason": f"timeout ({timeout_sec}s)", "type": session_type}
+    except Exception as exc:
+        return {"ok": False, "reason": str(exc), "type": session_type}
+
+
+async def _scheduler_loop(cfg: dict[str, Any]) -> None:
+    """Loop infinito che dorme fino alla prossima sessione e la esegue."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(cfg.get("timezone", "America/New_York"))
+    morning_t = _parse_session_time(cfg.get("morning_time", "09:00"), cfg.get("timezone", "America/New_York"))
+    eod_t     = _parse_session_time(cfg.get("eod_time", "16:30"),    cfg.get("timezone", "America/New_York"))
+
+    logger.info("SESSION_SCHEDULER started | morning=%s eod=%s tz=%s",
+                cfg.get("morning_time"), cfg.get("eod_time"), cfg.get("timezone"))
+
+    while True:
+        now = datetime.now(timezone.utc)
+        next_dt, session_type = _next_session_dt(now, morning_t, eod_t, cfg.get("timezone", "America/New_York"))
+
+        # Aggiorna stato
+        _SESSION_STATE[f"next_{session_type}"] = next_dt.isoformat()
+        sleep_sec = max(1.0, (next_dt.astimezone(timezone.utc) - now).total_seconds())
+        logger.info("SESSION_SCHEDULER sleeping %.0fs until %s (%s)",
+                    sleep_sec, next_dt.isoformat(), session_type)
+
+        try:
+            await asyncio.sleep(sleep_sec)
+        except asyncio.CancelledError:
+            logger.info("SESSION_SCHEDULER cancelled")
+            return
+
+        # Esegui sessione
+        _SESSION_STATE["running"] = True
+        logger.info("SESSION_SCHEDULER launching %s session", session_type)
+        try:
+            result = await _run_session_subprocess(session_type, cfg)
+            _SESSION_STATE[f"last_{session_type}"] = datetime.now(timezone.utc).isoformat()
+            _SESSION_STATE["last_result"] = result
+            ok_str = "OK" if result.get("ok") else "WARN"
+            logger.info("SESSION_%s %s errors=%s", session_type.upper(), ok_str,
+                        len(result.get("errors", [])))
+        except Exception as exc:
+            logger.exception("SESSION_%s FAILED: %s", session_type.upper(), exc)
+            _SESSION_STATE["last_result"] = {"ok": False, "reason": str(exc)}
+        finally:
+            _SESSION_STATE["running"] = False
+
+
 @asynccontextmanager
 async def _app_lifespan(_app: FastAPI):
+    global _SESSION_TASK
     try:
         init_execution_schema()
         init_wheel_schema()
     except Exception as exc:
         logger.warning("STARTUP_STORAGE_WARN %s", exc)
-    yield
+
+    # Avvia scheduler se abilitato in config
+    cfg = _load_sessions_config()
+    _SESSION_STATE["enabled"] = bool(cfg.get("enabled", False))
+    if _SESSION_STATE["enabled"]:
+        _SESSION_TASK = asyncio.create_task(_scheduler_loop(cfg))
+        logger.info("SESSION_SCHEDULER task created (morning=%s, eod=%s)",
+                    cfg.get("morning_time"), cfg.get("eod_time"))
+    else:
+        logger.info("SESSION_SCHEDULER disabled (enabled=false in config)")
+
+    try:
+        yield
+    finally:
+        if _SESSION_TASK and not _SESSION_TASK.done():
+            _SESSION_TASK.cancel()
+            try:
+                await _SESSION_TASK
+            except asyncio.CancelledError:
+                pass
+        logger.info("SESSION_SCHEDULER stopped")
 
 
 app = FastAPI(title="OPZ Operator API", version="0.1.0", lifespan=_app_lifespan)
@@ -3570,3 +3730,86 @@ def opz_wheel_transition(position_id: str, req: WheelTransitionRequest) -> Dict[
 
 
 
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Session scheduler endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/opz/session/status")
+def opz_session_status() -> Dict[str, Any]:
+    """
+    Stato dello scheduler di sessioni automatiche.
+    Restituisce last/next morning+eod, running, enabled.
+    """
+    return {
+        "ok": True,
+        "enabled": _SESSION_STATE.get("enabled", False),
+        "running": _SESSION_STATE.get("running", False),
+        "last_morning": _SESSION_STATE.get("last_morning"),
+        "last_eod": _SESSION_STATE.get("last_eod"),
+        "next_morning": _SESSION_STATE.get("next_morning"),
+        "next_eod": _SESSION_STATE.get("next_eod"),
+        "last_result": _SESSION_STATE.get("last_result"),
+    }
+
+
+class SessionRunRequest(BaseModel):
+    type: str = Field(default="morning", pattern="^(morning|eod)$")
+    profile: str = Field(default="paper")
+    force: bool = Field(default=False, description="Esegui anche se non è giorno di trading")
+
+
+@app.post("/opz/session/run")
+async def opz_session_run(req: SessionRunRequest) -> Dict[str, Any]:
+    """
+    Trigger manuale di una sessione morning o eod.
+    Esegue in foreground e restituisce il risultato completo.
+    Usabile dalla UI e dal bot Telegram.
+    """
+    if _SESSION_STATE.get("running"):
+        raise HTTPException(status_code=409, detail="Sessione già in corso — attendi il completamento")
+
+    cfg = _load_sessions_config()
+    cfg["profile"] = req.profile
+
+    _SESSION_STATE["running"] = True
+    try:
+        # Se --force non è richiesto, verifica giorno di trading
+        script = ROOT / "scripts" / "session_runner.py"
+        extra_args = ["--force"] if req.force else []
+        cmd = [
+            sys.executable, str(script),
+            "--type", req.type,
+            "--profile", req.profile,
+            "--api-base", cfg.get("api_base", "http://localhost:8765"),
+            "--format", "json",
+            *extra_args,
+        ]
+        timeout_sec = int(cfg.get("duration_max_min", 10)) * 60
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(ROOT),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
+        raw = (stdout or b"").decode(errors="replace").strip()
+        try:
+            result = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            result = {"ok": False, "raw": raw[:500]}
+        result["returncode"] = proc.returncode
+        result["stderr_tail"] = (stderr or b"").decode(errors="replace")[-300:]
+
+        # Aggiorna stato globale
+        now_iso = datetime.now(timezone.utc).isoformat()
+        _SESSION_STATE[f"last_{req.type}"] = now_iso
+        _SESSION_STATE["last_result"] = result
+        return result
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail=f"Timeout sessione {req.type} (>{cfg.get('duration_max_min', 10)} min)")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        _SESSION_STATE["running"] = False

@@ -747,6 +747,11 @@ export default function App() {
   const [aiPrompt, setAiPrompt] = useState<string>("");
   const [aiMessages, setAiMessages] = useState<AiChatMessage[]>([]);
   const [aiBusy, setAiBusy] = useState<boolean>(false);
+  const [sessionStatus, setSessionStatus] = useState<{
+    enabled: boolean; running: boolean;
+    last_morning: string | null; last_eod: string | null;
+    next_morning: string | null; next_eod: string | null;
+  } | null>(null);
 
   const parsedPayload = useMemo(() => {
     try {
@@ -1517,6 +1522,13 @@ export default function App() {
     } catch (e) { markFetchErr("exitCandidates"); }
   }
 
+  async function doFetchSessionStatus() {
+    try {
+      const r = await apiJson<typeof sessionStatus>(`${API_BASE}/opz/session/status`);
+      setSessionStatus(r);
+    } catch { /* non critico */ }
+  }
+
   async function doFetchWheelPositions() {
     try {
       const r = await apiJson<WheelPositionsResponse>(`${API_BASE}/opz/wheel/positions?profile=${ACTIVE_PROFILE}`);
@@ -1772,45 +1784,24 @@ export default function App() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Auto-check IBKR status on mount + poll every 30s
+  // On mount: connessione IBKR + fetch iniziale di tutti i dati
   useEffect(() => {
     void doCheckIbkr(true);
-    const id = window.setInterval(() => void doCheckIbkr(false), 30_000);
-    return () => window.clearInterval(id);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-fetch IBKR account on mount + poll every 60s
-  useEffect(() => {
     void doFetchIbkrAccount();
-    const id = window.setInterval(() => void doFetchIbkrAccount(), 60_000);
-    return () => window.clearInterval(id);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-fetch system status on mount + poll every 15s
-  useEffect(() => {
     void doFetchSysStatus();
-    const id = window.setInterval(() => void doFetchSysStatus(), 15_000);
-    return () => window.clearInterval(id);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-fetch regime current on mount + poll every 30s
-  useEffect(() => {
     void doFetchRegimeCurrent();
-    const id = window.setInterval(() => void doFetchRegimeCurrent(), 30_000);
-    return () => window.clearInterval(id);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-fetch equity history on mount + poll every 60s
-  useEffect(() => {
     void doFetchEquityHistory();
-    const id = window.setInterval(() => void doFetchEquityHistory(), 60_000);
-    return () => window.clearInterval(id);
+    void doFetchExitCandidates();
+    void doFetchSessionStatus();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-fetch exit candidates on mount + poll every 60s
+  // Heartbeat ogni 5 minuti — solo status leggeri (nessun dato daily ridondante)
   useEffect(() => {
-    void doFetchExitCandidates();
-    const id = window.setInterval(() => void doFetchExitCandidates(), 30_000); // 30s — urgency-sensitive
+    const id = window.setInterval(() => {
+      void doCheckIbkr(false);   // TCP probe IBG — rileva disconnessioni
+      void doFetchSysStatus();   // 1 query DuckDB — kill switch, kelly, data_mode
+      void doFetchSessionStatus(); // stato scheduler sessioni
+    }, 5 * 60_000);
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2008,6 +1999,36 @@ export default function App() {
 
                     {activeTab === "warroom" && (
             <>
+            {/* ── BANNER SESSIONI ──────────────────────────────────────────────── */}
+            {sessionStatus && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: "1.5rem",
+                padding: "6px 14px", background: "var(--card2)",
+                borderBottom: "1px solid var(--border)",
+                fontSize: "0.7rem", color: "var(--muted)", flexWrap: "wrap",
+              }}>
+                <span style={{ color: sessionStatus.enabled ? "var(--p1)" : "var(--muted)", fontWeight: 600 }}>
+                  {sessionStatus.enabled ? "● SCHEDULER ON" : "○ SCHEDULER OFF"}
+                </span>
+                {sessionStatus.running && (
+                  <span style={{ color: "var(--warn)", fontWeight: 600 }}>⟳ SESSIONE IN CORSO</span>
+                )}
+                {sessionStatus.last_morning && (
+                  <span>Ultima morning: <strong style={{ color: "var(--text)" }}>{sessionStatus.last_morning.replace("T", " ").slice(0, 16)} UTC</strong></span>
+                )}
+                {sessionStatus.last_eod && (
+                  <span>Ultima EOD: <strong style={{ color: "var(--text)" }}>{sessionStatus.last_eod.replace("T", " ").slice(0, 16)} UTC</strong></span>
+                )}
+                {sessionStatus.next_morning && !sessionStatus.running && (
+                  <span>Prossima morning: <strong style={{ color: "var(--p1)" }}>{sessionStatus.next_morning.replace("T", " ").slice(0, 16)}</strong></span>
+                )}
+                {sessionStatus.next_eod && !sessionStatus.running && (
+                  <span>Prossima EOD: <strong style={{ color: "var(--p1)" }}>{sessionStatus.next_eod.replace("T", " ").slice(0, 16)}</strong></span>
+                )}
+                <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px", marginLeft: "auto" }}
+                  onClick={() => void doFetchSessionStatus()} title="Aggiorna stato sessioni">⟳</button>
+              </div>
+            )}
             {/* ── NARRATORE — player inline ───────────────────────────────────── */}
             <div className="narrator-player-bar">
               {/* label + track */}
