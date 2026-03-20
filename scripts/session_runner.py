@@ -196,6 +196,21 @@ def _post(api_base: str, path: str, params: Optional[dict] = None) -> tuple[bool
         return False, {"error": str(exc)}
 
 
+def _post_json(api_base: str, path: str, payload: Optional[dict] = None) -> tuple[bool, Any]:
+    """POST JSON con timeout. Restituisce (ok, data)."""
+    try:
+        import httpx
+        r = httpx.post(
+            f"{api_base}{path}",
+            json=payload or {},
+            timeout=httpx.Timeout(CONNECT_TIMEOUT, read=READ_TIMEOUT),
+        )
+        r.raise_for_status()
+        return True, r.json()
+    except Exception as exc:
+        return False, {"error": str(exc)}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Universe symbols
 # ─────────────────────────────────────────────────────────────────────────────
@@ -281,7 +296,7 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
     steps["events"] = {"ok": True, "symbols": events_results}
 
     # ── Step 5: Universe scan (tramite API) ───────────────────────────────────
-    ok, data = _get(api_base, "/opz/universe/scan", {
+    ok, data = _post_json(api_base, "/opz/universe/scan", {
         "profile": profile,
         "source": "auto",
         "regime": steps["regime"].get("regime") or "NORMAL",
