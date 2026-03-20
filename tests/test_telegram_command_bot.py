@@ -88,16 +88,18 @@ class TestTelegramCommandBot(unittest.TestCase):
             mock.patch.object(
                 bot,
                 "_api_json",
-                return_value={"observer_state": "OFF", "reason": "IBKR_DISCONNECTED", "applied_action": "blocked"},
+                return_value={"observer_state": "OFF", "reason": "IBKR_DISCONNECTED", "applied_action": "blocked", "kill_switch_active": True},
             ),
             mock.patch.object(bot, "_send_message") as send,
         ):
             bot._handle_command(object(), cfg, "1", "OBSERVER ON")
         self.assertTrue(send.called)
         text = send.call_args.args[3]
-        self.assertIn("OBSERVER ON RICHIESTO MA NON ATTIVO", text)
-        self.assertIn("state=OFF", text)
-        self.assertIn("reason=IBKR_DISCONNECTED", text)
+        self.assertIn("OBSERVER ON NON ATTIVO", text)
+        self.assertIn("esito=BLOCCATO", text)
+        self.assertIn("stato_corrente=OFF", text)
+        self.assertIn("motivo=IBKR_DISCONNECTED", text)
+        self.assertIn("transizione=BLOCCATO", text)
 
     def test_observer_off_message_reports_active(self):
         cfg = bot.BotConfig(
@@ -112,7 +114,7 @@ class TestTelegramCommandBot(unittest.TestCase):
             mock.patch.object(
                 bot,
                 "_api_json",
-                return_value={"observer_state": "OFF", "reason": "MANUAL_OFF", "applied_action": "activate"},
+                return_value={"observer_state": "OFF", "reason": "MANUAL_OFF", "applied_action": "activate", "kill_switch_active": True},
             ),
             mock.patch.object(bot, "_send_message") as send,
         ):
@@ -120,7 +122,10 @@ class TestTelegramCommandBot(unittest.TestCase):
         self.assertTrue(send.called)
         text = send.call_args.args[3]
         self.assertIn("OBSERVER OFF ATTIVO", text)
-        self.assertIn("reason=MANUAL_OFF", text)
+        self.assertIn("esito=OK", text)
+        self.assertIn("kill_switch=ON", text)
+        self.assertIn("motivo=MANUAL_OFF", text)
+        self.assertIn("transizione=KILL_SWITCH_ON", text)
 
     def test_ibwr_on_message(self):
         cfg = bot.BotConfig(

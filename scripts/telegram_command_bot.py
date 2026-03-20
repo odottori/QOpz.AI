@@ -288,18 +288,32 @@ def _handle_command(client: httpx.Client, cfg: BotConfig, chat_id: str, cmd: str
             reason = out.get("reason", "UNKNOWN")
             requested = "ON" if action == "on" else "OFF"
             applied = str(out.get("applied_action", "unknown")).upper()
+            ks_active = bool(out.get("kill_switch_active"))
+            ks_state = "ON" if ks_active else "OFF"
+            transition_map = {
+                "ACTIVATE": "KILL_SWITCH_ON",
+                "DEACTIVATE": "KILL_SWITCH_OFF",
+                "BLOCKED": "BLOCCATO",
+                "NOOP": "NESSUNA_AZIONE",
+                "UNKNOWN": "SCONOSCIUTO",
+            }
+            transition = transition_map.get(applied, applied)
             if state != requested:
                 text = (
-                    f"OBSERVER {requested} RICHIESTO MA NON ATTIVO\n"
-                    f"state={state}\n"
-                    f"reason={reason}\n"
-                    f"applied={applied}"
+                    f"OBSERVER {requested} NON ATTIVO\n"
+                    "esito=BLOCCATO\n"
+                    f"stato_corrente={state}\n"
+                    f"kill_switch={ks_state}\n"
+                    f"motivo={reason}\n"
+                    f"transizione={transition}"
                 )
             else:
                 text = (
                     f"OBSERVER {state} ATTIVO\n"
-                    f"reason={reason}\n"
-                    f"applied={applied}"
+                    "esito=OK\n"
+                    f"kill_switch={ks_state}\n"
+                    f"motivo={reason}\n"
+                    f"transizione={transition}"
                 )
             _send_message(client, cfg.token, chat_id, text)
         except Exception as exc:
