@@ -1521,6 +1521,13 @@ class ObserverSwitchRequest(BaseModel):
     source: str = Field(default="operator_ui")
 
 
+class IbwrServiceRequest(BaseModel):
+    action: str = Field(..., description="'on', 'off', 'status' (alias: start/stop)")
+    notify_telegram: bool = Field(default=False, description="Invia conferma su Telegram")
+    telegram_chat_id: Optional[str] = Field(default=None, description="Override chat id telegram")
+    source: str = Field(default="operator_ui")
+
+
 def _load_telegram_cfg() -> dict:
     cfg_path = ROOT / "config" / "telegram.toml"
     if not cfg_path.exists():
@@ -1573,6 +1580,116 @@ def _normalize_observer_action(raw: str) -> str:
     if action in off_aliases:
         return "off"
     raise HTTPException(status_code=400, detail="action must be on/off (aliases: yes/no, activate/deactivate)")
+
+
+def _normalize_ibwr_action(raw: str) -> str:
+    action = str(raw or "").strip().lower()
+    on_aliases = {"on", "start", "enable", "enabled", "up", "1"}
+    off_aliases = {"off", "stop", "disable", "disabled", "down", "0"}
+    status_aliases = {"status", "state", "check", "info"}
+    if action in on_aliases:
+        return "on"
+    if action in off_aliases:
+        return "off"
+    if action in status_aliases:
+        return "status"
+    raise HTTPException(status_code=400, detail="action must be on/off/status (aliases: start/stop/state)")
+
+
+def _docker_find_ibg_container(containers: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    for c in containers:
+        labels = c.get("Labels") if isinstance(c.get("Labels"), dict) else {}
+        if labels.get("com.docker.compose.service") == "ibg":
+            return c
+    for c in containers:
+        names = c.get("Names") if isinstance(c.get("Names"), list) else []
+        if any("ibg" in str(name).lower() for name in names):
+            return c
+    return None
+
+
+def _docker_ibg_service_action(action: str) -> Dict[str, Any]:
+    sock_path = os.environ.get("DOCKER_SOCK_PATH", "/var/run/docker.sock")
+    if not Path(sock_path).exists():
+        raise HTTPException(status_code=503, detail=f"docker socket not available: {sock_path}")
+
+    def _raise_from_resp(prefix: str, resp: httpx.Response) -> None:
+        body = (resp.text or "").strip()
+        detail = f"{prefix} failed ({resp.status_code})"
+        if body:
+            detail += f": {body[:240]}"
+        raise HTTPException(status_code=502, detail=detail)
+
+    transport = httpx.HTTPTransport(uds=sock_path)
+    with httpx.Client(base_url="http://docker", transport=transport, timeout=12.0) as client:
+        list_resp = client.get("/containers/json", params={"all": 1})
+        if list_resp.status_code >= 400:
+            _raise_from_resp("docker list containers", list_resp)
+        data = list_resp.json()
+        containers = data if isinstance(data, list) else []
+        ibg = _docker_find_ibg_container(containers)
+        if not ibg:
+            raise HTTPException(status_code=404, detail="ibg container not found")
+
+        container_id = str(ibg.get("Id") or "")
+        if not container_id:
+            raise HTTPException(status_code=502, detail="ibg container id missing")
+
+        def _inspect() -> Dict[str, Any]:
+            ins = client.get(f"/containers/{container_id}/json")
+            if ins.status_code >= 400:
+                _raise_from_resp("docker inspect ibg", ins)
+            payload = ins.json()
+            if not isinstance(payload, dict):
+                raise HTTPException(status_code=502, detail="invalid docker inspect payload")
+            return payload
+
+        before = _inspect()
+        state_obj = before.get("State") if isinstance(before.get("State"), dict) else {}
+        running_before = bool(state_obj.get("Running"))
+        status_before = str(state_obj.get("Status") or ("running" if running_before else "stopped")).lower()
+
+        applied_action = "status"
+        reason = "RUNNING" if running_before else "STOPPED"
+
+        if action == "on":
+            if running_before:
+                applied_action = "noop"
+                reason = "ALREADY_RUNNING"
+            else:
+                start = client.post(f"/containers/{container_id}/start")
+                if start.status_code >= 400:
+                    _raise_from_resp("docker start ibg", start)
+                applied_action = "start"
+                reason = "STARTED"
+        elif action == "off":
+            if not running_before:
+                applied_action = "noop"
+                reason = "ALREADY_STOPPED"
+            else:
+                stop = client.post(f"/containers/{container_id}/stop", params={"t": 15})
+                if stop.status_code >= 400:
+                    _raise_from_resp("docker stop ibg", stop)
+                applied_action = "stop"
+                reason = "STOPPED"
+
+        after = _inspect()
+        after_state_obj = after.get("State") if isinstance(after.get("State"), dict) else {}
+        running_after = bool(after_state_obj.get("Running"))
+        status_after = str(after_state_obj.get("Status") or ("running" if running_after else "stopped")).lower()
+        ts_now = datetime.now(timezone.utc).isoformat()
+        return {
+            "ok": True,
+            "requested_action": action,
+            "applied_action": applied_action,
+            "service_state": "ON" if running_after else "OFF",
+            "running": running_after,
+            "status_before": status_before,
+            "status_after": status_after,
+            "reason": reason,
+            "container_id": container_id[:12],
+            "ts_utc": ts_now,
+        }
 
 
 def _ibkr_connected_for_observer() -> tuple[bool, str]:
@@ -1685,6 +1802,30 @@ def execution_observer_switch(req: ObserverSwitchRequest) -> Dict[str, Any]:
         "telegram_notified": telegram_notified,
         "telegram_error": telegram_error,
     }
+
+
+@app.post("/opz/ibwr/service")
+def ibwr_service_switch(req: IbwrServiceRequest) -> Dict[str, Any]:
+    action = _normalize_ibwr_action(req.action)
+    result = _docker_ibg_service_action(action)
+    service_state = str(result.get("service_state", "OFF"))
+    applied_action = str(result.get("applied_action", "status")).upper()
+    reason = str(result.get("reason", "UNKNOWN"))
+    msg = (
+        f"IBWR {action.upper()} | state={service_state} | reason={reason} | "
+        f"applied={applied_action} | ts={result.get('ts_utc')}"
+    )
+
+    telegram_notified = False
+    telegram_error: Optional[str] = None
+    if req.notify_telegram:
+        telegram_notified, telegram_error = _send_telegram_text(msg, req.telegram_chat_id)
+
+    out = dict(result)
+    out["message"] = msg
+    out["telegram_notified"] = telegram_notified
+    out["telegram_error"] = telegram_error
+    return out
 
 
 @app.post("/opz/opportunity/decision")

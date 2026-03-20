@@ -48,6 +48,7 @@ services:
       - qopz-logs:/app/logs
       - ./data:/app/data
       - ./ops:/app/ops
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - qopz-net
     restart: unless-stopped

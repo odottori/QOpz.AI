@@ -33,6 +33,12 @@ class TestTelegramCommandBot(unittest.TestCase):
         self.assertEqual(bot._normalize_command("observer yes"), "OBSERVER ON")
         self.assertEqual(bot._normalize_command("observer no"), "OBSERVER OFF")
 
+    def test_normalize_ibwr_aliases(self):
+        self.assertEqual(bot._normalize_command("/ibwr"), "IBWR STATUS")
+        self.assertEqual(bot._normalize_command("ibwr on"), "IBWR ON")
+        self.assertEqual(bot._normalize_command("ibwr off"), "IBWR OFF")
+        self.assertEqual(bot._normalize_command("ibg status"), "IBWR STATUS")
+
     def test_build_status_text(self):
         status = {
             "kill_switch_active": True,
@@ -57,6 +63,9 @@ class TestTelegramCommandBot(unittest.TestCase):
     def test_help_uses_slash_commands(self):
         txt = bot._build_help_text()
         self.assertIn("/status", txt)
+        self.assertIn("/ibwr status", txt)
+        self.assertIn("/ibwr on", txt)
+        self.assertIn("/ibwr off", txt)
         self.assertIn("/observer on", txt)
         self.assertIn("/observer off", txt)
         self.assertIn("/help", txt)
@@ -107,6 +116,30 @@ class TestTelegramCommandBot(unittest.TestCase):
         text = send.call_args.args[3]
         self.assertIn("OBSERVER OFF ATTIVO", text)
         self.assertIn("reason=MANUAL_OFF", text)
+
+    def test_ibwr_on_message(self):
+        cfg = bot.BotConfig(
+            token="x",
+            allowed_chat_ids={"1"},
+            api_base="http://api",
+            poll_timeout_sec=30,
+            poll_sleep_sec=1.0,
+            offset_path=Path("offset.txt"),
+        )
+        with (
+            mock.patch.object(
+                bot,
+                "_api_json",
+                return_value={"service_state": "ON", "reason": "STARTED", "applied_action": "start"},
+            ),
+            mock.patch.object(bot, "_send_message") as send,
+        ):
+            bot._handle_command(object(), cfg, "1", "IBWR ON")
+        self.assertTrue(send.called)
+        text = send.call_args.args[3]
+        self.assertIn("IBWR ON", text)
+        self.assertIn("state=ON", text)
+        self.assertIn("reason=STARTED", text)
 
 
 if __name__ == "__main__":

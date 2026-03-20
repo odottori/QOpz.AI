@@ -110,6 +110,14 @@ def _normalize_command(text: str) -> str:
         "STATUS": "STATUS",
         "HELP": "HELP",
         "H": "HELP",
+        "IBWR": "IBWR STATUS",
+        "IBWR STATUS": "IBWR STATUS",
+        "IBWR ON": "IBWR ON",
+        "IBWR OFF": "IBWR OFF",
+        "IBG": "IBWR STATUS",
+        "IBG STATUS": "IBWR STATUS",
+        "IBG ON": "IBWR ON",
+        "IBG OFF": "IBWR OFF",
         "OBSERVER ON": "OBSERVER ON",
         "OBSERVER OFF": "OBSERVER OFF",
         "OBSERVERON": "OBSERVER ON",
@@ -142,6 +150,12 @@ def _build_help_text() -> str:
         "HELP - COMANDI DISPONIBILI\n\n"
         "/status\n"
         "- stato OBSERVER, IBWR/IBG, API, regime, readiness\n\n"
+        "/ibwr status\n"
+        "- stato servizio IBWR/IBG (container)\n\n"
+        "/ibwr on\n"
+        "- avvia servizio IBWR/IBG\n\n"
+        "/ibwr off\n"
+        "- ferma servizio IBWR/IBG\n\n"
         "/observer on\n"
         "- richiede IBWR connesso\n"
         "- se IBWR non connesso resta OFF\n\n"
@@ -150,7 +164,7 @@ def _build_help_text() -> str:
         "- blocca operativita ordini\n\n"
         "/help\n"
         "- mostra questo elenco\n\n"
-        "Alias supportati: STATUS, HELP, OBSERVER ON/OFF, \\status"
+        "Alias supportati: STATUS, HELP, IBWR/IBG ON/OFF/STATUS, OBSERVER ON/OFF, \\status"
     )
 
 
@@ -193,6 +207,34 @@ def _handle_command(client: httpx.Client, cfg: BotConfig, chat_id: str, cmd: str
         except Exception as exc:
             text = f"STATUS ERROR: {type(exc).__name__}: {exc}"
         _send_message(client, cfg.token, chat_id, text)
+        return
+
+    if cmd in {"IBWR STATUS", "IBWR ON", "IBWR OFF"}:
+        action = "status"
+        if cmd.endswith("ON"):
+            action = "on"
+        elif cmd.endswith("OFF"):
+            action = "off"
+        try:
+            out = _api_json(
+                client,
+                cfg.api_base,
+                "/opz/ibwr/service",
+                method="POST",
+                payload={"action": action, "notify_telegram": False, "source": "telegram_bot"},
+            )
+            service_state = str(out.get("service_state", "OFF"))
+            reason = str(out.get("reason", "UNKNOWN"))
+            applied = str(out.get("applied_action", "status")).upper()
+            text = (
+                f"IBWR {action.upper()}\n"
+                f"state={service_state}\n"
+                f"reason={reason}\n"
+                f"applied={applied}"
+            )
+            _send_message(client, cfg.token, chat_id, text)
+        except Exception as exc:
+            _send_message(client, cfg.token, chat_id, f"IBWR ERROR: {type(exc).__name__}: {exc}")
         return
 
     if cmd in {"OBSERVER ON", "OBSERVER OFF"}:
