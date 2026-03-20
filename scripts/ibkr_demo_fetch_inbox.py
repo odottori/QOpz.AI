@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +73,21 @@ def _safe_int(v: Any) -> int | None:
         return None
 
 
+def _parse_port_list(raw: str | None) -> list[int]:
+    if not raw:
+        return []
+    out: list[int] = []
+    for part in str(raw).replace(";", ",").split(","):
+        p = part.strip()
+        if not p:
+            continue
+        try:
+            out.append(int(p))
+        except Exception:
+            continue
+    return out
+
+
 def _snapshot_payload(symbol: str, tkr: Any, asof: datetime) -> dict[str, Any]:
     return {
         "source": "ibkr_demo_api",
@@ -98,8 +114,24 @@ def run_fetch(args: argparse.Namespace) -> dict[str, Any]:
 
     cfg = load_profile_config(args.profile)
     b = cfg.get("broker") or {}
-    host = str(args.host or b.get("host") or "127.0.0.1")
-    port = int(args.port if args.port is not None else (b.get("port") or 7497))
+    env_host = (os.environ.get("IBKR_HOST") or "").strip()
+    host = str(args.host or env_host or b.get("host") or "127.0.0.1")
+    cfg_port = _safe_int(b.get("port"))
+    env_port = _safe_int(os.environ.get("IBKR_PORT"))
+    env_ports = _parse_port_list(os.environ.get("IBKR_PORTS"))
+    default_ports = [4004, 4002, 7497, 7496, 4001]
+    if args.port is not None:
+        ports = [int(args.port)]
+    else:
+        ports: list[int] = []
+        for p in [env_port, cfg_port, *env_ports, *default_ports]:
+            if p is None:
+                continue
+            if p in ports:
+                continue
+            ports.append(p)
+        if not ports:
+            ports = [7497]
     client_id = int(args.client_id if args.client_id is not None else (b.get("client_id") or b.get("clientId") or 7))
 
     symbols = _pick_symbols(args.symbols, args.settings_path, args.limit)
@@ -109,9 +141,28 @@ def run_fetch(args: argparse.Namespace) -> dict[str, Any]:
 
     ib = IB()
     try:
-        ok = ib.connect(host, port, clientId=client_id, timeout=float(args.timeout_sec), readonly=True)
-        if not ok:
-            raise RuntimeError(f"connect false host={host} port={port}")
+        connect_errors: list[str] = []
+        active_port: int | None = None
+        for port in ports:
+            try:
+                ok = ib.connect(host, port, clientId=client_id, timeout=float(args.timeout_sec), readonly=True)
+                if ok and ib.isConnected():
+                    active_port = port
+                    break
+                connect_errors.append(f"{port}: connect false")
+            except Exception as exc:
+                connect_errors.append(f"{port}: {type(exc).__name__}: {exc}")
+            finally:
+                if active_port is None:
+                    try:
+                        if ib.isConnected():
+                            ib.disconnect()
+                    except Exception:
+                        pass
+
+        if active_port is None:
+            joined = " | ".join(connect_errors[:6]) if connect_errors else "n/a"
+            raise RuntimeError(f"unable to connect host={host} ports={ports} errors={joined}")
 
         # Force delayed data in demo/paper when realtime subscriptions are missing.
         ib.reqMarketDataType(3)
@@ -148,7 +199,8 @@ def run_fetch(args: argparse.Namespace) -> dict[str, Any]:
         return {
             "ok": failed == 0,
             "host": host,
-            "port": port,
+            "port": active_port,
+            "ports_tried": ports,
             "client_id": client_id,
             "symbols": symbols,
             "captured": captured,
@@ -174,7 +226,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--settings-path", default="")
     p.add_argument("--limit", type=int, default=12)
     p.add_argument("--snapshot-wait-sec", type=float, default=2.0)
-    p.add_argument("--timeout-sec", type=float, default=4.0)
+    p.add_argument("--timeout-sec", type=float, default=12.0)
     p.add_argument("--out-dir", default=str(dpl.DATA_ROOT / "inbox"))
     p.add_argument("--format", choices=["line", "json"], default="line")
     return p.parse_args(argv)

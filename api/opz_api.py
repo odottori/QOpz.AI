@@ -761,7 +761,17 @@ def _run_ollama_prompt(prompt: str) -> dict[str, Any]:
             "duration_ms": duration_ms,
         }
     except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="ollama non trovato nel PATH")
+        duration_ms = int((time.time() - started) * 1000)
+        return {
+            "ok": False,
+            "model": model,
+            "prompt": txt,
+            "response": "",
+            "stdout": "",
+            "stderr": "ollama non trovato nel PATH",
+            "returncode": 127,
+            "duration_ms": duration_ms,
+        }
     except subprocess.TimeoutExpired:
         duration_ms = int((time.time() - started) * 1000)
         return {
