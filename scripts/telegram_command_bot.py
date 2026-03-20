@@ -205,14 +205,21 @@ def _build_status_text(status: dict[str, Any]) -> str:
 
     return (
         "STATUS\n"
-        f"OBSERVER: {observer_state} (KS={'ON' if ks else 'OFF'}) reason={observer_reason}\n"
-        f"IBWR/IBG: {ibwr_state} reason={ibwr_reason}\n"
-        f"IBKR API: {'ON' if ibkr_connected else 'OFF'}"
-        f"{f' port {ibkr_port}' if ibkr_connected and ibkr_port is not None else ''}\n"
-        f"VM: {vm_line}\n"
-        f"REGIME: {regime}\n"
-        f"DATA_MODE: {data_mode}\n"
-        f"READINESS: {h_score if h_score is not None else 'n/d'}% | days {h_days} | events {h_events} | ETA {eta_label}"
+        "esito=OK\n"
+        f"observer={observer_state}\n"
+        f"kill_switch={'ON' if ks else 'OFF'}\n"
+        f"observer_motivo={observer_reason}\n"
+        f"ibwr={ibwr_state}\n"
+        f"ibwr_motivo={ibwr_reason}\n"
+        f"ibkr_api={'ON' if ibkr_connected else 'OFF'}\n"
+        f"ibkr_port={ibkr_port if ibkr_connected and ibkr_port is not None else 'n/d'}\n"
+        f"vm={vm_line}\n"
+        f"regime={regime}\n"
+        f"data_mode={data_mode}\n"
+        f"readiness_pct={h_score if h_score is not None else 'n/d'}\n"
+        f"readiness_days={h_days}\n"
+        f"readiness_events={h_events}\n"
+        f"readiness_eta={eta_label}"
     )
 
 
@@ -230,7 +237,11 @@ def _handle_command(client: httpx.Client, cfg: BotConfig, chat_id: str, cmd: str
                 legacy = _api_json(client, cfg.api_base, "/opz/system/status")
                 text = _build_status_text(legacy)
             except Exception:
-                text = f"STATUS ERROR: {type(exc).__name__}: {exc}"
+                text = (
+                    "STATUS\n"
+                    "esito=ERRORE\n"
+                    f"motivo={type(exc).__name__}: {exc}"
+                )
         _send_message(client, cfg.token, chat_id, text)
         return
 
@@ -251,15 +262,37 @@ def _handle_command(client: httpx.Client, cfg: BotConfig, chat_id: str, cmd: str
             service_state = str(out.get("service_state", "OFF"))
             reason = str(out.get("reason", "UNKNOWN"))
             applied = str(out.get("applied_action", "status")).upper()
+            transition_map = {
+                "START": "AVVIO_SERVIZIO",
+                "STOP": "ARRESTO_SERVIZIO",
+                "NOOP": "NESSUNA_AZIONE",
+                "STATUS": "LETTURA_STATO",
+                "UNKNOWN": "SCONOSCIUTO",
+            }
+            transition = transition_map.get(applied, applied)
+            requested = action.upper()
+            esito = "OK"
+            if requested == "ON" and service_state == "OFF":
+                esito = "BLOCCATO"
             text = (
-                f"IBWR {action.upper()}\n"
-                f"state={service_state}\n"
-                f"reason={reason}\n"
-                f"applied={applied}"
+                f"IBWR {requested}\n"
+                f"esito={esito}\n"
+                f"stato_corrente={service_state}\n"
+                f"motivo={reason}\n"
+                f"transizione={transition}"
             )
             _send_message(client, cfg.token, chat_id, text)
         except Exception as exc:
-            _send_message(client, cfg.token, chat_id, f"IBWR ERROR: {type(exc).__name__}: {exc}")
+            _send_message(
+                client,
+                cfg.token,
+                chat_id,
+                (
+                    f"IBWR {action.upper()}\n"
+                    "esito=ERRORE\n"
+                    f"motivo={type(exc).__name__}: {exc}"
+                ),
+            )
         return
 
     if cmd == "OBSERVER STATUS":
@@ -269,9 +302,30 @@ def _handle_command(client: httpx.Client, cfg: BotConfig, chat_id: str, cmd: str
             obs_state = observer.get("state", "UNKNOWN")
             ks = "ON" if bool(observer.get("kill_switch_active")) else "OFF"
             reason = observer.get("reason", "UNKNOWN")
-            _send_message(client, cfg.token, chat_id, f"OBSERVER STATUS\nstate={obs_state}\nkill_switch={ks}\nreason={reason}")
+            _send_message(
+                client,
+                cfg.token,
+                chat_id,
+                (
+                    "OBSERVER STATUS\n"
+                    "esito=OK\n"
+                    f"stato_corrente={obs_state}\n"
+                    f"kill_switch={ks}\n"
+                    f"motivo={reason}\n"
+                    "transizione=LETTURA_STATO"
+                ),
+            )
         except Exception as exc:
-            _send_message(client, cfg.token, chat_id, f"OBSERVER STATUS ERROR: {type(exc).__name__}: {exc}")
+            _send_message(
+                client,
+                cfg.token,
+                chat_id,
+                (
+                    "OBSERVER STATUS\n"
+                    "esito=ERRORE\n"
+                    f"motivo={type(exc).__name__}: {exc}"
+                ),
+            )
         return
 
     if cmd in {"OBSERVER ON", "OBSERVER OFF"}:

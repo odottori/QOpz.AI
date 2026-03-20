@@ -58,11 +58,13 @@ class TestTelegramCommandBot(unittest.TestCase):
             },
         }
         txt = bot._build_status_text(status)
-        self.assertIn("OBSERVER: OFF", txt)
-        self.assertIn("IBWR/IBG: OFF", txt)
-        self.assertIn("VM: api=ON", txt)
-        self.assertIn("REGIME: CAUTION", txt)
-        self.assertIn("READINESS: 72.5%", txt)
+        self.assertIn("esito=OK", txt)
+        self.assertIn("observer=OFF", txt)
+        self.assertIn("kill_switch=ON", txt)
+        self.assertIn("ibwr=OFF", txt)
+        self.assertIn("vm=api=ON", txt)
+        self.assertIn("regime=CAUTION", txt)
+        self.assertIn("readiness_pct=72.5", txt)
 
     def test_help_uses_slash_commands(self):
         txt = bot._build_help_text()
@@ -148,8 +150,10 @@ class TestTelegramCommandBot(unittest.TestCase):
         self.assertTrue(send.called)
         text = send.call_args.args[3]
         self.assertIn("IBWR ON", text)
-        self.assertIn("state=ON", text)
-        self.assertIn("reason=STARTED", text)
+        self.assertIn("esito=OK", text)
+        self.assertIn("stato_corrente=ON", text)
+        self.assertIn("motivo=STARTED", text)
+        self.assertIn("transizione=AVVIO_SERVIZIO", text)
 
 
 if __name__ == "__main__":
