@@ -2644,6 +2644,16 @@ def _to_day_key(value: Any) -> Optional[str]:
     return txt[:10]
 
 
+def _is_present_text(value: Any) -> bool:
+    """True when text-like field is materially present (not empty/null sentinel)."""
+    if value is None:
+        return False
+    txt = str(value).strip()
+    if not txt:
+        return False
+    return txt.lower() not in {"none", "null", "nan", "na", "n/a", "-", "--"}
+
+
 def _build_history_readiness(profile: str = "paper") -> HistoryReadinessOut:
     window_days = _env_int("OPZ_HISTORY_READINESS_WINDOW_DAYS", 10, 3, 30)
     target_days = _env_int("OPZ_HISTORY_READINESS_TARGET_DAYS", 10, 3, 90)
