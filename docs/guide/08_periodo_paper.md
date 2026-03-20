@@ -1,6 +1,8 @@
 # Capitolo 8 — Il Periodo Paper
 ## Perché i primi mesi sono i più importanti
 
+[→ Apri la versione slideshow interattiva](periodo_paper.html){ .md-button .md-button--primary }
+
 ---
 
 ### Non stai aspettando. Stai costruendo.
