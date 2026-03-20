@@ -58,6 +58,27 @@ class _Signal(TypedDict):
     status: str   # "OK" | "WARN" | "ALERT" | "DISABLED"
     detail: str
 
+class HistoryReadinessOut(TypedDict):
+    profile: str
+    window_days: int
+    target_days: int
+    days_observed: int
+    days_remaining: int
+    target_events: int
+    events_observed: int
+    events_remaining: int
+    event_breakdown: Dict[str, int]
+    quality_completeness: float
+    quality_target: float
+    quality_gap: float
+    compliance_violations_window: int
+    pace_events_per_day: float
+    eta_days: Optional[int]
+    eta_date_utc: Optional[str]
+    blockers: List[str]
+    ready: bool
+    score_pct: float
+
 class IbkrStatusOut(TypedDict):
     ok: bool; connected: bool; host: str; port: Optional[int]
     client_id: Optional[int]; source_system: str
@@ -88,6 +109,7 @@ class SystemStatusOut(TypedDict):
     ibkr_source_system: str; ibkr_connected_at: Optional[str]
     execution_config_ready: bool; n_closed_trades: int
     regime: str; signals: List[_Signal]
+    history_readiness: HistoryReadinessOut
 
 class EquityPointOut(TypedDict):
     date: str; equity: float
@@ -2135,6 +2157,326 @@ def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
     }
 
 
+def _env_int(name: str, default: int, low: int, high: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(value, high))
+
+
+def _env_float(name: str, default: float, low: float, high: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(value, high))
+
+
+def _table_exists(con: Any, table_name: str) -> bool:
+    try:
+        row = con.execute(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+            (table_name,),
+        ).fetchone()
+        return bool(row and int(row[0]) > 0)
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        # In test mocks information_schema may be unavailable: assume table exists.
+        return True
+
+
+def _to_day_key(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value.isoformat()
+    txt = str(value).strip()
+    if len(txt) < 10:
+        return None
+    return txt[:10]
+
+
+def _build_history_readiness(profile: str = "paper") -> HistoryReadinessOut:
+    window_days = _env_int("OPZ_HISTORY_READINESS_WINDOW_DAYS", 10, 3, 30)
+    target_days = _env_int("OPZ_HISTORY_READINESS_TARGET_DAYS", 10, 3, 90)
+    target_events = _env_int("OPZ_HISTORY_READINESS_TARGET_EVENTS", 40, 1, 10000)
+    quality_target = _env_float("OPZ_HISTORY_READINESS_QUALITY_TARGET", 0.95, 0.50, 1.00)
+
+    d0 = datetime.now(timezone.utc).date()
+    d1 = d0 - timedelta(days=window_days - 1)
+    d1_iso = d1.isoformat()
+    d0_iso = d0.isoformat()
+
+    days_seen: set[str] = set()
+    snapshot_events = 0
+    trade_events = 0
+    decision_events = 0
+    compliance_events_window = 0
+    trade_violation_sum = 0
+    quality_completeness = 0.0
+
+    required_missing = {
+        "entry_ts_utc": 0,
+        "symbol_strategy_strikes": 0,
+        "regime_at_entry": 0,
+        "score_at_entry": 0,
+        "kelly_fraction": 0,
+        "pnl_realized": 0,
+        "slippage_actual": 0,
+        "exit_reason": 0,
+        "note_operational": 0,
+    }
+    missing_cells = 0
+    trade_rows_in_window = 0
+
+    try:
+        with _db_connect_ro() as con:
+            if _table_exists(con, "paper_equity_snapshots"):
+                row = con.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM paper_equity_snapshots
+                    WHERE profile = ? AND asof_date >= ? AND asof_date <= ?
+                    """,
+                    (profile, d1_iso, d0_iso),
+                ).fetchone()
+                snapshot_events = int(row[0]) if row and row[0] is not None else 0
+                rows = con.execute(
+                    """
+                    SELECT DISTINCT asof_date
+                    FROM paper_equity_snapshots
+                    WHERE profile = ? AND asof_date >= ? AND asof_date <= ?
+                    """,
+                    (profile, d1_iso, d0_iso),
+                ).fetchall()
+                for r in rows:
+                    day_key = _to_day_key(r[0] if r else None)
+                    if day_key:
+                        days_seen.add(day_key)
+
+            if _table_exists(con, "paper_trades"):
+                row = con.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM paper_trades
+                    WHERE profile = ? AND created_at IS NOT NULL
+                      AND CAST(created_at AS DATE) >= ? AND CAST(created_at AS DATE) <= ?
+                    """,
+                    (profile, d1_iso, d0_iso),
+                ).fetchone()
+                trade_events = int(row[0]) if row and row[0] is not None else 0
+                rows = con.execute(
+                    """
+                    SELECT DISTINCT CAST(created_at AS DATE)
+                    FROM paper_trades
+                    WHERE profile = ? AND created_at IS NOT NULL
+                      AND CAST(created_at AS DATE) >= ? AND CAST(created_at AS DATE) <= ?
+                    """,
+                    (profile, d1_iso, d0_iso),
+                ).fetchall()
+                for r in rows:
+                    day_key = _to_day_key(r[0] if r else None)
+                    if day_key:
+                        days_seen.add(day_key)
+
+                quality_rows = con.execute(
+                    """
+                    SELECT
+                      entry_ts_utc, symbol, strategy, strikes_json, regime_at_entry,
+                      score_at_entry, kelly_fraction, pnl, slippage_ticks, exit_reason,
+                      note, violations
+                    FROM paper_trades
+                    WHERE profile = ? AND created_at IS NOT NULL
+                      AND CAST(created_at AS DATE) >= ? AND CAST(created_at AS DATE) <= ?
+                    """,
+                    (profile, d1_iso, d0_iso),
+                ).fetchall()
+                trade_rows_in_window = len(quality_rows)
+                for row in quality_rows:
+                    (
+                        entry_ts,
+                        symbol,
+                        strategy,
+                        strikes_json,
+                        regime_at_entry,
+                        score_at_entry,
+                        kelly_fraction,
+                        pnl,
+                        slippage_ticks,
+                        exit_reason,
+                        note,
+                        violations,
+                    ) = row
+
+                    pnl_ok = False
+                    if pnl is not None:
+                        try:
+                            _ = float(pnl)
+                            pnl_ok = True
+                        except (TypeError, ValueError):
+                            pnl_ok = False
+                    if not pnl_ok:
+                        required_missing["pnl_realized"] += 1
+
+                    slippage_ok = False
+                    if slippage_ticks is not None:
+                        try:
+                            _ = float(slippage_ticks)
+                            slippage_ok = True
+                        except (TypeError, ValueError):
+                            slippage_ok = False
+                    if not slippage_ok:
+                        required_missing["slippage_actual"] += 1
+
+                    if not _is_present_text(entry_ts):
+                        required_missing["entry_ts_utc"] += 1
+
+                    has_symbol = _is_present_text(symbol)
+                    has_strategy = _is_present_text(strategy)
+                    has_strikes = _is_present_text(strikes_json)
+                    if not (has_symbol and has_strategy and has_strikes):
+                        required_missing["symbol_strategy_strikes"] += 1
+
+                    if not _is_present_text(regime_at_entry):
+                        required_missing["regime_at_entry"] += 1
+                    if score_at_entry is None:
+                        required_missing["score_at_entry"] += 1
+                    if kelly_fraction is None:
+                        required_missing["kelly_fraction"] += 1
+                    if not _is_present_text(exit_reason):
+                        required_missing["exit_reason"] += 1
+                    if not _is_present_text(note):
+                        required_missing["note_operational"] += 1
+
+                    try:
+                        trade_violation_sum += int(violations or 0)
+                    except (TypeError, ValueError):
+                        pass
+
+            if _table_exists(con, "operator_opportunity_decisions"):
+                row = con.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM operator_opportunity_decisions
+                    WHERE profile = ? AND created_at IS NOT NULL
+                      AND CAST(created_at AS DATE) >= ? AND CAST(created_at AS DATE) <= ?
+                    """,
+                    (profile, d1_iso, d0_iso),
+                ).fetchone()
+                decision_events = int(row[0]) if row and row[0] is not None else 0
+                rows = con.execute(
+                    """
+                    SELECT DISTINCT CAST(created_at AS DATE)
+                    FROM operator_opportunity_decisions
+                    WHERE profile = ? AND created_at IS NOT NULL
+                      AND CAST(created_at AS DATE) >= ? AND CAST(created_at AS DATE) <= ?
+                    """,
+                    (profile, d1_iso, d0_iso),
+                ).fetchall()
+                for r in rows:
+                    day_key = _to_day_key(r[0] if r else None)
+                    if day_key:
+                        days_seen.add(day_key)
+
+            if _table_exists(con, "compliance_events"):
+                row = con.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM compliance_events
+                    WHERE profile = ? AND ts_utc IS NOT NULL
+                      AND CAST(ts_utc AS DATE) >= ? AND CAST(ts_utc AS DATE) <= ?
+                    """,
+                    (profile, d1_iso, d0_iso),
+                ).fetchone()
+                compliance_events_window = int(row[0]) if row and row[0] is not None else 0
+    except (FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        logger.debug("SYSTEM_STATUS_HISTORY_READINESS_FALLBACK reason=%s", exc)
+
+    for misses in required_missing.values():
+        missing_cells += misses
+    fields_count = len(required_missing)
+    denom = trade_rows_in_window * fields_count
+    if denom > 0:
+        quality_completeness = max(0.0, min(1.0, 1.0 - (missing_cells / denom)))
+
+    days_observed = len(days_seen)
+    days_remaining = max(0, target_days - days_observed)
+
+    events_observed = trade_events + decision_events
+    events_remaining = max(0, target_events - events_observed)
+
+    pace_events_per_day = round(events_observed / days_observed, 2) if days_observed > 0 else 0.0
+    quality_gap = round(max(0.0, quality_target - quality_completeness), 4)
+    compliance_violations_window = max(0, compliance_events_window + trade_violation_sum)
+
+    blockers: list[str] = []
+    if days_remaining > 0:
+        blockers.append(f"coverage_days {days_observed}/{target_days}")
+    if events_remaining > 0:
+        blockers.append(f"events {events_observed}/{target_events}")
+    if quality_gap > 0:
+        blockers.append(
+            f"journal_quality {(quality_completeness * 100):.1f}% < {(quality_target * 100):.1f}%"
+        )
+    if compliance_violations_window > 0:
+        blockers.append(f"compliance_violations_window={compliance_violations_window}")
+
+    ready = len(blockers) == 0
+
+    eta_events_days: Optional[int] = None
+    if events_remaining <= 0:
+        eta_events_days = 0
+    elif pace_events_per_day > 0:
+        eta_events_days = int(math.ceil(events_remaining / pace_events_per_day))
+
+    if ready:
+        eta_days: Optional[int] = 0
+    elif events_remaining > 0 and eta_events_days is None:
+        eta_days = None
+    else:
+        eta_days = max(days_remaining, eta_events_days or 0)
+
+    eta_date_utc = (d0 + timedelta(days=eta_days)).isoformat() if eta_days is not None else None
+
+    day_score = min(1.0, (days_observed / target_days) if target_days > 0 else 0.0)
+    event_score = min(1.0, (events_observed / target_events) if target_events > 0 else 0.0)
+    quality_score = min(1.0, (quality_completeness / quality_target) if quality_target > 0 else 0.0)
+    compliance_score = 1.0 if compliance_violations_window == 0 else 0.0
+    score_pct = round((0.35 * day_score + 0.35 * event_score + 0.20 * quality_score + 0.10 * compliance_score) * 100.0, 1)
+
+    return {
+        "profile": profile,
+        "window_days": window_days,
+        "target_days": target_days,
+        "days_observed": days_observed,
+        "days_remaining": days_remaining,
+        "target_events": target_events,
+        "events_observed": events_observed,
+        "events_remaining": events_remaining,
+        "event_breakdown": {
+            "equity_snapshots": snapshot_events,
+            "paper_trades": trade_events,
+            "opportunity_decisions": decision_events,
+        },
+        "quality_completeness": round(quality_completeness, 4),
+        "quality_target": round(quality_target, 4),
+        "quality_gap": quality_gap,
+        "compliance_violations_window": compliance_violations_window,
+        "pace_events_per_day": pace_events_per_day,
+        "eta_days": eta_days,
+        "eta_date_utc": eta_date_utc,
+        "blockers": blockers,
+        "ready": ready,
+        "score_pct": score_pct,
+    }
+
+
 @app.get("/opz/system/status")
 def opz_system_status() -> SystemStatusOut:
     """
@@ -2208,6 +2550,8 @@ def opz_system_status() -> SystemStatusOut:
 
     # ── Kelly gate ────────────────────────────────────────────────────────────
     kelly_enabled = (data_mode == "VENDOR_REAL_CHAIN") and (n_closed_trades >= 50)
+    history_profile = os.environ.get("OPZ_HISTORY_READINESS_PROFILE", "paper").strip().lower() or "paper"
+    history_readiness = _build_history_readiness(profile=history_profile)
 
     # ── Semafori operativi ────────────────────────────────────────────────────
     signals: list[dict] = [
@@ -2237,6 +2581,15 @@ def opz_system_status() -> SystemStatusOut:
             "status": "OK" if execution_config_ready else "ALERT",
             "detail": "Config trovata" if execution_config_ready else "Nessun config trovato",
         },
+        {
+            "name": "history_readiness",
+            "status": "OK" if history_readiness["ready"] else ("WARN" if history_readiness["score_pct"] >= 70.0 else "ALERT"),
+            "detail": (
+                f"{history_readiness['days_observed']}/{history_readiness['target_days']}d · "
+                f"{history_readiness['events_observed']}/{history_readiness['target_events']} ev · "
+                f"Q {(history_readiness['quality_completeness'] * 100):.0f}%"
+            ),
+        },
     ]
 
     return {
@@ -2254,6 +2607,7 @@ def opz_system_status() -> SystemStatusOut:
         "n_closed_trades": n_closed_trades,
         "regime": regime,
         "signals": signals,
+        "history_readiness": history_readiness,
     }
 
 

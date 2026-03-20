@@ -80,7 +80,7 @@ class TestSystemStatusStructure(unittest.TestCase):
             "ok", "timestamp_utc", "api_online", "kill_switch_active",
             "data_mode", "kelly_enabled", "ibkr_connected", "ibkr_port",
             "ibkr_source_system", "ibkr_connected_at", "execution_config_ready",
-            "n_closed_trades", "regime", "signals",
+            "n_closed_trades", "regime", "signals", "history_readiness",
         ]
         for field in required:
             self.assertIn(field, body, f"Missing field: {field}")
@@ -116,6 +116,32 @@ class TestSystemStatusStructure(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. Kill switch
 # ─────────────────────────────────────────────────────────────────────────────
+
+    def test_history_readiness_structure(self):
+        body = _get()
+        hr = body["history_readiness"]
+        required = [
+            "profile", "window_days", "target_days", "days_observed", "days_remaining",
+            "target_events", "events_observed", "events_remaining", "event_breakdown",
+            "quality_completeness", "quality_target", "quality_gap",
+            "compliance_violations_window", "pace_events_per_day",
+            "eta_days", "eta_date_utc", "blockers", "ready", "score_pct",
+        ]
+        for field in required:
+            self.assertIn(field, hr, f"Missing history_readiness field: {field}")
+
+    def test_history_readiness_ranges(self):
+        body = _get()
+        hr = body["history_readiness"]
+        self.assertGreaterEqual(hr["days_observed"], 0)
+        self.assertGreaterEqual(hr["days_remaining"], 0)
+        self.assertGreaterEqual(hr["events_observed"], 0)
+        self.assertGreaterEqual(hr["events_remaining"], 0)
+        self.assertGreaterEqual(hr["quality_completeness"], 0.0)
+        self.assertLessEqual(hr["quality_completeness"], 1.0)
+        self.assertGreaterEqual(hr["score_pct"], 0.0)
+        self.assertLessEqual(hr["score_pct"], 100.0)
+
 
 class TestKillSwitch(unittest.TestCase):
 

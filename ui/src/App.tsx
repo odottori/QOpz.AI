@@ -199,12 +199,34 @@ type IbkrStatusResponse = {
   ports_probed: number[]; message: string;
 };
 type SystemSignal = { name: string; status: "OK" | "WARN" | "ALERT" | "DISABLED"; detail: string };
+type HistoryReadinessResponse = {
+  profile: string;
+  window_days: number;
+  target_days: number;
+  days_observed: number;
+  days_remaining: number;
+  target_events: number;
+  events_observed: number;
+  events_remaining: number;
+  event_breakdown: { equity_snapshots: number; paper_trades: number; opportunity_decisions: number };
+  quality_completeness: number;
+  quality_target: number;
+  quality_gap: number;
+  compliance_violations_window: number;
+  pace_events_per_day: number;
+  eta_days: number | null;
+  eta_date_utc: string | null;
+  blockers: string[];
+  ready: boolean;
+  score_pct: number;
+};
 type SystemStatusResponse = {
   ok: boolean; timestamp_utc: string; api_online: boolean;
   kill_switch_active: boolean; data_mode: string; kelly_enabled: boolean;
   ibkr_connected: boolean; ibkr_port: number | null; ibkr_source_system: string;
   ibkr_connected_at: string | null; execution_config_ready: boolean;
   n_closed_trades: number; regime: string; signals: SystemSignal[];
+  history_readiness: HistoryReadinessResponse;
 };
 type RegimeCurrentResponse = {
   ok: boolean; regime: string;
@@ -1497,6 +1519,19 @@ export default function App() {
   const goGate = paperSummary?.gates.go_nogo;
   const f6Gate = paperSummary?.gates.f6_t1_acceptance;
   const f6t2Gate = paperSummary?.gates.f6_t2_journal_complete;
+  const historyReadiness = sysStatus?.history_readiness ?? null;
+  const historyEtaLabel = useMemo(() => {
+    if (!historyReadiness) return "n/d";
+    if (historyReadiness.ready) return "Pronto ora";
+    if (historyReadiness.eta_days === null) return "ETA non stimabile";
+    if (historyReadiness.eta_days === 0) return "Pronto oggi";
+    return `${historyReadiness.eta_days}g (stima)`;
+  }, [historyReadiness]);
+  const historyStatusClass = historyReadiness?.ready
+    ? "history-ready"
+    : (historyReadiness?.score_pct ?? 0) >= 70
+      ? "history-building"
+      : "history-critical";
   const stateObj = stateJson && typeof stateJson === "object" ? (stateJson as Record<string, unknown>) : null;
   const nextStep = typeof stateObj?.next_step === "string" ? stateObj.next_step : "-";
   const progressObj = stateObj?.progress && typeof stateObj.progress === "object" ? (stateObj.progress as Record<string, unknown>) : null;
@@ -1980,6 +2015,29 @@ export default function App() {
                   <span>{apiOnline ? "ONLINE" : "OFFLINE"}</span>
                   <span style={{ color: apiOnline ? "#4ade80" : "#f87171", fontWeight: 700 }}>{apiOnline ? "OK" : "ALERT"}</span>
                 </div>
+
+                <div className="panel-title mt10">HISTORY READINESS</div>
+                {historyReadiness ? (
+                  <div className={`history-readiness-box ${historyStatusClass}`}>
+                    <div className="history-readiness-head">
+                      <span>{historyReadiness.ready ? "READY" : "BUILDING"}</span>
+                      <span>{historyReadiness.score_pct.toFixed(1)}%</span>
+                    </div>
+                    <div className="checklist-item"><span className="ci-label">Finestra</span><span>{historyReadiness.window_days}g</span></div>
+                    <div className="checklist-item"><span className="ci-label">Giorni coperti</span><span>{historyReadiness.days_observed}/{historyReadiness.target_days}</span></div>
+                    <div className="checklist-item"><span className="ci-label">Eventi</span><span>{historyReadiness.events_observed}/{historyReadiness.target_events}</span></div>
+                    <div className="checklist-item"><span className="ci-label">Qualita journal</span><span>{(historyReadiness.quality_completeness * 100).toFixed(1)}%</span></div>
+                    <div className="checklist-item"><span className="ci-label">Violazioni window</span><span>{historyReadiness.compliance_violations_window}</span></div>
+                    <div className="checklist-item"><span className="ci-label">ETA</span><span>{historyEtaLabel}</span></div>
+                    {!historyReadiness.ready && historyReadiness.blockers.length > 0 && (
+                      <div className="history-blockers">
+                        {historyReadiness.blockers.join(" | ")}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="dim" style={{ fontSize: "0.7rem" }}>Caricamento readiness...</div>
+                )}
 
                 {sysStatus?.kill_switch_active && (
                   <div style={{ marginTop: 8, padding: "6px 10px", background: "#3a1010", border: "1px solid #f87171", borderRadius: 4, color: "#f87171", fontWeight: 700, fontSize: "0.75rem" }}>

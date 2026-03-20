@@ -949,6 +949,41 @@ select:focus {
   margin-bottom: 6px;
 }
 
+.history-readiness-box {
+  border: 1px solid var(--border);
+  background: var(--p2);
+  padding: 6px 8px;
+  margin-top: 4px;
+}
+
+.history-readiness-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 1px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.history-readiness-box.history-ready .history-readiness-head {
+  color: var(--g1);
+}
+
+.history-readiness-box.history-building .history-readiness-head {
+  color: var(--amber);
+}
+
+.history-readiness-box.history-critical .history-readiness-head {
+  color: var(--red);
+}
+
+.history-blockers {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--amber);
+  line-height: 1.3;
+}
+
 @media (max-width: 1320px) {
   .terminal-main {
     grid-template-columns: 210px 1fr;
