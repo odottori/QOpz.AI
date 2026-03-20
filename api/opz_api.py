@@ -1958,8 +1958,8 @@ def opz_ibkr_account() -> IbkrAccountOut:
     if not mgr.is_connected:
         try:
             mgr.try_connect(timeout=1.5)
-        except Exception:
-            pass
+        except (TimeoutError, OSError, RuntimeError) as exc:
+            logger.info("IBKR quick reconnect attempt failed: %s", exc)
 
     if not mgr.is_connected:
         return _empty_account_response(False, "Non connesso a TWS/Gateway — chiama prima /opz/ibkr/status?try_connect=true")
@@ -2042,8 +2042,8 @@ def opz_ibkr_account() -> IbkrAccountOut:
         try:
             if "ib" in locals() and ib is not None and "prev_timeout" in locals():
                 ib.RequestTimeout = prev_timeout
-        except Exception:
-            pass
+        except (AttributeError, RuntimeError, TypeError) as exc:
+            logger.debug("IBKR account timeout restore skipped: %s", exc)
 
 
 @app.get("/opz/regime/current")
@@ -2625,14 +2625,15 @@ def opz_tier(profile: str = "dev", regime: str = "NORMAL") -> Dict[str, Any]:
     # data_gate: Kelly requires real chain data AND enough closed trades
     data_mode = os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
     n_closed = 0
+    import duckdb as _duckdb
     try:
         with _db_connect_ro() as _con:
             _row = _con.execute(
                 "SELECT COUNT(*) FROM paper_trades WHERE exit_ts_utc IS NOT NULL"
             ).fetchone()
             n_closed = int(_row[0]) if _row else 0
-    except Exception:
-        pass
+    except (FileNotFoundError, OSError, RuntimeError, TypeError, ValueError, _duckdb.Error) as exc:
+        logger.debug("SYSTEM_STATUS_DB_COUNT_FALLBACK reason=%s", exc)
     data_gate_ok = (data_mode == "VENDOR_REAL_CHAIN") and (n_closed >= 50)
 
     def _blk(visible: bool, interactive: bool, gate: str, reason: Optional[str] = None) -> Dict[str, Any]:

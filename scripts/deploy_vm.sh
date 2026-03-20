@@ -65,9 +65,45 @@ EOF
 fi
 
 # ── 5. Build + avvia con docker compose ───────────────────────────────────────
-echo "[5/5] Building images and starting services..."
+echo "[5/6] Ensuring IBG settings permissions..."
+mkdir -p "$APP_DIR/data/ibg-settings"
+chown -R 1000:1000 "$APP_DIR/data/ibg-settings" || true
+chmod -R ug+rwX "$APP_DIR/data/ibg-settings" || true
+
+echo "[6/6] Building images and starting services..."
 docker compose build
 docker compose up -d
+
+wait_service_healthy() {
+  local svc="$1"
+  local timeout="${2:-180}"
+  local elapsed=0
+
+  while [ "$elapsed" -lt "$timeout" ]; do
+    local cid
+    cid="$(docker compose ps -q "$svc" 2>/dev/null || true)"
+    if [ -n "$cid" ]; then
+      local state health
+      state="$(docker inspect -f '{{.State.Status}}' "$cid" 2>/dev/null || true)"
+      health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || true)"
+      if [ "$state" = "running" ] && { [ "$health" = "healthy" ] || [ "$health" = "none" ]; }; then
+        echo "  [ok] ${svc} ready (state=${state}, health=${health})"
+        return 0
+      fi
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+
+  echo "  [fail] ${svc} not ready within ${timeout}s"
+  docker compose ps "$svc" || true
+  return 1
+}
+
+echo "[6/6] Waiting service health..."
+wait_service_healthy api 180
+wait_service_healthy ibg 240
+wait_service_healthy nginx 120
 
 echo ""
 echo "=== Done ==="

@@ -4,6 +4,8 @@ param(
     [string]$SshKeyPath = "$HOME/.ssh/qopz_vm_key",
     [string]$WebUser = "opz",
     [string]$WebPassword = $env:QOPZ_WEB_PASSWORD,
+    [string]$IbgSettingsPath = "/opt/qopz/data/ibg-settings",
+    [bool]$AutoHealIbgSettings = $true,
     [int]$ServerLoopCount = 10,
     [int]$ServerLoopSleepSec = 1,
     [switch]$SkipUi
@@ -33,9 +35,54 @@ function Invoke-SshCommand {
     }
 }
 
+function Get-IbgSettingsStat {
+    $cmd = [string]::Format(
+        "if [ -d '{0}' ]; then stat -c '%u:%g %a' '{0}'; else echo MISSING; fi",
+        $IbgSettingsPath
+    )
+    return Invoke-SshCommand -RemoteCommand $cmd
+}
+
+Write-Host "[audit] Checking IBG settings permissions..." -ForegroundColor Cyan
+$ibgStatPre = Get-IbgSettingsStat
+$ibgPreRaw = ($ibgStatPre.Output.Trim() -split "`r?`n")[-1]
+$ibgOwnerPre = $null
+$ibgModePre = $null
+$ibgOwnerOkPre = $false
+if ($ibgPreRaw -match "^(?<owner>\d+:\d+)\s+(?<mode>\d+)$") {
+    $ibgOwnerPre = $Matches["owner"]
+    $ibgModePre = $Matches["mode"]
+    $ibgOwnerOkPre = ($ibgOwnerPre -eq "1000:1000")
+}
+
+$ibgHealAttempted = $false
+$ibgHealResult = $null
+if ($AutoHealIbgSettings -and -not $ibgOwnerOkPre) {
+    Write-Host "[audit] Repairing IBG settings permissions..." -ForegroundColor Yellow
+    $ibgHealAttempted = $true
+    $healCmd = [string]::Format(
+        "mkdir -p '{0}' && chown -R 1000:1000 '{0}' && chmod -R ug+rwX '{0}' && cd /opt/qopz && docker compose up -d --force-recreate ibg",
+        $IbgSettingsPath
+    )
+    $ibgHealResult = Invoke-SshCommand -RemoteCommand $healCmd
+    Start-Sleep -Seconds 8
+}
+
+$ibgStatPost = Get-IbgSettingsStat
+$ibgPostRaw = ($ibgStatPost.Output.Trim() -split "`r?`n")[-1]
+$ibgOwnerPost = $null
+$ibgModePost = $null
+$ibgOwnerOkPost = $false
+if ($ibgPostRaw -match "^(?<owner>\d+:\d+)\s+(?<mode>\d+)$") {
+    $ibgOwnerPost = $Matches["owner"]
+    $ibgModePost = $Matches["mode"]
+    $ibgOwnerOkPost = ($ibgOwnerPost -eq "1000:1000")
+}
+
 Write-Host "[audit] Checking VM docker services..." -ForegroundColor Cyan
 $psCmd = "cd /opt/qopz && docker compose ps"
 $psResult = Invoke-SshCommand -RemoteCommand $psCmd
+$psHasRestarting = $psResult.Output -match "Restarting"
 
 Write-Host "[audit] Checking server-side /health..." -ForegroundColor Cyan
 $healthCmd = [string]::Format(
@@ -80,6 +127,23 @@ $result = [ordered]@{
     vm = [ordered]@{
         docker_compose_ps_exit = $psResult.ExitCode
         docker_compose_ps = $psResult.Output
+        docker_compose_ps_has_restarting = $psHasRestarting
+        ibg_settings = [ordered]@{
+            path = $IbgSettingsPath
+            precheck_exit = $ibgStatPre.ExitCode
+            precheck_raw = $ibgPreRaw
+            precheck_owner = $ibgOwnerPre
+            precheck_mode = $ibgModePre
+            precheck_owner_ok = $ibgOwnerOkPre
+            heal_attempted = $ibgHealAttempted
+            heal_exit = if ($ibgHealResult) { $ibgHealResult.ExitCode } else { $null }
+            heal_output = if ($ibgHealResult) { $ibgHealResult.Output } else { $null }
+            postcheck_exit = $ibgStatPost.ExitCode
+            postcheck_raw = $ibgPostRaw
+            postcheck_owner = $ibgOwnerPost
+            postcheck_mode = $ibgModePost
+            postcheck_owner_ok = $ibgOwnerOkPost
+        }
         health_exit = $healthResult.ExitCode
         health_code = $healthCode
         account_loop_exit = $loopResult.ExitCode
@@ -95,7 +159,12 @@ $result = [ordered]@{
     }
 }
 
-$vmHealthy = ($healthResult.ExitCode -eq 0 -and $healthCode -eq "200")
+$vmHealthy = (
+    $healthResult.ExitCode -eq 0 -and
+    $healthCode -eq "200" -and
+    $ibgOwnerOkPost -and
+    -not $psHasRestarting
+)
 $loopHealthy = ($loopResult.ExitCode -eq 0 -and $loopCodes.Count -eq $ServerLoopCount -and $loopOk -eq $ServerLoopCount)
 $uiHealthy = $true
 if (-not $SkipUi) {
