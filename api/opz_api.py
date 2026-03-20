@@ -356,6 +356,7 @@ class EquitySnapshotRequest(BaseModel):
     asof_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     equity: float
     note: str = Field(default="")
+    trigger: str = Field(default="manual", pattern="^(auto|manual)$")
 
 
 class TradeJournalRequest(BaseModel):
@@ -374,6 +375,7 @@ class TradeJournalRequest(BaseModel):
     slippage_ticks: Optional[float] = None
     violations: int = Field(default=0, ge=0)
     note: str = Field(default="")
+    trigger: str = Field(default="manual", pattern="^(auto|manual)$")
 
 
 class PreviewResponse(BaseModel):
@@ -1126,129 +1128,6 @@ def _stringify_scalar(value: Any) -> str:
     return str(value).strip()
 
 
-
-def _count_profile_rows(con: Any, table_name: str, profile: str) -> int:
-    row = con.execute(f"SELECT COUNT(*) FROM {table_name} WHERE profile = ?", (profile,)).fetchone()
-    if not row:
-        return 0
-    try:
-        return int(row[0])
-    except (ValueError, TypeError):
-        return 0
-
-
-def _pick_bootstrap_candidate(profile: str) -> tuple[str, str, float]:
-    latest = fetch_latest_universe_batch()
-    if latest.get("has_data") and isinstance(latest.get("items"), list) and latest["items"]:
-        top = latest["items"][0]
-        symbol = str(top.get("symbol") or "SPY").strip().upper()
-        strategy = str(top.get("strategy") or "BULL_PUT").strip().upper()
-        score = float(top.get("score") or 0.62)
-        return symbol, strategy, score
-
-    try:
-        out = run_universe_scan_from_ibkr_settings(profile=profile, regime="NORMAL", top_n=6)
-    except Exception as _exc:  # IBKR settings unavailable — fall back to manual scan
-        logger.debug("IBKR settings scan failed, falling back: %s", _exc)
-        try:
-            out = run_universe_scan(profile=profile, symbols=["SPY", "QQQ", "IWM"], regime="NORMAL", top_n=3, source="manual")
-        except Exception as _exc2:  # manual scan also failed (e.g. UniverseDataUnavailableError in test env)
-            logger.debug("Manual scan fallback also failed: %s", _exc2)
-            return "SPY", "BULL_PUT", 0.62
-
-    items = out.get("items") if isinstance(out, dict) else None
-    if isinstance(items, list) and items:
-        top = items[0]
-        symbol = str(top.get("symbol") or "SPY").strip().upper()
-        strategy = str(top.get("strategy") or "BULL_PUT").strip().upper()
-        score = float(top.get("score") or 0.62)
-        return symbol, strategy, score
-
-    return "SPY", "BULL_PUT", 0.62
-
-
-def _bootstrap_runtime_data(profile: str = "paper") -> dict[str, Any]:
-    init_execution_schema()
-    con = _connect()
-    snapshots_before = _count_profile_rows(con, "paper_equity_snapshots", profile)
-    trades_before = _count_profile_rows(con, "paper_trades", profile)
-    con.close()
-
-    seeded_snapshots = 0
-    seeded_trades = 0
-    symbol = "SPY"
-    strategy = "BULL_PUT"
-
-    if snapshots_before > 0 and trades_before > 0:
-        return {
-            "ok": True,
-            "changed": False,
-            "profile": profile,
-            "seeded_snapshots": 0,
-            "seeded_trades": 0,
-            "symbol": symbol,
-            "strategy": strategy,
-        }
-
-    symbol, strategy, base_score = _pick_bootstrap_candidate(profile)
-    today = datetime.now(timezone.utc).date()
-
-    if snapshots_before == 0:
-        equity = 10000.0
-        start = today - timedelta(days=59)
-        for i in range(60):
-            d = start + timedelta(days=i)
-            drift = 0.0009 if (i % 7) not in {2, 5} else -0.0004
-            equity = round(equity * (1.0 + drift), 2)
-            record_equity_snapshot(
-                profile=profile,
-                asof_date=d,
-                equity=equity,
-                note="AUTO_BOOTSTRAP_DEMO startup warmup",
-            )
-            seeded_snapshots += 1
-
-    if trades_before == 0:
-        pnl_values = [32, -12, 28, 24, -10, 35, 18, 22, -14, 30, 26, 19, -11, 27, 21, -9, 25, 16, 20, -8]
-        start_day = today - timedelta(days=len(pnl_values) + 8)
-        for idx, pnl in enumerate(pnl_values):
-            d = start_day + timedelta(days=idx)
-            entry = datetime.combine(d, time_cls(hour=14, minute=35), tzinfo=timezone.utc)
-            exit_ = entry + timedelta(hours=2, minutes=10)
-            score = max(0.0, min(1.0, base_score + ((idx % 5) - 2) * 0.015))
-            slip = round(0.7 + (idx % 4) * 0.12, 2)
-            kelly = round(max(0.03, min(0.15, 0.08 + ((idx % 3) - 1) * 0.01)), 3)
-            exit_reason = "TAKE_PROFIT" if pnl >= 0 else "STOP_LOSS"
-            record_trade(
-                profile=profile,
-                symbol=symbol,
-                strategy=strategy,
-                entry_ts_utc=entry,
-                exit_ts_utc=exit_,
-                strikes=[100.0, 105.0],
-                regime_at_entry="NORMAL",
-                score_at_entry=score,
-                kelly_fraction=kelly,
-                exit_reason=exit_reason,
-                pnl=float(pnl),
-                pnl_pct=round(float(pnl) / 10000.0, 4),
-                slippage_ticks=slip,
-                violations=0,
-                note="AUTO_BOOTSTRAP_DEMO startup warmup",
-            )
-            seeded_trades += 1
-
-    return {
-        "ok": True,
-        "changed": bool(seeded_snapshots or seeded_trades),
-        "profile": profile,
-        "seeded_snapshots": seeded_snapshots,
-        "seeded_trades": seeded_trades,
-        "symbol": symbol,
-        "strategy": strategy,
-    }
-
-
 @app.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
@@ -1302,16 +1181,14 @@ def opz_release_status() -> Dict[str, Any]:
 @app.post("/opz/bootstrap")
 def opz_bootstrap(profile: str = "paper", allow_demo: bool = False) -> Dict[str, Any]:
     profile_norm = _clean_text(profile, "profile")
-    if not allow_demo:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "stage": "bootstrap",
-                "reason": "demo bootstrap disabled by default; retry with allow_demo=true only for explicit demo warmup",
-                "profile": profile_norm,
-            },
-        )
-    return _bootstrap_runtime_data(profile=profile_norm)
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "stage": "bootstrap",
+            "reason": "demo bootstrap warmup removed: synthetic seed generation is disabled",
+            "profile": profile_norm,
+        },
+    )
 
 
 @app.get("/opz/narrator/tutorial")
@@ -1369,7 +1246,7 @@ def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
 
     snapshots_rows = con.execute(
         """
-        SELECT created_at, asof_date, equity, note, profile
+        SELECT created_at, asof_date, equity, note, profile, COALESCE(trigger, 'manual')
         FROM paper_equity_snapshots
         ORDER BY created_at DESC
         LIMIT ?
@@ -1379,7 +1256,8 @@ def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
     trades_rows = con.execute(
         """
         SELECT created_at, symbol, strategy, pnl, pnl_pct, slippage_ticks, violations, note, profile,
-               entry_ts_utc, exit_ts_utc, strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason
+               entry_ts_utc, exit_ts_utc, strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason,
+               COALESCE(trigger, 'manual')
         FROM paper_trades
         ORDER BY created_at DESC
         LIMIT ?
@@ -1407,6 +1285,7 @@ def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
             "equity": float(r[2]) if r[2] is not None else None,
             "note": str(r[3]) if r[3] is not None else "",
             "profile": str(r[4]) if r[4] is not None else "",
+            "trigger": str(r[5]) if r[5] is not None else "manual",
         }
         for r in snapshots_rows
     ]
@@ -1429,6 +1308,7 @@ def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
             "score_at_entry": float(r[13]) if r[13] is not None else None,
             "kelly_fraction": float(r[14]) if r[14] is not None else None,
             "exit_reason": str(r[15]) if r[15] is not None else "",
+            "trigger": str(r[16]) if r[16] is not None else "manual",
         }
         for r in trades_rows
     ]
@@ -1512,9 +1392,14 @@ def opz_paper_summary(profile: str = "paper", window_days: int = 60, asof_date: 
 
 
 @app.get("/opz/paper/equity_history")
-def opz_paper_equity_history(profile: str = "paper", limit: int = 60) -> EquityHistoryOut:
+def opz_paper_equity_history(
+    profile: str = "paper",
+    limit: int = 60,
+    asof_date: Optional[str] = None,
+) -> EquityHistoryOut:
     """
     Ultimi N snapshot equity ordinati per data ASC (per sparkline).
+    asof_date (YYYY-MM-DD): se fornita, mostra solo snapshot <= asof_date.
 
     Response:
       ok              bool
@@ -1522,22 +1407,44 @@ def opz_paper_equity_history(profile: str = "paper", limit: int = 60) -> EquityH
       n_points        int
       latest_equity   float | null
       initial_equity  float | null
+      min_date        str | null   (la data più vecchia disponibile nel DB)
+      max_date        str | null   (la data più recente disponibile nel DB)
       points          list[{date: str, equity: float}]
     """
     n = max(1, min(int(limit), 500))
     con = _connect()
     try:
-        rows = con.execute(
-            """
-            SELECT asof_date, equity
-            FROM paper_equity_snapshots
-            WHERE profile = ?
-              AND equity IS NOT NULL
-            ORDER BY asof_date DESC
-            LIMIT ?
-            """,
-            (profile, n),
-        ).fetchall()
+        if asof_date:
+            rows = con.execute(
+                """
+                SELECT asof_date, equity
+                FROM paper_equity_snapshots
+                WHERE profile = ?
+                  AND equity IS NOT NULL
+                  AND asof_date <= ?
+                ORDER BY asof_date DESC
+                LIMIT ?
+                """,
+                (profile, asof_date, n),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                """
+                SELECT asof_date, equity
+                FROM paper_equity_snapshots
+                WHERE profile = ?
+                  AND equity IS NOT NULL
+                ORDER BY asof_date DESC
+                LIMIT ?
+                """,
+                (profile, n),
+            ).fetchall()
+
+        # range boundaries for navigation
+        bounds = con.execute(
+            "SELECT MIN(asof_date), MAX(asof_date) FROM paper_equity_snapshots WHERE profile = ? AND equity IS NOT NULL",
+            (profile,),
+        ).fetchone()
     finally:
         con.close()
 
@@ -1548,6 +1455,8 @@ def opz_paper_equity_history(profile: str = "paper", limit: int = 60) -> EquityH
     ]
     latest_equity = points[-1]["equity"] if points else None
     initial_equity = points[0]["equity"] if points else None
+    min_date = str(bounds[0]) if bounds and bounds[0] else None
+    max_date = str(bounds[1]) if bounds and bounds[1] else None
 
     return {
         "ok": True,
@@ -1555,6 +1464,8 @@ def opz_paper_equity_history(profile: str = "paper", limit: int = 60) -> EquityH
         "n_points": len(points),
         "latest_equity": latest_equity,
         "initial_equity": initial_equity,
+        "min_date": min_date,
+        "max_date": max_date,
         "points": points,
     }
 
@@ -1571,7 +1482,7 @@ def opz_paper_equity_snapshot(req: EquitySnapshotRequest) -> Dict[str, Any]:
         d = _date.fromisoformat(req.asof_date)
     except ValueError:
         raise HTTPException(status_code=400, detail="invalid asof_date (expected YYYY-MM-DD)")
-    sid = record_equity_snapshot(profile=profile, asof_date=d, equity=equity, note=req.note.strip())
+    sid = record_equity_snapshot(profile=profile, asof_date=d, equity=equity, note=req.note.strip(), trigger=req.trigger)
     return {"ok": True, "snapshot_id": sid}
 
 
@@ -1615,6 +1526,7 @@ def opz_paper_trade(req: TradeJournalRequest) -> Dict[str, Any]:
         slippage_ticks=slippage_ticks,
         violations=req.violations,
         note=note,
+        trigger=req.trigger,
     )
     return {"ok": True, "trade_id": tid}
 
@@ -3020,7 +2932,11 @@ def opz_system_status() -> SystemStatusOut:
         {
             "name": "data_mode",
             "status": "OK" if data_mode == "VENDOR_REAL_CHAIN" else "WARN",
-            "detail": data_mode,
+            "detail": (
+                "Sintetici — fase paper normale"
+                if "SYNTHETIC" in data_mode
+                else "Reali IBKR — dati live"
+            ),
         },
         {
             "name": "kelly",
@@ -3823,3 +3739,110 @@ async def opz_session_run(req: SessionRunRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         _SESSION_STATE["running"] = False
+
+
+class SessionLogRequest(BaseModel):
+    profile: str = Field(default="paper")
+    session_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    session_type: str = Field(..., pattern="^(morning|eod)$")
+    regime: Optional[str] = None
+    equity: Optional[float] = None
+    n_symbols: Optional[int] = None
+    errors: Optional[list[str]] = None
+    trigger: str = Field(default="auto", pattern="^(auto|manual)$")
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+
+
+@app.post("/opz/session/log")
+def opz_session_log(req: SessionLogRequest) -> Dict[str, Any]:
+    """
+    Registra il risultato di una sessione morning/eod in DuckDB (session_logs).
+    Chiamato da session_runner.py al termine di ogni sessione automatica.
+    """
+    init_execution_schema()
+    con = _connect()
+    log_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    prov = _prov(req.profile, now)
+    errors_json = json.dumps(req.errors or [], ensure_ascii=False)
+    equity_val = float(req.equity) if req.equity is not None and math.isfinite(req.equity) else None
+    try:
+        con.execute(
+            """
+            INSERT INTO session_logs (
+                log_id, profile, session_date, session_type, regime,
+                equity, n_symbols, errors_json, trigger,
+                started_at, finished_at,
+                source_system, source_mode, source_quality, asof_ts, received_ts
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                log_id, req.profile, req.session_date, req.session_type,
+                req.regime, equity_val, req.n_symbols, errors_json, req.trigger,
+                req.started_at, req.finished_at,
+                *prov,
+            ),
+        )
+        if hasattr(con, "commit"):
+            con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "log_id": log_id}
+
+
+@app.get("/opz/session/logs")
+def opz_session_logs(
+    profile: str = "paper",
+    limit: int = 30,
+    session_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Storico sessioni persistito in DuckDB, ordinato per session_date DESC."""
+    init_execution_schema()
+    n = max(1, min(int(limit), 200))
+    con = _connect()
+    try:
+        if session_type:
+            rows = con.execute(
+                """
+                SELECT log_id, session_date, session_type, regime, equity, n_symbols,
+                       errors_json, trigger, started_at, finished_at
+                FROM session_logs
+                WHERE profile = ? AND session_type = ?
+                ORDER BY session_date DESC, finished_at DESC
+                LIMIT ?
+                """,
+                (profile, session_type, n),
+            ).fetchall()
+        else:
+            rows = con.execute(
+                """
+                SELECT log_id, session_date, session_type, regime, equity, n_symbols,
+                       errors_json, trigger, started_at, finished_at
+                FROM session_logs
+                WHERE profile = ?
+                ORDER BY session_date DESC, finished_at DESC
+                LIMIT ?
+                """,
+                (profile, n),
+            ).fetchall()
+    finally:
+        con.close()
+
+    logs = [
+        {
+            "log_id": r[0],
+            "session_date": str(r[1]) if r[1] else "",
+            "session_type": str(r[2]) if r[2] else "",
+            "regime": str(r[3]) if r[3] else None,
+            "equity": float(r[4]) if r[4] is not None else None,
+            "n_symbols": int(r[5]) if r[5] is not None else None,
+            "errors": json.loads(r[6]) if r[6] else [],
+            "trigger": str(r[7]) if r[7] else "auto",
+            "started_at": str(r[8]) if r[8] else None,
+            "finished_at": str(r[9]) if r[9] else None,
+        }
+        for r in rows
+    ]
+    return {"ok": True, "profile": profile, "n": len(logs), "logs": logs}
+
