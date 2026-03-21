@@ -406,7 +406,7 @@ type IbwrServiceResponse = {
   message?: string;
 };
 
-type TabKey = "warroom" | "pipeline" | "universe";
+type TabKey = "warroom" | "pipeline";
 type CenterPhase = "ante" | "op" | "post" | "old";
 type AnteSubTab = "dati" | "analisi" | "briefing";
 type OpSubTab = "trading" | "wheel" | "metriche" | "backtest";
@@ -803,6 +803,7 @@ export default function App() {
   const [activityOpen, setActivityOpen] = useState<boolean>(true);
   const [sysLog, setSysLog] = useState<SysLogRecord[]>([]);
   const [sysLogOpen, setSysLogOpen] = useState<boolean>(true);
+  const [scanConfigOpen, setScanConfigOpen] = useState<boolean>(false);
   const sysLogRef = React.useRef<HTMLDivElement>(null);
   const [wheelPositions, setWheelPositions] = useState<WheelPositionsResponse | null>(null);
   const [wheelFetchedAt, setWheelFetchedAt] = useState<number | null>(null);
@@ -2202,7 +2203,6 @@ export default function App() {
 
   const oldNavItems: Array<{ id: TabKey; label: string }> = [
     { id: "warroom", label: "WAR ROOM" },
-    { id: "universe", label: "UNIVERSE SCANNER" },
     { id: "pipeline", label: "PIPELINE AUTO" },
   ];
   const resolvedTab: TabKey = centerPhase === "old"
@@ -2877,6 +2877,55 @@ export default function App() {
                         <div className="lc-screen-row"><span className="lc-dim">max_loss_pct</span><span className={premarketPrimary.max_loss_pct < 0.3 ? "sev-ok" : "sev-warn"}>{(premarketPrimary.max_loss_pct * 100).toFixed(1)}%</span></div>
                       </div>
                     </>}
+                    {/* Parametri scan — collassabile */}
+                    <div style={{marginTop:10, borderTop:"1px solid var(--border)", paddingTop:8}}>
+                      <div
+                        style={{display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", fontSize:"0.62rem", color:"var(--dim)", userSelect:"none"}}
+                        onClick={() => setScanConfigOpen(v => !v)}
+                        role="button" tabIndex={0}
+                      >
+                        <span>{scanConfigOpen ? "▾" : "▸"} parametri scan manuale</span>
+                        {!scanConfigOpen && <span className="sev-meta" style={{fontSize:"0.58rem"}}>regime={universeRegime} · top {universeTopN}</span>}
+                      </div>
+                      {scanConfigOpen && (
+                        <div style={{marginTop:8, display:"flex", flexDirection:"column", gap:6}}>
+                          <div style={{display:"flex", gap:8, alignItems:"center"}}>
+                            <span style={{fontSize:"0.62rem", color:"var(--dim)", width:60}}>Regime</span>
+                            <select value={universeRegime} onChange={e => setUniverseRegime(e.target.value as "NORMAL"|"CAUTION"|"SHOCK")}
+                              style={{background:"var(--p1)", color:"var(--text)", border:"1px solid var(--border)", fontSize:"0.65rem", padding:"2px 4px", flex:1}}>
+                              <option value="NORMAL">NORMAL</option>
+                              <option value="CAUTION">CAUTION</option>
+                              <option value="SHOCK">SHOCK</option>
+                            </select>
+                          </div>
+                          <div style={{display:"flex", gap:8, alignItems:"center"}}>
+                            <span style={{fontSize:"0.62rem", color:"var(--dim)", width:60}}>Top N</span>
+                            <input value={universeTopN} onChange={e => setUniverseTopN(e.target.value)}
+                              style={{background:"var(--p1)", color:"var(--text)", border:"1px solid var(--border)", fontSize:"0.65rem", padding:"2px 4px", flex:1, width:40}} />
+                          </div>
+                          <div style={{display:"flex", gap:8, alignItems:"center"}}>
+                            <span style={{fontSize:"0.62rem", color:"var(--dim)", width:60}}>Source</span>
+                            <select value={universeSource} onChange={e => setUniverseSource(e.target.value as "auto"|"manual"|"ibkr_settings")}
+                              style={{background:"var(--p1)", color:"var(--text)", border:"1px solid var(--border)", fontSize:"0.65rem", padding:"2px 4px", flex:1}}>
+                              <option value="ibkr_settings">ibkr_settings</option>
+                              <option value="auto">auto</option>
+                              <option value="manual">manual</option>
+                            </select>
+                          </div>
+                          {universeSource === "manual" && (
+                            <div style={{display:"flex", gap:8, alignItems:"center"}}>
+                              <span style={{fontSize:"0.62rem", color:"var(--dim)", width:60}}>Symbols</span>
+                              <input value={universeSymbols} onChange={e => setUniverseSymbols(e.target.value)}
+                                placeholder="SPY,QQQ,AAPL,..."
+                                style={{background:"var(--p1)", color:"var(--text)", border:"1px solid var(--border)", fontSize:"0.65rem", padding:"2px 4px", flex:1}} />
+                            </div>
+                          )}
+                          <div style={{fontSize:"0.58rem", color:"var(--dim)", marginTop:2}}>
+                            batch: {universeLatest?.batch_id?.slice(0,8) ?? "—"} · size: {universeLatest?.universe_size ?? "N/D"} · {universeLatest?.created_at_utc ? fmtTs(universeLatest.created_at_utc) : "mai"}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <div className="lc-action-bar">
                       <button className="btn btn-primary" onClick={() => void doScanFull()} disabled={busy || !apiOnline}>
                         {busy ? "..." : "▶ Scan completo"}
@@ -3992,7 +4041,7 @@ export default function App() {
                 {/* ── ROC16: Quick-nav action strip ───────────────────── */}
                 <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
                   <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "3px 8px", flex: 1 }}
-                    onClick={() => openOldTab("universe")}>
+                    onClick={() => { setCenterPhase("ante"); setAnteSubTab("analisi"); }}>
                     → SCAN
                   </button>
                   <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "3px 8px", flex: 1 }}
@@ -4470,190 +4519,6 @@ export default function App() {
             </div>
           )}
 
-          {centerPhase === "old" && resolvedTab === "universe" && (
-            <div className="panel-grid two">
-                            <article className="panel">
-                <div className="panel-title">UNIVERSE CONFIG</div>
-                <div className="form-grid">
-                  <label>Source</label>
-                  <select value={universeSource} onChange={(e) => setUniverseSource(e.target.value as "auto" | "manual" | "ibkr_settings") }>
-                    <option value="ibkr_settings">ibkr_settings</option>
-                    <option value="manual">manual</option>
-                    <option value="auto">auto</option>
-                  </select>
-
-                  {universeSource === "manual" && (
-                    <>
-                      <label>Symbols</label>
-                      <input
-                        value={universeSymbols}
-                        onChange={(e) => setUniverseSymbols(e.target.value)}
-                        placeholder="SPY,QQQ,IWM,..."
-                      />
-                    </>
-                  )}
-
-                  <label>Regime</label>
-                  <select
-                    value={universeRegime}
-                    onChange={(e) => setUniverseRegime(e.target.value as "NORMAL" | "CAUTION" | "SHOCK")}
-                  >
-                    <option value="NORMAL">NORMAL</option>
-                    <option value="CAUTION">CAUTION</option>
-                    <option value="SHOCK">SHOCK</option>
-                  </select>
-
-                  <label>Top N</label>
-                  <input value={universeTopN} onChange={(e) => setUniverseTopN(e.target.value)} />
-
-                  <label>Settings path</label>
-                  <input
-                    value={universeSettingsPath}
-                    onChange={(e) => setUniverseSettingsPath(e.target.value)}
-                    placeholder="default: docs/IBKE setting decriptato.sanitized.xml"
-                  />
-
-                  <label>Scanner</label>
-                  <select value={universeScannerName} onChange={(e) => setUniverseScannerName(e.target.value)}>
-                    {ibkrScanners.map((s) => (
-                      <option key={s.scanner_name} value={s.scanner_name}>
-                        {s.scanner_name} ({s.scan_code || "n/a"})
-                      </option>
-                    ))}
-                    {ibkrScanners.length === 0 && <option value="">No scanner</option>}
-                  </select>
-                </div>
-
-                <div className="actions">
-                  <button className="btn btn-primary" onClick={() => void doAutoDemoPipeline()} disabled={busy}>
-                    AUTO PIPELINE
-                  </button>
-                  <button className="btn btn-primary" onClick={doUniverseScan} disabled={busy}>
-                    RUN SCAN
-                  </button>
-                  <button className="btn" onClick={refreshAll} disabled={busy}>
-                    REFRESH
-                  </button>
-                </div>
-
-                <ul className="activity-list">
-                  <li>Batch: <code>{universeLatest?.batch_id ?? "-"}</code></li>
-                  <li>Created UTC: {universeLatest?.created_at_utc ? fmtTs(universeLatest.created_at_utc) : "-"}</li>
-                  <li>Regime: {universeLatest?.regime ?? "-"}</li>
-                  <li>Source: {universeLatest?.source ?? "-"}</li>
-                  <li>Market rows: {universeLatest?.market_rows_available ?? 0}</li>
-                  <li>Universe size: {universeLatest?.universe_size ?? 0}</li>
-                  <li>Settings file: {ibkrContext?.settings_exists ? "FOUND" : "MISSING"}</li>
-                  <li>Quote symbols in settings: {ibkrContext?.quote_symbol_count ?? 0}</li>
-                  <li>Scanner code: {selectedScanner?.scan_code || "-"}</li>
-                  <li>Filter fallback: {universeLatest?.filter_fallback ? "YES" : "NO"}</li>
-                  <li>Provenance rows API/OCR: {(universeProvenance?.api_rows ?? 0)} / {(universeProvenance?.ocr_rows ?? 0)}</li>
-                  <li>Provenance ts: {universeProvenance?.generated_at_utc ? fmtTs(universeProvenance.generated_at_utc) : "-"}</li>
-                </ul>
-
-                {selectedScannerFilters.length > 0 && (
-                  <pre className="console">{JSON.stringify(Object.fromEntries(selectedScannerFilters), null, 2)}</pre>
-                )}
-              </article>
-
-              <article className="panel">
-                <div className="panel-title">UNIVERSE PANELS (IBKR)</div>
-                <div className="universe-subtabs">
-                  <button className={`btn ${universeSubTab === "titoli" ? "btn-primary" : ""}`} onClick={() => setUniverseSubTab("titoli")}>Titoli</button>
-                  <button className={`btn ${universeSubTab === "indici" ? "btn-primary" : ""}`} onClick={() => setUniverseSubTab("indici")}>Indici</button>
-                  <button className={`btn ${universeSubTab === "opzioni" ? "btn-primary" : ""}`} onClick={() => setUniverseSubTab("opzioni")}>Opzioni</button>
-                  <button className={`btn ${universeSubTab === "ciclo" ? "btn-primary" : ""}`} onClick={() => setUniverseSubTab("ciclo")}>Ciclo</button>
-                  <button className={`btn ${universeSubTab === "palinsesto" ? "btn-primary" : ""}`} onClick={() => setUniverseSubTab("palinsesto")}>Palinsesto</button>
-                </div>
-
-                {universeSubTab === "opzioni" && (
-                  <table className="data-table shortlist-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Symbol</th>
-                        <th>Strategy</th>
-                        <th><Tooltip text={TOOLTIPS.score_composito}>Score</Tooltip></th>
-                        <th><Tooltip text={TOOLTIPS.ivr}>IVR</Tooltip></th>
-                        <th><Tooltip text={TOOLTIPS.spread_pct}>Spread</Tooltip></th>
-                        <th>Source</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {opzioniRows.map((it) => (
-                        <tr key={`u-${it.rank}-${it.symbol}`}>
-                          <td>{it.rank}</td>
-                          <td>{it.symbol}</td>
-                          <td>{it.strategy}</td>
-                          <td>{it.score.toFixed(3)}</td>
-                          <td>{(it.iv_rank * 100).toFixed(1)}%</td>
-                          <td>{(it.spread_pct * 100).toFixed(2)}%</td>
-                          <td><span className={`source-badge ${sourceBadgeClass(rowSourceBySymbol.get(it.symbol.toUpperCase()) ?? "none")}`}>{(rowSourceBySymbol.get(it.symbol.toUpperCase()) ?? "none").toUpperCase()}</span></td>
-                          <td>
-                            <button
-                              className="btn btn-ghost"
-                              onClick={() => {
-                                setSymbol(it.symbol);
-                                setStrategy(it.strategy);
-                                setPayload(
-                                  JSON.stringify(
-                                    {
-                                      source: "universe_shortlist",
-                                      symbol: it.symbol,
-                                      strategy: it.strategy,
-                                      rank: it.rank,
-                                      score: it.score,
-                                      regime: universeLatest?.regime ?? universeRegime,
-                                    },
-                                    null,
-                                    2
-                                  )
-                                );
-                                openOldTab("pipeline");
-                                setError("");
-                                setMessage(`Candidate loaded: ${it.symbol}/${it.strategy}`);
-                              }}
-                            >
-                              LOAD
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {opzioniRows.length === 0 && (
-                        <tr>
-                          <td colSpan={8} className="dim">Nessuna shortlist disponibile. Esegui RUN SCAN.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
-
-                {universeSubTab !== "opzioni" && (
-                  <table className="data-table shortlist-table">
-                    <thead>
-                      <tr><th>#</th><th>Symbol</th><th>Last</th><th>VS%</th><th>VI%</th><th>Source</th></tr>
-                    </thead>
-                    <tbody>
-                      {nonOptionsRows.map((row, idx) => (
-                        <tr key={`sym-${universeSubTab}-${row.symbol}`}>
-                          <td>{idx + 1}</td>
-                          <td>{row.symbol}</td>
-                          <td className={fieldClass(row.field_sources?.last)}>{row.last === null ? "-" : row.last.toFixed(3)}</td>
-                          <td className={fieldClass(row.field_sources?.vs_pct)}>{row.vs_pct === null ? "-" : `${(row.vs_pct * 100).toFixed(2)}%`}</td>
-                          <td className={fieldClass(row.field_sources?.vi_pct)}>{row.vi_pct === null ? "-" : `${(row.vi_pct * 100).toFixed(2)}%`}</td>
-                          <td><span className={`source-badge ${sourceBadgeClass(row.source)}`}>{row.source.toUpperCase()}</span></td>
-                        </tr>
-                      ))}
-                      {nonOptionsRows.length === 0 && (
-                        <tr><td colSpan={6} className="dim">Nessun simbolo disponibile in questo pannello.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
-              </article>
-            </div>
-          )}
         </section>
 
         <aside className="rightpanel">
