@@ -32,6 +32,8 @@ nav:
   - 'Cap. 5 — La WAR ROOM': 06_war_room.md
   - 'Cap. 6 — Tier e Strategie': 07_tier_strategie.md
   - 'Cap. 7 — Il Periodo Paper': 08_periodo_paper.md
+  - 'Cap. 8 — Lo Scheduler': 09_scheduler.md
+  - 'Cap. 9 — Control Plane': 10_control_plane.md
   - 'Appendice A — I Dati nel dettaglio': appendice_a_dati.md
   - 'Il Viaggio di un Trade': trade_lifecycle.md
 
