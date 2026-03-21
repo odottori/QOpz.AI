@@ -90,3 +90,13 @@ Quello che arriva sulla tua scrivania è già stato setacciato, pesato, valutato
 ---
 
 *Nel prossimo capitolo, il concetto più importante di tutto il sistema: il regime di mercato.*
+
+---
+
+## Cosa può andare storto
+
+| Situazione | Segnale che vedi | Causa probabile | Cosa fare |
+|------------|-----------------|-----------------|-----------|
+| Scanner restituisce 0 candidati | Lista opportunità vuota dopo RUN SCAN | Regime SHOCK attivo (nessun trade consentito), oppure tutti i simboli dell'universo non superano i filtri duri in questo momento | Controlla il badge regime: se è SHOCK è normale e corretto. Se è NORMAL, verifica IVR medio del mercato — potrebbe essere un periodo di volatilità compressa in cui pochi simboli raggiungono IVR ≥ 20 |
+| Candidato sparisce tra scan e conferma | Il simbolo non appare più nella pipeline al momento del CONFIRM | I filtri vengono ricalcolati in tempo reale: spread, OI o IVR sono cambiati tra la visualizzazione e la conferma | Non forzare l'ordine su un candidato che non supera più i filtri al momento della conferma; esegui un nuovo scan per avere dati aggiornati |
+| IVR basso su tutti i simboli | Scan restituisce pochi o nessun candidato; IVR di ogni simbolo sotto 20 | Mercato in fase di compressione della volatilità (es. periodo post-evento, mercato laterale stretto) — condizione normale in certi contesti stagionali | Non abbassare la soglia IVR per "trovare qualcosa"; aspetta che il mercato torni in condizioni favorevoli; questo è esattamente ciò per cui il filtro esiste |

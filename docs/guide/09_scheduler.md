@@ -3,40 +3,91 @@
 
 ---
 
-### Cos'è il Session Scheduler
+### Cos'è
 
-Il Session Scheduler è il componente che avvia automaticamente due cicli operativi ogni giorno di trading:
-
-- **Sessione Morning** — alle 09:00 ora New York, prima dell'apertura del mercato americano. Esegue il regime check, lo scan delle opportunità e prepara il briefing del giorno.
-- **Sessione EOD** (End of Day) — alle 16:30 ora New York, dopo la chiusura. Aggiorna le metriche di equity, controlla le posizioni aperte, registra l'esito della giornata.
-
-Senza lo scheduler, queste operazioni vanno avviate manualmente ogni giorno. Con lo scheduler attivo, il sistema lavora da solo nei giorni di mercato — incluso nei fine settimana di raccolta dati.
+Il Session Scheduler avvia automaticamente due cicli operativi ogni giorno di mercato: uno la mattina, prima dell'apertura delle borse americane, e uno a fine giornata, dopo la chiusura. Senza scheduler, queste operazioni andrebbero avviate manualmente ogni giorno.
 
 ---
 
-### Come si attiva
+### Cosa vede l'operatore
 
-Lo scheduler si configura nel file `config/paper.toml` (o `config/dev.toml` per sviluppo), nella sezione `[sessions]`:
+Nella barra superiore della War Room compare un badge **Scheduler** con tre possibili stati:
 
-```toml
-[sessions]
-enabled = true
-morning_time = "09:00"
-eod_time = "16:30"
-timezone = "America/New_York"
-duration_max_min = 10
-skip_weekends = true
-skip_holidays = true
-profile = "paper"
-api_base = "http://localhost:8765"
-```
+| Badge | Cosa significa |
+|-------|---------------|
+| **Attivo** (verde) | Lo scheduler è abilitato e aspetta l'orario programmato |
+| **In esecuzione** (arancione, lampeggiante) | Una sessione è in corso in questo momento |
+| **Inattivo** (grigio) | Lo scheduler è disabilitato in configurazione — le sessioni si avviano solo manualmente |
 
-I campi principali:
+Accanto al badge compare l'orario della prossima sessione prevista, es. "Prossima: mattina alle 09:00 ET".
+
+---
+
+### Flusso normale
+
+**Ogni mattina (ore 09:00 ET, giorni di mercato)**
+
+Lo scheduler si attiva automaticamente. Il sistema controlla il regime di mercato (NORMAL / CAUTION / SHOCK), scansiona l'universo di simboli in cerca di opportunità e prepara il briefing del giorno. Al termine, il risultato viene registrato nello storico delle sessioni.
+
+L'operatore trova il briefing aggiornato nella War Room quando apre il pannello al mattino — non deve fare nulla.
+
+**Ogni fine giornata (ore 16:30 ET, giorni di mercato)**
+
+Lo scheduler avvia la sessione EOD. Il sistema registra lo snapshot di equity del conto, controlla le posizioni aperte e chiude le metriche della giornata. Anche questo avviene senza intervento dell'operatore.
+
+**Giorni festivi e weekend**
+
+Lo scheduler salta automaticamente sabato, domenica e i giorni festivi di mercato americano. Nessuna sessione viene avviata e nessuna riga appare nello storico — è il comportamento corretto.
+
+---
+
+### Avviare una sessione manualmente
+
+Dalla War Room, nella sezione Scheduler, compare il pulsante **Avvia sessione**. L'operatore sceglie il tipo (mattina o EOD) e conferma.
+
+Quando ha senso farlo:
+
+- Una sessione automatica è saltata per un problema tecnico e l'operatore vuole recuperarla
+- Si vuole forzare un ciclo fuori orario, ad esempio dopo aver corretto un errore
+- Si vuole testare il sistema in un ambiente di sviluppo senza aspettare l'orario previsto
+
+Se una sessione è già in corso, il sistema mostra un avviso e blocca il secondo avvio — bisogna aspettare il completamento prima di riprovare.
+
+---
+
+### Cosa può andare storto
+
+| Situazione | Messaggio / segnale | Causa probabile | Cosa fare |
+|------------|--------------------|-----------------|-----------|
+| Lo scheduler non si avvia all'avvio dell'API | Badge "Inattivo", nei log compare `SESSION_SCHEDULER disabled (enabled=false in config)` | L'opzione `enabled` è `false` nel file di configurazione | Controlla `config/paper.toml`, sezione `[sessions]`: imposta `enabled = true` e riavvia l'API |
+| Avvio manuale bloccato con errore | "Sessione già in corso — attendi il completamento" (codice 409) | Una sessione è già in esecuzione in background | Aspetta che la sessione corrente finisca; se il badge rimane "In esecuzione" da oltre 10 minuti, è bloccata — vedi riga seguente |
+| Badge "In esecuzione" da troppo tempo | Nessun aggiornamento dopo 10+ minuti | La sessione ha raggiunto il timeout oppure è bloccata su un subprocess | Riavvia l'API: il task in background viene cancellato automaticamente allo shutdown. I log del processo sono in `logs/` |
+| Avvio manuale scaduto | "Timeout sessione morning (>10 min)" (codice 504) | La sessione non ha completato entro il tempo massimo configurato | Verifica che IBKR sia raggiungibile e che non ci siano errori nei log. Ritenta dopo aver risolto il problema alla base |
+| Sessione completata con avvisi | Nel log: `SESSION_MORNING WARN errors=N` | La sessione è terminata ma ha incontrato N errori non bloccanti (es. simbolo non disponibile, dati parziali) | Apri lo storico sessioni e leggi il campo `errors` della riga corrispondente. Ogni messaggio indica quale componente ha avuto problemi |
+| Sessione fallita completamente | Nel log: `SESSION_MORNING FAILED` | Un errore critico ha interrotto la sessione (eccezione non gestita, servizio non raggiungibile) | Consulta i log dell'API per il dettaglio dell'eccezione. Risolvi il problema e avvia manualmente la sessione con il pulsante in UI |
+| EOD senza snapshot di equity | Il grafico equity non si aggiorna, la sessione EOD risulta completata ma con warning | IBKR non era connesso al momento dell'EOD: lo snapshot di equity non può essere acquisito senza dati live dal conto | Verifica che TWS o IBG siano in esecuzione e connessi. Inserisci manualmente lo snapshot equity dal pannello Paper Metrics, poi riesegui l'EOD se necessario |
+| Sessione non compare nello storico | Nessuna riga nel log per la data attesa | Giorno festivo o weekend (comportamento corretto), oppure l'API era offline all'orario previsto | Se era un giorno di mercato e l'API era attiva, controlla i log per messaggi `SESSION_SCHEDULER`. Se l'API era spenta, avvia la sessione manualmente con "Avvia sessione" |
+
+---
+
+### Riferimento tecnico
+
+> Questa sezione è destinata a chi lavora direttamente con l'API o i file di configurazione.
+
+**Endpoint**
+
+| Operazione | Endpoint |
+|------------|----------|
+| Stato scheduler e prossime sessioni | `GET /opz/session/status` |
+| Avvia sessione manualmente | `POST /opz/session/run` |
+| Storico sessioni | `GET /opz/session/logs?profile=paper&limit=30` |
+
+**Configurazione** — `config/paper.toml`, sezione `[sessions]`
 
 | Campo | Default | Significato |
 |-------|---------|-------------|
 | `enabled` | `false` | Attiva (`true`) o disattiva lo scheduler |
-| `morning_time` | `"09:00"` | Orario sessione mattutina (timezone locale) |
+| `morning_time` | `"09:00"` | Orario sessione mattutina (nel fuso configurato) |
 | `eod_time` | `"16:30"` | Orario sessione serale |
 | `timezone` | `"America/New_York"` | Fuso orario di riferimento |
 | `duration_max_min` | `10` | Timeout massimo in minuti per sessione |
@@ -44,138 +95,12 @@ I campi principali:
 | `skip_holidays` | `true` | Salta giorni festivi di mercato |
 | `profile` | `"paper"` | Profilo di configurazione usato dalle sessioni |
 
-Lo scheduler si avvia automaticamente all'apertura dell'API. Se `enabled = false`, rimane inattivo ma disponibile per trigger manuali.
-
----
-
-### Flusso: automatico vs manuale
-
-**Automatico (scheduler abilitato)**
-
-```
-API avviata
-    └─ Scheduler legge config
-       └─ Calcola prossima sessione (morning o eod)
-          └─ Dorme fino all'orario previsto
-             └─ Esegue session_runner.py come subprocess
-                └─ Salva risultato in DuckDB (tabella session_logs)
-                   └─ Ricomincia il ciclo
-```
-
-**Manuale (trigger on-demand)**
-
-Puoi avviare una sessione in qualsiasi momento anche con lo scheduler disabilitato, tramite l'API:
-
-```
-POST /opz/session/run
-{
-  "type": "morning",   // oppure "eod"
-  "profile": "paper",
-  "force": false        // true = esegui anche fuori orario/giorno di trading
-}
-```
-
-Il trigger manuale è utile per:
-- Recuperare una sessione saltata per problemi tecnici
-- Testare il sistema fuori orario
-- Forzare un ciclo dopo aver corretto un errore
-
-> Se una sessione è già in corso, il sistema risponde con errore 409 — attendi il completamento prima di rilanciare.
-
----
-
-### Stato dello scheduler
-
-Per vedere se lo scheduler è attivo e quando sono previste le prossime sessioni:
-
-```
-GET /opz/session/status
-```
-
-Risposta tipica:
-
-```json
-{
-  "ok": true,
-  "enabled": true,
-  "running": false,
-  "last_morning": "2026-03-21T13:02:17Z",
-  "last_eod": "2026-03-20T20:31:44Z",
-  "next_morning": "2026-03-24T13:00:00Z",
-  "next_eod": "2026-03-24T20:30:00Z",
-  "last_result": { "ok": true, "regime": "NORMAL", ... }
-}
-```
+**Campi principali nello storico sessioni**
 
 | Campo | Significato |
 |-------|-------------|
-| `enabled` | Se lo scheduler è abilitato in config |
-| `running` | Se una sessione è in esecuzione in questo momento |
-| `last_morning` / `last_eod` | Timestamp ISO dell'ultima esecuzione (UTC) |
-| `next_morning` / `next_eod` | Timestamp ISO della prossima esecuzione prevista |
-| `last_result` | Esito dell'ultima sessione completata |
-
----
-
-### Come leggere i session logs
-
-Ogni sessione completata viene registrata nella tabella `session_logs` di DuckDB. Per consultare lo storico:
-
-```
-GET /opz/session/logs?profile=paper&limit=30
-```
-
-Parametri opzionali:
-- `limit` — numero di righe restituite (default: 30, max: 200)
-- `session_type` — filtra per `"morning"` o `"eod"`
-
-Ogni riga del log contiene:
-
-| Campo | Tipo | Significato |
-|-------|------|-------------|
-| `log_id` | string | Identificatore univoco della sessione |
-| `session_date` | string | Data della sessione (YYYY-MM-DD) |
-| `session_type` | string | `"morning"` o `"eod"` |
-| `regime` | string | Regime rilevato durante la sessione (NORMAL/CAUTION/SHOCK) |
-| `equity` | float | Equity del conto al termine della sessione |
-| `n_symbols` | int | Numero di simboli scansionati |
-| `errors` | lista | Errori non bloccanti incontrati (lista di stringhe) |
-| `trigger` | string | `"auto"` (scheduler) o `"manual"` (trigger manuale) |
-| `started_at` | string | Timestamp inizio sessione (ISO UTC) |
-| `finished_at` | string | Timestamp fine sessione (ISO UTC) |
-
----
-
-### Troubleshooting
-
-**Lo scheduler non si avvia**
-
-Verifica che in `config/paper.toml` sia presente `enabled = true` nella sezione `[sessions]`. Controlla i log dell'API per righe che iniziano con `SESSION_SCHEDULER`.
-
-**Una sessione non compare nei logs**
-
-La sessione potrebbe essere stata saltata per una di queste ragioni:
-- Giorno festivo o weekend (con `skip_weekends = true` / `skip_holidays = true`)
-- La sessione è scaduta per timeout (campo `duration_max_min`)
-- L'API era offline all'orario previsto
-
-**Una sessione mostra errori nel campo `errors`**
-
-Gli errori nel campo `errors` sono non bloccanti — la sessione è comunque considerata completata. Leggi i messaggi per capire quale componente ha avuto problemi (es. connessione IBKR, dati mancanti).
-
-**Voglio rieseguire una sessione fallita**
-
-```
-POST /opz/session/run
-{
-  "type": "morning",
-  "profile": "paper",
-  "force": true
-}
-```
-
-Il parametro `"force": true` permette di eseguire la sessione anche se non è il giorno o l'orario previsto.
-
-**Lo scheduler mostra `"running": true` da troppo tempo**
-
-La sessione è bloccata. Riavvia l'API — il task in background viene cancellato e pulito automaticamente allo shutdown. I log del subprocess sono nella cartella `logs/`.
+| `session_type` | `"morning"` o `"eod"` |
+| `regime` | Regime rilevato durante la sessione |
+| `equity` | Equity del conto al termine (solo EOD) |
+| `errors` | Lista di errori non bloccanti (vuota = nessun problema) |
+| `trigger` | `"auto"` (scheduler) o `"manual"` (avvio manuale) |

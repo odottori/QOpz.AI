@@ -83,3 +83,14 @@ QOpz.AI usa una tecnica chiamata **Walk-Forward Analysis**: divide il tempo in f
 ---
 
 *Nell'ultimo capitolo vediamo dove tutto questo si materializza: la WAR ROOM — il pannello di controllo operativo.*
+
+---
+
+### Cosa può andare storto
+
+| Situazione | Segnale che vedi | Causa probabile | Cosa fare |
+|------------|-----------------|-----------------|-----------|
+| Kill switch attivo ma un ordine risulta eseguito (non dovrebbe succedere) | Il journal mostra un trade confermato con il kill switch in stato ON | Anomalia grave: o il record del kill switch non era correttamente propagato al momento della conferma, oppure un ordine era già in attesa di esecuzione sul broker prima dell'attivazione | Segnala immediatamente come incidente critico. Non operare finché non è chiarita la causa. Verifica manualmente il conto IBKR e il trail degli eventi per ricostruire la sequenza. |
+| Il margine supera il 30% senza avviso | Noti nel pannello IBKR che il margine utilizzato è sopra il 30% del capitale, senza aver ricevuto nessun segnale preventivo | Il filtro hard di margine si applica al momento della proposta, non monitora le posizioni già aperte. Un movimento di mercato avverso può portare una posizione esistente sopra soglia. | Rivedi le posizioni aperte nella WAR ROOM. Se una posizione ha superato il 30% di margine, valuta se chiuderla manualmente. Il sistema segnala exit candidates su altri criteri, non su margine dinamico. |
+| Kelly attivo con meno di 50 trade chiusi (non dovrebbe succedere) | Il Paper Countdown mostra meno di 50 operazioni chiuse ma le dimensioni delle posizioni sembrano calcolate con Kelly | Anomalia: il gate di abilitazione Kelly non si è applicato correttamente, oppure il contatore delle operazioni non è allineato con il database reale | Segnala come anomalia. Non confermare ordini finché non verifichi che il contatore sia corretto. Kelly su campione piccolo può portare a sizing eccessivo. |
+| Protezione non risponde al toggle nella UI | Clicchi il pulsante kill switch o il toggle Observer ma il badge non cambia stato | Problema di connessione tra UI e backend, oppure il backend ha restituito un errore non visibile | Attendi 5 secondi e ricarica la pagina. Se lo stato rimane invariato, usa direttamente l'endpoint `GET /opz/control/status` per verificare lo stato reale. Non assumere mai che il toggle abbia avuto effetto senza conferma visiva del badge aggiornato. |

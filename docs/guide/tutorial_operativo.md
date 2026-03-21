@@ -270,3 +270,15 @@ POST /opz/execution/observer       {"action": "on"}
 ```
 
 Per i dettagli completi vedi il **Capitolo 10 — Il Control Plane operativo**.
+
+---
+
+## Se qualcosa non va — riferimento rapido
+
+| Problema | Segnale che vedi | Causa probabile | Cosa fare |
+|----------|-----------------|-----------------|-----------|
+| Briefing non generato | Drawer NARRATORE vuoto o data non aggiornata | NARRATORE non attivo in configurazione, oppure sessione morning non completata o fallita | Verifica che la sessione morning sia andata a buon fine (`GET /opz/session/status`); se manca, avviala manualmente (`POST /opz/session/run {"type": "morning"}`); poi clicca GENERA nel drawer NARRATORE |
+| Scanner vuoto | Lista OPP SCAN senza candidati dopo RUN SCAN | Regime SHOCK attivo (corretto e atteso), oppure tutti i simboli filtrati per IVR basso o spread eccessivo | Se il badge è SHOCK: normale, non aprire trade. Se è NORMAL: IVR di mercato probabilmente basso, attendi condizioni più favorevoli |
+| Ordine non eseguito | CONFIRM eseguito ma nessuna posizione aperta in IBKR | Kill switch attivo, oppure IBWR non in esecuzione, oppure connessione IBKR caduta dopo lo scan | Controlla il Kill Switch (topbar: deve essere verde/inattivo); verifica IBWR con `GET /opz/control/status`; riattiva se necessario con `POST /opz/ibwr/service {"action": "on"}` |
+| Session log mancante | `GET /opz/session/logs` non mostra la sessione del giorno | Scheduler non abilitato in configurazione, oppure API offline all'orario previsto (09:00 NY) | Verifica `GET /opz/session/status` → campo `scheduler_enabled`; se disabilitato, avvia la sessione manualmente; considera di abilitare lo scheduler per le sessioni future |
+| Observer Telegram silenzioso | Nessuna notifica ricevuta su Telegram durante la sessione | Bot non configurato correttamente, token scaduto, oppure IBKR non connesso (l'Observer non invia se non c'è attività da segnalare) | Verifica la configurazione del bot in config; controlla `GET /opz/control/status` per lo stato dell'Observer; assicurati che IBKR sia connesso — l'Observer segnala solo eventi legati all'esecuzione |

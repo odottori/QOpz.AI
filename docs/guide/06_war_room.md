@@ -145,3 +145,15 @@ In alto nell'interfaccia della WAR ROOM compare il badge **Observer**. Indica se
 Se vedi il badge OFF al mattino senza averlo disattivato tu, significa che qualcosa ha interrotto la connessione a IBKR durante la notte. Prima di fare qualsiasi operazione, verifica che TWS/IBG sia attivo e controlla `GET /opz/control/status`.
 
 Per i dettagli su come gestire l'Observer, vedi il Capitolo 10 — Il Control Plane operativo.
+
+---
+
+### Cosa può andare storto
+
+| Situazione | Segnale che vedi | Causa probabile | Cosa fare |
+|------------|-----------------|-----------------|-----------|
+| Gate rosso nel pannello sinistro | Uno o più semafori nel primo pannello mostrano rosso | Un controllo di sistema ha rilevato una condizione fuori norma: può essere un dato mancante, una connessione interrotta, una metrica che supera una soglia critica. Il sistema blocca le operazioni su quel componente. | Clicca sul gate rosso per leggere il messaggio associato. Il messaggio indica il componente e la causa. Non operare finché il gate non torna verde. I gate gialli sono avvisi, quelli rossi bloccano. |
+| Pannello opportunità vuoto | Il terzo pannello non mostra candidati, nemmeno con mercato aperto | Può dipendere da regime SHOCK o CAUTION restrittivo (è il comportamento corretto), oppure il processo di scan non ha terminato l'elaborazione, oppure nessun sottostante ha superato i filtri hard (spread, OI, DTE, IVR, margine). | Verifica prima il regime: se è SHOCK, l'assenza di opportunità è attesa. Se il regime è NORMAL e il pannello è vuoto, controlla che lo scan sia stato avviato. In CAUTION, i filtri sono più stretti — poche o zero opportunità sono normali. |
+| Metriche equity mancanti o a zero | La curva equity mostra una linea piatta a zero o i campi drawdown/equity risultano vuoti | Il database non ha ancora nessun evento registrato per la sessione corrente, oppure c'è un problema di lettura dei dati storici | Se sei nelle prime ore di utilizzo è normale. Altrimenti, verifica che almeno un'operazione sia stata registrata nel journal. Un equity a zero su una sessione attiva da settimane indica un problema di connessione al database. |
+| NARRATORE non genera audio | Clicchi "genera briefing" e il sistema va in timeout dopo 120 secondi, oppure il drawer mostra un errore | `edge-tts` non è installato nell'ambiente Python del backend, oppure il servizio di sintesi vocale non è raggiungibile | Verifica che `edge-tts` sia installato (`pip show edge-tts`). Se non è installato, i briefing testuali nel drawer rimangono disponibili anche senza audio. Il resto della WAR ROOM funziona normalmente. |
+| Briefing non disponibile al mattino | Il drawer NARRATORE non mostra nessun briefing recente, oppure l'ultimo è di ieri | Il job di generazione automatica del briefing notturno non è partito, oppure ha fallito silenziosamente | Genera manualmente un nuovo briefing dal drawer. Se il problema si ripete ogni mattina, verifica il log del backend per errori nel job schedulato. |

@@ -56,3 +56,14 @@ Operare senza questa consapevolezza significa trattare tutti i giorni allo stess
 ---
 
 *Nel prossimo capitolo vediamo le protezioni: cosa succede quando qualcosa va storto — perché prima o poi, succede.*
+
+---
+
+### Cosa può andare storto
+
+| Situazione | Segnale che vedi | Causa probabile | Cosa fare |
+|------------|-----------------|-----------------|-----------|
+| Regime bloccato su UNKNOWN | Badge grigio "UNKNOWN" nella WAR ROOM che non cambia | L'algoritmo HMM non ha ricevuto dati di mercato sufficienti per classificare il regime, oppure il feed dati è interrotto | Verifica che la connessione a IBKR sia attiva. Controlla lo stato della pipeline dati nella WAR ROOM. Se il badge rimane grigio dopo 30 minuti di mercato aperto, rilancia la sessione. |
+| Regime non si aggiorna da ore | Il badge mostra sempre lo stesso regime per tutta la giornata, anche in presenza di movimenti bruschi | Il processo di aggiornamento periodico si è bloccato, oppure c'è un errore silenzioso nel ciclo di calcolo | Controlla i log di sistema. Riavvia il backend se necessario. Non operare con un regime fermo: senza aggiornamento, le protezioni di sizing non sono affidabili. |
+| Regime passa a SHOCK inaspettatamente | Il badge diventa rosso SHOCK senza che tu abbia visto movimenti particolari | Un picco improvviso di volatilità implicita o un dato macro ha fatto scattare la soglia. Può essere un falso positivo su dati thin di fine seduta. | Non forzare operazioni. Aspetta il briefing del mattino successivo. Se il mercato è effettivamente tranquillo, il regime tornerà a NORMAL nel ciclo successivo. Non ignorare il segnale anche se sembra strano. |
+| Badge regime assente nella UI | Il secondo pannello della WAR ROOM non mostra nessun badge regime | Il componente UI non ha ricevuto risposta dall'endpoint di stato, oppure il backend non è raggiungibile | Ricarica la pagina. Se il badge rimane assente, verifica che il backend sia in ascolto sulla porta 8765. Con il regime assente, non aprire nuove posizioni. |

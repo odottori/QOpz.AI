@@ -67,3 +67,14 @@ Un prezzo di un'opzione aggiornato tre ore fa non vale nulla per prendere una de
 ---
 
 *Nel prossimo capitolo vediamo cosa succede a questi dati una volta che arrivano: come il sistema decide cosa tenere e cosa buttare.*
+
+---
+
+## Cosa può andare storto
+
+| Situazione | Segnale che vedi | Causa probabile | Cosa fare |
+|------------|-----------------|-----------------|-----------|
+| Watermark DATA_MODE = SYNTHETIC in UI | Badge arancione "SYNTHETIC" visibile su report e scan | IBKR non connesso o dati reali non disponibili — il sistema è caduto su dati simulati | Verifica connessione IBKR (porta 7496 paper / 7497 live); non aprire trade reali in questa condizione; Kelly rimane bloccato finché il watermark è attivo |
+| IBKR offline, dati non aggiornati | asof_ts nell'interfaccia mostra orario di oltre 5 minuti fa; scan riusa dati vecchi | TWS/IBG disconnesso, timeout di rete, o riavvio del gateway durante la sessione | Controlla lo stato IBKR in TWS; riavvia il gateway se necessario; chiama `POST /opz/ibwr/service {"action": "off"}` poi `"on"` per forzare la riconnessione |
+| Chain options vuota per un simbolo | Scan non mostra candidati per quel simbolo; nessun errore esplicito | Il simbolo non ha opzioni liquide nel range DTE 14–60, oppure il dato non è ancora arrivato dal provider | Attendi il prossimo ciclo di ingest; se persiste, verifica che il simbolo sia nel universo configurato; non aggiungere manualmente candidati senza dati validi |
+| Qualità dati A+ vs B — differenza operativa | Indicatore di qualità sul record (source_quality nel log) | A+ = catena completa con Greeks verificati; B = dati parziali o Greeks stimati | Con qualità B evita strategie multi-gamba (Iron Condor, Calendar); preferisci Bull Put semplice; la differenza non blocca ma riduce l'affidabilità dello scoring |

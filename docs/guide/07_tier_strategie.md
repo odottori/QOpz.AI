@@ -152,3 +152,13 @@ Non esiste una scorciatoia manuale per saltare un gate di validazione.
 ---
 
 *Nel prossimo capitolo affrontiamo la domanda più importante: quanto dura il periodo paper, perché non si può accorciare, e cosa fare nel frattempo per arrivare preparati al trading reale.*
+
+---
+
+## Cosa può andare storto
+
+| Situazione | Segnale che vedi | Causa probabile | Cosa fare |
+|------------|-----------------|-----------------|-----------|
+| Strategia non visibile nel pannello | Il blocco Iron Condor, Wheel o altro non compare nell'interfaccia | Capital gate non raggiunto: il capitale registrato nel sistema è inferiore alla soglia minima per quel tier | Verifica il capitale impostato nello scan (account size); se il capitale reale è sufficiente ma il pannello non appare, aggiorna il valore nel campo account size e ricarica |
+| Copilota mostra avviso giallo ma l'operatore vuole procedere | Banner giallo con messaggio "gate non ancora validato" visibile sul pannello strategia | Capitale sufficiente ma gate operativo non superato: mancano operazioni chiuse o le metriche non soddisfano ancora la soglia | L'avviso non blocca — puoi procedere con consapevolezza; il Copilota segnala il rischio, la decisione resta tua; annota l'avviso nel trade log per tracciabilità |
+| Tier non avanza nonostante il capitale sufficiente | Paper countdown fermo; gate non si sblocca automaticamente | Il data gate Kelly richiede DATA_MODE = VENDOR_REAL_CHAIN e almeno 50 operazioni chiuse — una delle due condizioni non è ancora soddisfatta | Controlla il pannello Kelly per vedere quale condizione manca; se i dati sono ancora sintetici, il gate è bloccato per design; non esiste scorciatoia manuale per saltarlo |
