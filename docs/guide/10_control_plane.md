@@ -144,4 +144,4 @@ Riavvia TWS o IBG, esegui gli aggiornamenti o le modifiche al conto necessarie.
 | Avvia Observer | `POST /opz/execution/observer` | `{"action": "on"}` |
 | Attiva kill switch | `POST /opz/execution/kill_switch` | `{"action": "activate"}` |
 | Disattiva kill switch | `POST /opz/execution/kill_switch` | `{"action": "deactivate"}` |
-| Stato sistema | `GET /opz/control/status` | — |
+| Stato control plane | `GET /opz/control/status` | — |
