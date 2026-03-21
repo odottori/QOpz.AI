@@ -58,6 +58,7 @@ def record_equity_snapshot(
     asof_date: date,
     equity: float,
     note: str = "",
+    trigger: str = "manual",
 ) -> str:
     init_execution_schema()
     con = _connect()
@@ -67,15 +68,15 @@ def record_equity_snapshot(
     prov = _prov(profile, created)
     if backend == "duckdb":
         con.execute(
-            "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (sid, profile, asof_date.isoformat(), float(equity), note, created, *prov),
+            "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, trigger, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (sid, profile, asof_date.isoformat(), float(equity), note, trigger, created, *prov),
         )
         con.close()
         return sid
 
     con.execute(
-        "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (sid, profile, asof_date.isoformat(), float(equity), note, created, *prov),
+        "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, trigger, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (sid, profile, asof_date.isoformat(), float(equity), note, trigger, created, *prov),
     )
     if hasattr(con, "commit"):
         con.commit()
@@ -100,6 +101,7 @@ def record_trade(
     score_at_entry: Optional[float] = None,
     kelly_fraction: Optional[float] = None,
     exit_reason: Optional[str] = None,
+    trigger: str = "manual",
 ) -> str:
     init_execution_schema()
     con = _connect()
@@ -117,9 +119,9 @@ def record_trade(
             INSERT INTO paper_trades (
                 trade_id, profile, symbol, strategy, entry_ts_utc, exit_ts_utc,
                 strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason,
-                pnl, pnl_pct, slippage_ticks, violations, note, created_at,
+                pnl, pnl_pct, slippage_ticks, violations, note, trigger, created_at,
                 source_system, source_mode, source_quality, asof_ts, received_ts
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 tid,
@@ -138,6 +140,7 @@ def record_trade(
                 float(slippage_ticks) if slippage_ticks is not None else None,
                 int(violations),
                 note,
+                trigger,
                 created,
                 *prov,
             ),

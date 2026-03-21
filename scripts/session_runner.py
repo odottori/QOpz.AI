@@ -325,6 +325,20 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
         errors.append(f"briefing: {data.get('error')}")
 
     finished_at = datetime.now(timezone.utc).isoformat()
+
+    # ── Persistenza: session log in DuckDB ────────────────────────────────────
+    _post_json(api_base, "/opz/session/log", {
+        "profile": profile,
+        "session_date": date.today().isoformat(),
+        "session_type": "morning",
+        "regime": steps.get("regime", {}).get("regime"),
+        "n_symbols": steps.get("symbols", {}).get("count"),
+        "errors": errors,
+        "trigger": "auto",
+        "started_at": started_at,
+        "finished_at": finished_at,
+    })
+
     return {
         "type": "morning",
         "profile": profile,
@@ -393,7 +407,46 @@ def run_eod(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE) ->
         "kill_switch_active": data.get("kill_switch_active") if ok else None,
     }
 
+    # ── Step 5: Equity snapshot automatico EOD ────────────────────────────────
+    ok_acct, acct = _get(api_base, "/opz/ibkr/account")
+    equity_val: Optional[float] = None
+    if ok_acct:
+        raw_nav = acct.get("net_liquidation")
+        try:
+            equity_val = float(raw_nav) if raw_nav is not None else None
+        except (TypeError, ValueError):
+            equity_val = None
+
+    if equity_val is not None and equity_val > 0:
+        regime_str = steps.get("regime_eod", {}).get("regime") or "?"
+        ok_snap, snap = _post_json(api_base, "/opz/paper/equity_snapshot", {
+            "profile": profile,
+            "asof_date": date.today().isoformat(),
+            "equity": equity_val,
+            "note": f"[AUTO] EOD snapshot — regime:{regime_str}",
+            "trigger": "auto",
+        })
+        steps["equity_snapshot"] = {"ok": ok_snap, "equity": equity_val}
+        if not ok_snap:
+            errors.append(f"equity_snapshot: {snap.get('detail') or snap.get('error')}")
+    else:
+        steps["equity_snapshot"] = {"ok": False, "reason": "IBKR non connesso o NAV non disponibile"}
+
     finished_at = datetime.now(timezone.utc).isoformat()
+
+    # ── Persistenza: session log in DuckDB ────────────────────────────────────
+    _post_json(api_base, "/opz/session/log", {
+        "profile": profile,
+        "session_date": date.today().isoformat(),
+        "session_type": "eod",
+        "regime": steps.get("regime_eod", {}).get("regime"),
+        "equity": equity_val,
+        "errors": errors,
+        "trigger": "auto",
+        "started_at": started_at,
+        "finished_at": finished_at,
+    })
+
     return {
         "type": "eod",
         "profile": profile,

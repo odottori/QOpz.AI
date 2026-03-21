@@ -41,6 +41,7 @@ type LastActionsResponse = {
     equity: number | null;
     note: string;
     profile: string;
+    trigger: string;
   }>;
   paper_trades: Array<{
     ts_utc: string;
@@ -59,6 +60,7 @@ type LastActionsResponse = {
     score_at_entry: number | null;
     kelly_fraction: number | null;
     exit_reason: string;
+    trigger: string;
   }>;
   execution_previews: Array<{
     confirm_token: string | null;
@@ -238,6 +240,7 @@ type EquityPoint = { date: string; equity: number };
 type EquityHistoryResponse = {
   ok: boolean; profile: string; n_points: number;
   latest_equity: number | null; initial_equity: number | null;
+  min_date: string | null; max_date: string | null;
   points: EquityPoint[];
 };
 type IbkrAccountPosition = {
@@ -702,6 +705,7 @@ export default function App() {
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
+  const [navDate, setNavDate] = useState<string>(""); // YYYY-MM-DD — vuoto = oggi
   const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
   const [wheelPositions, setWheelPositions] = useState<WheelPositionsResponse | null>(null);
   const [wheelFetchedAt, setWheelFetchedAt] = useState<number | null>(null);
@@ -1505,12 +1509,25 @@ export default function App() {
     } catch (e) { markFetchErr("regime"); }
   }
 
-  async function doFetchEquityHistory() {
+  async function doFetchEquityHistory(asof?: string) {
     try {
-      const r = await apiJson<EquityHistoryResponse>(`${API_BASE}/opz/paper/equity_history?profile=${ACTIVE_PROFILE}&limit=60`);
+      const dateParam = asof ?? navDate;
+      const url = dateParam
+        ? `${API_BASE}/opz/paper/equity_history?profile=${ACTIVE_PROFILE}&limit=60&asof_date=${dateParam}`
+        : `${API_BASE}/opz/paper/equity_history?profile=${ACTIVE_PROFILE}&limit=60`;
+      const r = await apiJson<EquityHistoryResponse>(url);
       setEquityHistory(r);
       clearFetchErr("equity");
     } catch (e) { markFetchErr("equity"); }
+  }
+
+  function shiftDate(days: number) {
+    const base = navDate || new Date().toISOString().slice(0, 10);
+    const d = new Date(base);
+    d.setDate(d.getDate() + days);
+    const next = d.toISOString().slice(0, 10);
+    setNavDate(next);
+    void doFetchEquityHistory(next);
   }
 
   async function doFetchExitCandidates() {
@@ -2097,6 +2114,27 @@ export default function App() {
                       </span>
                     );
                   })()}
+                </div>
+
+                {/* ── Navigazione temporale equity ── */}
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4, flexWrap: "wrap" }}>
+                  <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px" }}
+                    onClick={() => shiftDate(-1)} title="Giorno precedente">◀ -1g</button>
+                  <input
+                    type="date"
+                    value={navDate}
+                    min={equityHistory?.min_date ?? undefined}
+                    max={equityHistory?.max_date ?? new Date().toISOString().slice(0, 10)}
+                    onChange={e => { setNavDate(e.target.value); void doFetchEquityHistory(e.target.value); }}
+                    style={{ fontSize: "0.65rem", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 3, padding: "1px 4px" }}
+                  />
+                  <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px" }}
+                    onClick={() => shiftDate(+1)} title="Giorno successivo">+1g ▶</button>
+                  {navDate && (
+                    <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px", color: "var(--p1)" }}
+                      onClick={() => { setNavDate(""); void doFetchEquityHistory(""); }}>OGGI</button>
+                  )}
+                  {navDate && <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>— vista al {navDate}</span>}
                 </div>
 
                 <EqSparkline points={equityHistory?.points ?? []} w={240} h={56} />
@@ -3147,12 +3185,26 @@ export default function App() {
               <article className="panel">
                 <div className="panel-title">LAST PAPER TRADES</div>
                 <table className="data-table">
-                  <thead><tr><th>TS</th><th>Symbol</th><th>Strategy</th><th>PnL</th><th>Viol</th></tr></thead>
+                  <thead><tr><th>TS</th><th>Symbol</th><th>Strategy</th><th>PnL</th><th>Viol</th><th>Src</th></tr></thead>
                   <tbody>
-                    {(lastActions?.paper_trades ?? []).map((x, i) => (
-                      <tr key={`t-${i}`}><td>{fmtTs(x.ts_utc)}</td><td>{x.symbol}</td><td>{x.strategy}</td><td>{x.pnl ?? "-"}</td><td>{x.violations}</td></tr>
-                    ))}
-                    {(lastActions?.paper_trades.length ?? 0) === 0 && <tr><td colSpan={5} className="dim">Nessun trade registrato.</td></tr>}
+                    {(lastActions?.paper_trades ?? []).map((x, i) => {
+                      const isAuto = x.trigger === "auto";
+                      return (
+                        <tr key={`t-${i}`} style={{ background: isAuto ? "rgba(74,222,128,0.06)" : "transparent" }}>
+                          <td>{fmtTs(x.ts_utc)}</td>
+                          <td>{x.symbol}</td>
+                          <td>{x.strategy}</td>
+                          <td>{x.pnl ?? "-"}</td>
+                          <td>{x.violations}</td>
+                          <td>
+                            {isAuto
+                              ? <span style={{ color: "#4ade80", fontSize: "0.6rem", fontWeight: 700 }}>AUTO</span>
+                              : <span style={{ color: "var(--muted)", fontSize: "0.6rem" }}>MAN</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {(lastActions?.paper_trades.length ?? 0) === 0 && <tr><td colSpan={6} className="dim">Nessun trade registrato.</td></tr>}
                   </tbody>
                 </table>
               </article>

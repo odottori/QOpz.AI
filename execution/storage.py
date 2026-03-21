@@ -123,6 +123,7 @@ def init_execution_schema() -> None:
                 asof_date DATE,
                 equity DOUBLE,
                 note VARCHAR,
+                trigger VARCHAR DEFAULT 'manual',
                 created_at TIMESTAMP,
                 source_system VARCHAR,
                 source_mode VARCHAR,
@@ -132,6 +133,10 @@ def init_execution_schema() -> None:
             )
             """
         )
+        try:
+            con.execute("ALTER TABLE paper_equity_snapshots ADD COLUMN IF NOT EXISTS trigger VARCHAR DEFAULT 'manual'")
+        except Exception as _exc:
+            logger.debug("ALTER TABLE skip: %s", _exc)
         for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
             try:
                 con.execute(f"ALTER TABLE paper_equity_snapshots ADD COLUMN IF NOT EXISTS {_col}")
@@ -157,6 +162,7 @@ def init_execution_schema() -> None:
                 slippage_ticks DOUBLE,
                 violations INTEGER,
                 note VARCHAR,
+                trigger VARCHAR DEFAULT 'manual',
                 created_at TIMESTAMP,
                 source_system VARCHAR,
                 source_mode VARCHAR,
@@ -172,6 +178,7 @@ def init_execution_schema() -> None:
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS score_at_entry DOUBLE")
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS kelly_fraction DOUBLE")
             con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS exit_reason VARCHAR")
+            con.execute("ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS trigger VARCHAR DEFAULT 'manual'")
         except Exception as _exc:  # column already exists — safe to ignore
             logger.debug("ALTER TABLE skip: %s", _exc)
         for _col in ("source_system VARCHAR", "source_mode VARCHAR", "source_quality VARCHAR", "asof_ts VARCHAR", "received_ts VARCHAR"):
@@ -317,6 +324,29 @@ def init_execution_schema() -> None:
                 exit_pnl      DOUBLE,
                 exit_reason   VARCHAR,
                 ev_realized   DOUBLE,
+                source_system VARCHAR,
+                source_mode   VARCHAR,
+                source_quality VARCHAR,
+                asof_ts       VARCHAR,
+                received_ts   VARCHAR
+            )
+            """
+        )
+
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS session_logs (
+                log_id        VARCHAR PRIMARY KEY,
+                profile       VARCHAR,
+                session_date  VARCHAR,
+                session_type  VARCHAR,
+                regime        VARCHAR,
+                equity        DOUBLE,
+                n_symbols     INTEGER,
+                errors_json   VARCHAR,
+                trigger       VARCHAR DEFAULT 'auto',
+                started_at    VARCHAR,
+                finished_at   VARCHAR,
                 source_system VARCHAR,
                 source_mode   VARCHAR,
                 source_quality VARCHAR,
