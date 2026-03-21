@@ -257,6 +257,15 @@ type IbkrAccountResponse = {
   buying_power: number | null; positions: IbkrAccountPosition[];
   message: string;
 };
+type ActivityEvent = {
+  ts: string; source: string; type: string;
+  symbol?: string | null; detail: string;
+  severity: "ok" | "warn" | "error" | "meta" | "data" | "neutral";
+};
+type ActivityStreamResponse = {
+  ok: boolean; profile: string; n: number;
+  events: ActivityEvent[]; as_of: string | null;
+};
 type ExitCandidate = {
   symbol: string; expiry: string | null; strike: number | null; right: string | null;
   quantity: number; avg_cost: number; market_price: number | null;
@@ -788,6 +797,8 @@ export default function App() {
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
   const [navDate, setNavDate] = useState<string>(""); // YYYY-MM-DD — vuoto = oggi
   const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
+  const [activityStream, setActivityStream] = useState<ActivityStreamResponse | null>(null);
+  const [activityOpen, setActivityOpen] = useState<boolean>(true);
   const [wheelPositions, setWheelPositions] = useState<WheelPositionsResponse | null>(null);
   const [wheelFetchedAt, setWheelFetchedAt] = useState<number | null>(null);
   const [tierInfo, setTierInfo] = useState<TierResponse | null>(null);
@@ -1169,6 +1180,7 @@ export default function App() {
       void doFetchSysStatus();
       void doFetchRegimeCurrent();
       void doFetchExitCandidates();
+      void doFetchActivityStream();
       void doFetchWheelPositions();
       void doFetchTier();
       void doFetchBriefingList();
@@ -1647,6 +1659,13 @@ export default function App() {
       setExitCandidatesFetchedAt(Date.now());
       clearFetchErr("exitCandidates");
     } catch (e) { markFetchErr("exitCandidates"); }
+  }
+
+  async function doFetchActivityStream() {
+    try {
+      const r = await apiJson<ActivityStreamResponse>(`${API_BASE}/opz/activity/stream?n=30`);
+      setActivityStream(r);
+    } catch { /* non critico */ }
   }
 
   async function doFetchSessionStatus() {
@@ -2128,6 +2147,7 @@ export default function App() {
     void doFetchRegimeCurrent();
     void doFetchEquityHistory();
     void doFetchExitCandidates();
+    void doFetchActivityStream();
     void doFetchSessionStatus();
     void doFetchControlStatus();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2139,6 +2159,7 @@ export default function App() {
       void doFetchSysStatus();   // 1 query DuckDB — kill switch, kelly, data_mode
       void doFetchSessionStatus(); // stato scheduler sessioni
       void doFetchControlStatus(); // observer + ibwr + control plane
+      void doFetchActivityStream(); // activity stream — refresh ogni 5 min
     }, 5 * 60_000);
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2606,6 +2627,48 @@ export default function App() {
                   </div>
                 )}
               </>
+            )}
+          </div>
+          {/* ACTIVITY STREAM */}
+          <div className="nav-section left-ops-section activity-stream-section">
+            <div className="left-grouphead" onClick={() => setActivityOpen(v => !v)} role="button" tabIndex={0}>
+              <span className="left-grouphead-title">
+                <span className="group-arrow">{activityOpen ? "▾" : "▸"}</span>ATTIVITA
+              </span>
+              {activityStream && activityStream.n > 0 && (
+                <span className="sev-data" style={{fontSize:"0.6rem"}}>{activityStream.n}</span>
+              )}
+            </div>
+            {activityOpen && (
+              <div className="activity-feed">
+                {!activityStream && (
+                  <div className="activity-empty sev-meta">—</div>
+                )}
+                {activityStream && activityStream.n === 0 && (
+                  <div className="activity-empty sev-meta">Nessun evento registrato</div>
+                )}
+                {activityStream && activityStream.events.map((ev, i) => {
+                  const ts = ev.ts ? ev.ts.slice(11, 19) : ""; // HH:MM:SS
+                  const icon = ev.source === "regime" ? "⬡" : ev.type === "filled" || ev.type === "opened" ? "✓" : ev.type === "error" || ev.type === "rejected" ? "✗" : "·";
+                  return (
+                    <div key={i} className="activity-row">
+                      <span className="activity-ts">{ts}</span>
+                      <span className={`activity-icon sev-${ev.severity}`}>{icon}</span>
+                      <span className="activity-body">
+                        {ev.symbol && <span className="activity-sym">{ev.symbol} </span>}
+                        <span className={`sev-${ev.severity}`}>{ev.type}</span>
+                        {ev.detail && <span className="activity-detail"> {ev.detail}</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div style={{display:"flex", justifyContent:"flex-end", marginTop:4}}>
+                  <button className="btn btn-ghost"
+                    style={{fontSize:"0.58rem", padding:"1px 5px"}}
+                    disabled={!apiOnline}
+                    onClick={() => void doFetchActivityStream()}>⟳</button>
+                </div>
+              </div>
             )}
           </div>
         </aside><section className="centerpane">

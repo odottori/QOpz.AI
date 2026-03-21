@@ -3275,3 +3275,93 @@ def opz_session_logs(
     ]
     return {"ok": True, "profile": profile, "n": len(logs), "logs": logs}
 
+
+# ---------------------------------------------------------------------------
+# Activity stream — last N events from order_events + regime transitions
+# ---------------------------------------------------------------------------
+@app.get("/opz/activity/stream")
+def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
+    """Return last N activity events (order_events + regime transitions) for the activity feed."""
+    from execution.storage import _connect
+    events: list[Dict[str, Any]] = []
+    try:
+        con = _connect(profile)
+        # Order events
+        rows = con.execute(
+            """
+            SELECT ts_utc, event_type, client_order_id, prev_state, new_state, details_json
+            FROM order_events
+            ORDER BY ts_utc DESC
+            LIMIT ?
+            """,
+            [n],
+        ).fetchall()
+        for r in rows:
+            ts, evt_type, order_id, prev_st, new_st, det_raw = r
+            try:
+                det = json.loads(det_raw) if det_raw else {}
+            except Exception:
+                det = {}
+            symbol = det.get("symbol") or det.get("ticker") or None
+            if evt_type in ("filled", "submitted", "opened"):
+                sev = "ok"
+            elif evt_type in ("rejected", "cancelled", "error"):
+                sev = "error"
+            elif evt_type in ("assigned", "expired", "called_away"):
+                sev = "warn"
+            else:
+                sev = "meta"
+            state_part = f"{prev_st}→{new_st}" if prev_st and new_st else (new_st or "")
+            detail_parts = [p for p in [state_part, det.get("reason"), det.get("note")] if p]
+            events.append({
+                "ts": str(ts) if ts else "",
+                "source": "order",
+                "type": str(evt_type) if evt_type else "event",
+                "symbol": symbol,
+                "detail": "  ".join(str(p) for p in detail_parts) or str(order_id or ""),
+                "severity": sev,
+            })
+    except Exception as exc:
+        logger.warning("activity_stream order_events: %s", exc)
+
+    try:
+        con2 = _connect(profile)
+        reg_rows = con2.execute(
+            """
+            SELECT asof_ts, regime, xgb_prob, hmm_prob_shock
+            FROM regime_snapshots
+            ORDER BY asof_ts DESC
+            LIMIT ?
+            """,
+            [max(5, n // 4)],
+        ).fetchall()
+        for rr in reg_rows:
+            ts2, regime, xgb_p, hmm_p = rr
+            sev2 = "error" if regime == "SHOCK" else ("warn" if regime == "CAUTION" else "ok")
+            prob_str = ""
+            if xgb_p is not None:
+                prob_str += f"xgb={float(xgb_p):.2f}"
+            if hmm_p is not None:
+                prob_str += f"  hmm={float(hmm_p):.2f}"
+            events.append({
+                "ts": str(ts2) if ts2 else "",
+                "source": "regime",
+                "type": "regime_change",
+                "symbol": None,
+                "detail": f"{regime}  {prob_str}".strip(),
+                "severity": sev2,
+            })
+    except Exception as exc:
+        logger.warning("activity_stream regime_snapshots: %s", exc)
+
+    # Sort all events by ts desc, take top n
+    events.sort(key=lambda e: e["ts"], reverse=True)
+    events = events[:n]
+    return {
+        "ok": True,
+        "profile": profile,
+        "n": len(events),
+        "events": events,
+        "as_of": events[0]["ts"] if events else None,
+    }
+
