@@ -161,7 +161,16 @@ Il sistema genera un bollettino audio giornaliero (MP3 via edge-tts):
 [Observer]     --> Telegram bot --> notifiche operative
 ```
 
+### Contratti di errore (Operational Layer)
 
+I contratti normativi di comportamento su errore sono definiti in `04_APPENDICI.md` — Appendice E.
+
+Invarianti non negoziabili (estratto):
+- Nessun componente critico deve crashare l'API — ogni eccezione va catturata e restituita come errore HTTP strutturato
+- Kill switch ha priorità assoluta su qualsiasi altro meccanismo (incluso IBWR)
+- Ogni sessione deve produrre una riga in `session_logs`, anche in caso di errore parziale
+- Watermark `DATA_MODE` obbligatorio su ogni report — assenza = CRITICAL FAIL nel validator
+- Kelly disabilitato se `DATA_MODE != VENDOR_REAL_CHAIN` OR `N_closed_trades < 50` — violazione = run non certificabile
 
 ---
 

@@ -224,6 +224,74 @@ L'endpoint scrive una nuova riga in `session_logs` con `trigger = "manual"`.
 
 ---
 
+## Appendice E — Contratti di comportamento su errore [v.T.11.14]
+
+> Questa appendice definisce **cosa il sistema DEVE fare** in caso di errore su componenti critici.
+> Non è un troubleshooting operativo — è un contratto normativo per implementatori.
+> Violazioni di questi contratti rendono il run non certificabile.
+
+---
+
+### E.1 — Scheduler di sessione
+
+| Condizione | Comportamento obbligatorio |
+|---|---|
+| Config `enabled=false` | Log `SESSION_SCHEDULER disabled` — nessun task creato — API rimane attiva |
+| Config non parsabile (`SESSION_CFG_WARN`) | Log warning, scheduler non avviato, API non crasha |
+| Sessione già in corso (`_SESSION_STATE["running"]=True`) | HTTP 409, messaggio `"Sessione già in corso — attendi il completamento"` — nessun secondo subprocess |
+| Timeout subprocess (`duration_max_min` superato) | HTTP 504, log `SESSION_MORNING|EOD FAILED`, riga `session_logs` con `errors_json` popolato |
+| Subprocess termina con errori non bloccanti | HTTP 200, log `SESSION_MORNING|EOD WARN errors=N`, riga `session_logs` con `errors_json` non vuoto |
+| Subprocess termina con eccezione | Log `SESSION_MORNING|EOD FAILED: <exception>`, riga `session_logs` con stato di errore, API non crasha |
+| IBKR non connesso durante EOD (equity snapshot) | Campo `equity=null` in `session_logs`, log warning, sessione considerata completata con warning |
+| API offline all'orario schedulato | Sessione saltata senza riga in `session_logs` — comportamento atteso, non è un errore |
+
+---
+
+### E.2 — Control plane (IBWR / Observer / Kill switch)
+
+| Condizione | Comportamento obbligatorio |
+|---|---|
+| Kill switch attivato | Blocco immediato esecuzione ordini — IBWR non può eseguire anche se `on` — log `KILL_SWITCH activated` |
+| Kill switch attivato | Observer forzato `off` automaticamente — log `OBSERVER forced off` |
+| IBWR stop | Nuovi ordini rifiutati — posizioni aperte invariate su broker — API resta attiva per monitoraggio |
+| IBWR stop con kill switch attivo | Comportamento identico a kill switch — IBWR stop è ridondante ma non è un errore |
+| Observer `on` senza Telegram configurato | Log warning `OBSERVER: Telegram not configured` — Observer rimane `off` — nessuna eccezione |
+| Stato incoerente (IBWR on + kill switch on) | Kill switch ha priorità assoluta — `control_plane_ok=false` nel payload di stato |
+
+---
+
+### E.3 — DATA_MODE e Kelly gate
+
+| Condizione | Comportamento obbligatorio |
+|---|---|
+| `DATA_MODE=SYNTHETIC_SURFACE_CALIBRATED` | Kelly DISABILITATO — sizing `adaptive_fixed_fractional` — watermark `NOT EXECUTION GRADE` obbligatorio su ogni report |
+| `DATA_MODE=VENDOR_REAL_CHAIN` + `N_closed_trades < 50` | Kelly DISABILITATO — log `KELLY_GATE: N_trades insufficient` — sizing `adaptive_fixed_fractional` |
+| Kelly abilitato senza gate soddisfatti | Condizione non ammessa — il sistema DEVE rifiutare il calcolo sizing Kelly e loggare come CRITICAL |
+| `DATA_MODE` non presente in un record DuckDB | Record non valido — run non certificabile — CRITICAL in Phase 0 validator |
+
+---
+
+### E.4 — Dati e pipeline
+
+| Condizione | Comportamento obbligatorio |
+|---|---|
+| IBKR offline durante ingest | Log `IBKR_OFFLINE`, chain options non aggiornata, `asof_ts` non avanzato — nessun crash |
+| Chain options vuota per un simbolo | Simbolo escluso dallo scan con log warning — gli altri simboli processati normalmente |
+| Latenza `asof_ts` > 30 min | Alert Telegram (se Observer on) + log `INGESTION_LATENCY_WARN` |
+| Qualità dati sotto soglia (`source_quality` < B) | Candidato non ammesso allo scoring — hard filter — log per ogni esclusione |
+
+---
+
+### E.5 — Invarianti di errore (non negoziabili)
+
+1. **Nessun componente critico deve crashare l'API** — ogni eccezione va catturata, loggata, e restituita come errore HTTP strutturato
+2. **Ogni errore su un componente non blocca gli altri** — degradazione parziale, non arresto totale
+3. **Ogni sessione deve scrivere una riga in `session_logs`** — anche in caso di errore parziale
+4. **Kill switch ha priorità assoluta** — nessun meccanismo può bypassarlo, incluso IBWR
+5. **Watermark DATA_MODE è obbligatorio** — la sua assenza è un CRITICAL FAIL nel validator
+
+---
+
 <!-- BEGIN GO_NOGO_RELEASE_PLAN -->
 ## Appendice Z — Roadmap GO/NO-GO (Release per moduli)
 
