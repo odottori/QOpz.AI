@@ -1668,3 +1668,290 @@ select:focus {
   border-left: 1px solid var(--border);
   border-top: 1px solid var(--border);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   LIFECYCLE PANELS — ANTE / OP / POST
+   Ispirate alle slide trade_lifecycle.html
+   ═══════════════════════════════════════════════════════════════ */
+
+.lifecycle-panel {
+  padding: 14px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Header step ── */
+.lc-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  flex-wrap: wrap;
+}
+.lc-step-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--g2);
+}
+.lc-step-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.lc-step-sub {
+  font-size: 0.65rem;
+  color: var(--dim);
+  margin-left: auto;
+}
+
+/* ── Body: 2-colonne panel + screen ── */
+.lc-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .lc-body { grid-template-columns: 1fr; }
+}
+
+/* ── Left panel ── */
+.lc-panel {
+  background: var(--p1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+}
+.lc-panel-title {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── KPI grid ── */
+.lc-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.lc-kpi-item {
+  background: var(--p2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+.lc-kpi-item.full { grid-column: span 2; }
+.lc-kpi-label {
+  font-size: 0.58rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+.lc-kpi-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.lc-kpi-value.big { font-size: 1.5rem; }
+.lc-kpi-sub {
+  font-size: 0.6rem;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+/* ── Progress bar ── */
+.lc-progress-wrap {
+  margin-top: 12px;
+}
+.lc-progress-track {
+  background: var(--border);
+  border-radius: 3px;
+  height: 7px;
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+.lc-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s;
+}
+.lc-progress-fill.ok   { background: var(--g2); }
+.lc-progress-fill.warn { background: var(--amber); }
+.lc-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--dim);
+}
+
+/* ── Checklist ── */
+.lc-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.lc-check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  background: var(--p2);
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+}
+.lc-check-item.pass { border-color: var(--g3); }
+.lc-check-item.fail { border-color: var(--red); }
+.lc-check-item.warn { border-color: var(--amber); }
+.lc-check-icon { font-size: 0.85rem; flex-shrink: 0; }
+.lc-check-name { flex: 1; color: var(--text); }
+.lc-check-val  { font-size: 0.65rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+/* ── Right terminal screen ── */
+.lc-screen {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: "IBM Plex Mono", Consolas, monospace;
+}
+.lc-screen-bar {
+  background: var(--p2);
+  border-bottom: 1px solid var(--border);
+  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lc-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.lc-dot.r { background: #ff5f57; }
+.lc-dot.y { background: #ffbd2e; }
+.lc-dot.g { background: #28c840; }
+.lc-screen-title {
+  font-size: 0.62rem;
+  color: var(--dim);
+  margin-left: 4px;
+}
+.lc-screen-body {
+  padding: 12px 14px;
+  font-size: 0.7rem;
+  line-height: 1.9;
+  color: var(--dim);
+}
+.lc-screen-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(20,51,34,0.5);
+  gap: 8px;
+}
+.lc-screen-row:last-child { border-bottom: none; }
+.lc-screen-section {
+  background: var(--p1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 8px 0;
+}
+.lc-dim { color: var(--dim); }
+
+/* ── Regime pill (large) ── */
+.lc-regime-big {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 6px 18px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.lc-regime-big.normal  { background: rgba(0,200,83,.15);  color: var(--g1); border: 1px solid var(--g3); }
+.lc-regime-big.caution { background: rgba(255,184,0,.12); color: var(--amber); border: 1px solid var(--amber); }
+.lc-regime-big.shock   { background: rgba(255,48,48,.12); color: var(--red); border: 1px solid var(--red); }
+.lc-regime-big.unknown { background: rgba(127,143,134,.1); color: var(--sev-neutral); border: 1px solid var(--border); }
+
+/* ── Pill badge ── */
+.lc-badge {
+  display: inline-block;
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.lc-badge.ok   { background: rgba(0,200,83,.15); color: var(--g1); }
+.lc-badge.warn { background: rgba(255,184,0,.15); color: var(--amber); }
+.lc-badge.bad  { background: rgba(255,48,48,.15); color: var(--red); }
+.lc-badge.blue { background: rgba(0,170,255,.15); color: var(--blue); }
+.lc-badge.dim  { background: rgba(74,122,90,.1);  color: var(--dim); }
+
+/* ── Candidate row ── */
+.lc-candidate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem;
+}
+.lc-candidate-row:last-child { border-bottom: none; }
+.lc-candidate-rank { color: var(--dim); font-size: 0.62rem; min-width: 18px; }
+.lc-candidate-sym  { flex: 1; color: var(--text); }
+.lc-candidate-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ── Wheel state machine ── */
+.lc-wheel-states {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.lc-wheel-state {
+  flex: 1;
+  min-width: 64px;
+  background: var(--p2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  text-align: center;
+  font-size: 0.6rem;
+}
+.lc-wheel-state.active {
+  border-color: var(--g2);
+  background: rgba(0,204,85,.08);
+}
+.lc-wheel-state-name {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.lc-wheel-state-desc { color: var(--dim); font-size: 0.55rem; }
+
+/* ── Action bar at bottom of screen ── */
+.lc-action-bar {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+}
+.lc-action-bar .btn { flex: 1; font-size: 0.68rem; }
