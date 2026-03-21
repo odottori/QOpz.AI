@@ -159,6 +159,71 @@ Metodo stima: applicare scenari VIX da T5.3 al P&L del portafoglio corrente tram
     - BROKER + MARKET DATA (profilo-dipendente): dev=WARNING; paper/live=CRITICAL (connectivity + option bid/ask smoke test)
     - OPS (CRITICAL): logging scrivibile + rotation policy; kill-switch dryrun config presente
 
+---
+
+## Appendice C — Control Plane Operativo (IBWR + Observer) [v.T.11.14]
+
+### Quando disabilitare IBKR (IBWR stop)
+
+| Situazione | Azione consigliata |
+|---|---|
+| Manutenzione TWS/Gateway | `POST /opz/ibwr/service {"action":"stop"}` |
+| Aggiornamento configurazione IBKR | stop → modifica → start |
+| Sospetto malfunzionamento connessione | stop → verifica log → start |
+| Fine giornata operativa | opzionale (sessione EOD la gestisce) |
+
+Effetti di `IBWR stop`:
+- Nuovi ordini bloccati (come soft kill switch)
+- Posizioni aperte restano invariate su broker
+- L'API rimane attiva (puoi monitorare, non eseguire)
+
+### Observer Telegram — quando on/off
+
+| Stato | Quando usarlo |
+|---|---|
+| `on` | Operatività normale — ricevi notifiche regime, briefing, errori |
+| `off` | Manutenzione, test, rumore non desiderato |
+
+Il kill switch forza `observer off` automaticamente — ricordare di riattivarlo dopo reset.
+
+### Workflow manutenzione IBKR
+
+```
+1. observer off        (silenzio durante manutenzione)
+2. ibwr stop           (blocca esecuzione)
+3. ... modifica TWS/Gateway ...
+4. ibwr start          (ripristina connessione)
+5. verifica GET /opz/ibkr/status  (conferma porta 4001/4002 up)
+6. observer on         (riattiva notifiche)
+```
+
+---
+
+## Appendice D — Session Logs: Query di riferimento [v.T.11.14]
+
+### Leggere sessioni dell'ultima settimana
+```
+GET /opz/session/logs?limit=14
+```
+
+### Diagnosticare sessioni con errori
+```sql
+SELECT session_date, session_type, trigger, errors_json
+FROM session_logs
+WHERE errors_json != '[]'
+ORDER BY created_ts DESC
+LIMIT 10;
+```
+
+### Rieseguire una sessione fallita manualmente
+```
+POST /opz/session/run
+{"session_type": "morning"}
+```
+L'endpoint scrive una nuova riga in `session_logs` con `trigger = "manual"`.
+
+---
+
 <!-- BEGIN GO_NOGO_RELEASE_PLAN -->
 ## Appendice Z — Roadmap GO/NO-GO (Release per moduli)
 

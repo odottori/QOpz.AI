@@ -75,4 +75,80 @@ Questo è più importante di quanto sembri. La Wheel può durare settimane. Le a
 
 ---
 
+---
+
+### Visibilità dei pannelli per tier — Block Visibility
+
+L'interfaccia non mostra tutti i blocchi a tutti gli operatori. Il sistema adatta dinamicamente la visibilità dei pannelli in base a tre fattori: il tier di capitale, il regime di mercato corrente, e il gate di validazione raggiunto.
+
+**Blocchi sempre visibili**
+
+Questi pannelli sono sempre presenti, indipendentemente da tier e regime:
+
+- Kill switch, badge regime, sommario rischio
+- Stato connessione, grafico equity, stato gate
+- Conto IBKR, exit candidates, log operazioni, matrice regime
+
+**Blocchi sospesi in regime SHOCK**
+
+In regime SHOCK, i pannelli di scanning e trading diventano automaticamente read-only:
+
+- Scanner universo, scan opportunità, pipeline automatica → visibili ma non interattivi
+- Blocchi strategia → visibili ma non interattivi (collapse automatico)
+- Preview e conferma ordini → visibili ma non cliccabili
+
+Questo comportamento è intenzionale: in SHOCK puoi leggere tutto, ma non puoi aprire nuove posizioni.
+
+**Blocchi condizionati al capitale (capital gate)**
+
+Se il tuo capitale è inferiore a quello richiesto per una strategia, il blocco corrispondente non viene visualizzato:
+
+| Pannello | Capitale minimo |
+|---------|----------------|
+| Bull Put | MICRO (€1k–2k) |
+| Iron Condor, Wheel | SMALL (€2k–5k) |
+| PMCC, Calendar, Hedge Attivo | MEDIUM (€5k–15k) |
+| Ratio Spread, Delta Overlay | ADVANCED (€15k+) |
+
+**Pannello Kelly — data gate**
+
+Il pannello di sizing Kelly è soggetto a un gate separato: viene mostrato e reso attivo solo se sono soddisfatte entrambe le condizioni:
+
+- I dati provengono da Interactive Brokers (non sintetici)
+- Ci sono almeno 50 operazioni chiuse nel log
+
+Se una delle due condizioni manca, il pannello Kelly mostra un avviso con il dettaglio di cosa manca.
+
+---
+
+### Avviso Copilota — Capitale vs Gate validato
+
+Il sistema distingue tra due situazioni diverse, entrambe gestite senza bloccare l'operatività:
+
+**Capitale sufficiente, gate non ancora validato**
+
+Hai abbastanza capitale per usare una strategia, ma non hai ancora superato il gate di validazione (non hai ancora operato abbastanza per quella fascia). In questo caso:
+
+- Il pannello è visibile e interattivo
+- Appare un avviso del Copilota: il gate non è ancora stato superato
+- L'avviso non blocca — è informativo
+
+Questa distinzione esiste perché avere il capitale non equivale ad avere l'esperienza. Il Copilota ti segnala la discrepanza e suggerisce di procedere con cautela.
+
+**Capitale insufficiente**
+
+Il pannello non viene mostrato. Non c'è avviso — semplicemente il blocco non esiste nell'interfaccia.
+
+**Flusso upgrade suggerito**
+
+Quando il Copilota segnala un gate non validato, il modo corretto di avanzare è:
+
+1. Completare il numero di operazioni richiesto per la fascia attuale
+2. Superare la verifica delle metriche (rendimento/rischio, perdita massima, violazioni)
+3. Il gate si sblocca automaticamente — il Copilota smette di avvisare
+
+Non esiste una scorciatoia manuale per saltare un gate di validazione.
+
+---
+
 *Nel prossimo capitolo affrontiamo la domanda più importante: quanto dura il periodo paper, perché non si può accorciare, e cosa fare nel frattempo per arrivare preparati al trading reale.*

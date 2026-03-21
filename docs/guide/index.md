@@ -54,6 +54,9 @@ Ogni capitolo risponde a una domanda precisa:
 - **Come vengono protetti i tuoi soldi** quando qualcosa va storto?
 - **Come si legge la WAR ROOM?** Pannello per pannello, numero per numero.
 - **Tier e strategie: Wheel, Iron Condor e come crescere.** Quando si sbloccano le strategie avanzate e perché.
+- **Il periodo paper: come funziona e quando sei pronto.** Metriche, history readiness, passaggio al live.
+- **Le sessioni automatiche: scheduler e briefing audio.** Come il sistema lavora per te ogni mattina.
+- **Il control plane: IBWR e Telegram observer.** Come gestire le interruzioni senza perdere il controllo.
 
 Alla fine di questo percorso saprai spiegare QOpz.AI a chiunque. E soprattutto — lo controllerai davvero, non solo lo userai.
 

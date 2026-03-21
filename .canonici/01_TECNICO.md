@@ -576,6 +576,78 @@ if runtime > 5.0:
 ```
 La modalitÃ  approssimata deve essere loggata e riportata nel journal.
 
+---
+
+## Addendum v.T.11.14 — T7.4 Schema session_logs
+
+Tabella DuckDB `session_logs` — persistenza stato sessioni giornaliere:
+
+| Campo | Tipo | Descrizione |
+|---|---|---|
+| `id` | INTEGER | PK auto-increment |
+| `session_date` | DATE | Data sessione (UTC) |
+| `session_type` | VARCHAR | `morning` o `eod` |
+| `trigger` | VARCHAR | `auto` (scheduler) o `manual` (operatore) |
+| `regime` | VARCHAR | Regime al momento della sessione (`NORMAL/CAUTION/SHOCK`) |
+| `equity` | FLOAT | Equity snapshot al momento della sessione |
+| `n_symbols` | INTEGER | Numero simboli scansionati |
+| `errors_json` | JSON | Array errori (vuoto se OK) |
+| `run_id` | VARCHAR | UUID del run associato |
+| `created_ts` | TIMESTAMP | Timestamp creazione riga (UTC) |
+
+Endpoint:
+- `POST /opz/session/log` — scrive riga (chiamato da `session_runner.py`)
+- `GET /opz/session/logs?limit=30` — legge storico sessioni
+
+---
+
+## Addendum v.T.11.14 — T7.5 History Readiness Telemetry
+
+Campo aggiunto a `/opz/system/status`:
+
+| Campo | Descrizione |
+|---|---|
+| `days_observed` | Giorni di dati reali accumulati |
+| `target_days` | Target giorni per certificazione (default: 90) |
+| `events_observed` | Eventi regime osservati |
+| `target_events` | Target eventi per certificazione |
+| `completeness_pct` | Score % complessivo |
+| `eta_days` | Stima giorni mancanti al target |
+| `blockers` | Lista blocchi espliciti che impediscono avanzamento |
+
+Regola: `completeness_pct >= 100%` AND `blockers == []` => sistema pronto per avanzamento a live.
+Connessione con DATA_MODE: history_readiness viene considerata solo in `DATA_MODE = VENDOR_REAL_CHAIN`.
+
+---
+
+## Addendum v.T.11.14 — Block Visibility Architecture
+
+Il sistema applica una logica tier-aware e regime-aware sulla visibilità dei blocchi UI:
+
+### Tier-aware visibility
+Ogni tier (`MICRO/SMALL/MEDIUM/ADVANCED`) ha un insieme di blocchi UI abilitati.
+L'`active_mode` (scelto dall'operatore) non può superare il `capital_tier` (determinato dal capitale).
+
+### Regime-aware visibility (SHOCK collapse)
+In regime `SHOCK`:
+- Panel operativi (scanner, execution, wheel) si collassano automaticamente
+- Rimangono visibili: regime badge, equity curve, kill switch, exit candidates
+- L'operatore non può avviare nuovi trade (UI in sola lettura per blocchi trading)
+
+### Kelly gate visuale
+Il gate Kelly è visibile come stato nel War Room:
+- `LOCKED`: `DATA_MODE != VENDOR_REAL_CHAIN` OR `N_closed_trades < 50`
+- `READY`: condizioni soddisfatte — Kelly fraction applicata al sizing
+
+### Tier Copilot Warning Model
+Separazione tra due condizioni:
+- `capital_tier`: determinato dal capitale disponibile (es. €1.5k = MICRO)
+- `validated_tier`: determinato dal superamento gate (min trade, Sharpe OOS, max DD)
+
+Se `capital_tier > validated_tier` → il sistema mostra warning operatore: "Capitale sufficiente per tier superiore, ma gate non superato. Rimani in [tier_corrente]."
+
+---
+
 ### Chiarimento: sizing in DEV con DATA_MODE sintetico (engineering-only)
 
 Per `DATA_MODE != VENDOR_REAL_CHAIN` alcune funzioni di sizing (es. `adaptive_fixed_fractional`) possono restituire `0.0` **per evitare qualsiasi interpretazione economica** di performance su dati sintetici.

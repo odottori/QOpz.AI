@@ -1546,6 +1546,17 @@ export default function App() {
     } catch { /* non critico */ }
   }
 
+  async function doRunSession(type: "morning" | "eod") {
+    try {
+      await apiJson(`${API_BASE}/opz/session/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, profile: ACTIVE_PROFILE }),
+      });
+      void doFetchSessionStatus();
+    } catch { /* non critico */ }
+  }
+
   async function doFetchWheelPositions() {
     try {
       const r = await apiJson<WheelPositionsResponse>(`${API_BASE}/opz/wheel/positions?profile=${ACTIVE_PROFILE}`);
@@ -2042,8 +2053,18 @@ export default function App() {
                 {sessionStatus.next_eod && !sessionStatus.running && (
                   <span>Prossima EOD: <strong style={{ color: "var(--p1)" }}>{sessionStatus.next_eod.replace("T", " ").slice(0, 16)}</strong></span>
                 )}
-                <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px", marginLeft: "auto" }}
-                  onClick={() => void doFetchSessionStatus()} title="Aggiorna stato sessioni">⟳</button>
+                <span style={{ marginLeft: "auto", display: "flex", gap: "6px", alignItems: "center" }}>
+                  <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px" }}
+                    disabled={sessionStatus.running}
+                    onClick={() => void doRunSession("morning")}
+                    title="Avvia sessione morning manualmente">▶ Morning</button>
+                  <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px" }}
+                    disabled={sessionStatus.running}
+                    onClick={() => void doRunSession("eod")}
+                    title="Avvia sessione EOD manualmente">▶ EOD</button>
+                  <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px" }}
+                    onClick={() => void doFetchSessionStatus()} title="Aggiorna stato sessioni">⟳</button>
+                </span>
               </div>
             )}
             {/* ── NARRATORE — player inline ───────────────────────────────────── */}

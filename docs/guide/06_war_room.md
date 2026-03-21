@@ -76,3 +76,72 @@ Per tutto il resto del tempo, il sistema lavora per te. Se qualcosa richiede att
 La WAR ROOM è progettata per darti informazioni, non per farti sentire in balia degli eventi. Ogni numero ha un contesto. Ogni segnale ha una spiegazione. Ogni azione richiede la tua conferma.
 
 Uno strumento che capisci è uno strumento che controlli. E uno strumento che controlli, anche nei momenti difficili, rimane uno strumento — non diventa un problema.
+
+---
+
+### Il NARRATORE — Briefing audio integrato
+
+Il NARRATORE è la barra di ascolto nella WAR ROOM. Ti permette di ascoltare un riassunto vocale della situazione operativa senza dover leggere ogni pannello singolarmente.
+
+**Come aprire il drawer**
+
+Il NARRATORE è disponibile come pannello espandibile nella WAR ROOM. Clicca sulla barra **NARRATORE** per aprirlo. Il drawer mostra:
+
+- Il player audio con i controlli di riproduzione (indietro / play-pause / avanti)
+- La lista dei briefing disponibili (ultimi 20)
+- Il pulsante per generare un nuovo briefing
+
+**Play e pause**
+
+Usa i controlli **◀ PREV / ▶ PLAY / NEXT ▶** per navigare tra i briefing disponibili e controllare la riproduzione. Il player funziona inline — non apre finestre esterne.
+
+**Generare un nuovo briefing**
+
+Il briefing viene generato raccogliendo i dati correnti dal sistema (regime, equity, opportunità, exit candidates) e convertendoli in audio tramite il motore di sintesi vocale `edge-tts`. Per generare:
+
+```
+POST /opz/briefing/generate
+```
+
+Parametri opzionali:
+- `no_telegram=true` — non invia il briefing su Telegram dopo la generazione (default: invia)
+
+Prerequisito: `edge-tts` deve essere installato nell'ambiente Python. Se non è installato, la generazione scade in timeout (120 secondi) con un messaggio esplicativo.
+
+**Cosa contiene il briefing**
+
+Il briefing vocale riassume:
+- Regime corrente e tendenza
+- Equity e drawdown del conto
+- Uscite urgenti (se presenti)
+- Principali opportunità del giorno
+
+**Lista briefing disponibili**
+
+```
+GET /opz/briefing/list
+```
+
+Restituisce i filename degli ultimi 20 briefing MP3 disponibili, ordinati per data discendente.
+
+**Ascoltare un briefing specifico**
+
+```
+GET /opz/briefing/latest        — il più recente
+GET /opz/briefing/file/{nome}   — un file specifico per nome
+```
+
+---
+
+### Il badge Observer — Stato delle notifiche Telegram
+
+In alto nell'interfaccia della WAR ROOM compare il badge **Observer**. Indica se il canale di notifica Telegram è attivo.
+
+| Badge | Significato operativo |
+|-------|-----------------------|
+| **ON** (verde) | Notifiche attive, IBKR connesso, esecuzione sbloccata |
+| **OFF** (rosso) | Notifiche sospese, kill switch attivo, nessun ordine possibile |
+
+Se vedi il badge OFF al mattino senza averlo disattivato tu, significa che qualcosa ha interrotto la connessione a IBKR durante la notte. Prima di fare qualsiasi operazione, verifica che TWS/IBG sia attivo e controlla `GET /opz/control/status`.
+
+Per i dettagli su come gestire l'Observer, vedi il Capitolo 10 — Il Control Plane operativo.

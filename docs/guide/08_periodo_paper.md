@@ -166,4 +166,56 @@ La scelta è tua. Il sistema non ha fretta. I mercati ci saranno anche domani.
 
 ---
 
+### History Readiness — Il tuo punteggio di copertura dati
+
+Oltre al contatore delle 50 operazioni chiuse, il sistema calcola un secondo indicatore chiamato **History Readiness**. Misura quanto il tuo storico dati è completo e affidabile per supportare le decisioni del sistema.
+
+**Cosa misura**
+
+L'indicatore combina quattro dimensioni:
+
+| Dimensione | Peso | Cosa conta |
+|-----------|------|-----------|
+| Giorni coperti | 35% | Quanti giorni distinti hanno almeno un evento registrato |
+| Eventi totali | 35% | Trade registrati + decisioni su opportunità nella finestra temporale |
+| Qualità del giornale | 20% | Completezza dei campi obbligatori in ogni trade (regime, score, kelly, exit reason, ecc.) |
+| Violazioni compliance | 10% | Assenza di violazioni delle regole operative nella finestra |
+
+Il risultato è uno **score percentuale** da 0 a 100. Quando raggiunge 100, tutti i blockers sono risolti.
+
+**Come leggerlo nella WAR ROOM**
+
+Il pannello di stato sistema (`GET /opz/system/status`, campo `history_readiness`) mostra:
+
+| Campo | Significato |
+|-------|-------------|
+| `score_pct` | Punteggio complessivo (0–100%) |
+| `days_observed` / `target_days` | Giorni con attività / obiettivo |
+| `events_observed` / `target_events` | Events registrati / obiettivo |
+| `quality_completeness` | Percentuale di campi compilati correttamente |
+| `eta_days` / `eta_date_utc` | Stima in giorni e data di quando raggiungerai la readiness |
+| `blockers` | Lista dei criteri ancora non soddisfatti |
+| `ready` | `true` quando tutti i blockers sono risolti |
+
+**Esempio di lettura**
+
+```
+score_pct: 62.4
+days_observed: 6 / target_days: 10
+events_observed: 18 / target_events: 40
+quality_completeness: 0.88 (88%)
+eta_days: 7
+blockers: ["coverage_days 6/10", "events 18/40"]
+```
+
+In questo caso mancano ancora 4 giorni di copertura e 22 eventi. La stima è di 7 giorni prima di raggiungere la readiness completa, al ritmo attuale.
+
+**Connessione con il passaggio al trading reale**
+
+La History Readiness è uno dei criteri che il sistema verifica prima di consentire il passaggio da dati sintetici a dati reali. Non è l'unico criterio (servono anche le 50 operazioni chiuse, le metriche di performance, nessuna violazione), ma è quello che puoi migliorare più direttamente: registra ogni operazione con tutti i campi, opera con continuità nei giorni di mercato, mantieni il giornale pulito.
+
+Con i dati sintetici (`DATA_MODE = SYNTHETIC_SURFACE_CALIBRATED`), la History Readiness contribuisce alla maturazione del sistema ma non sblocca il Kelly. Per sbloccare il Kelly servono dati reali da IBKR e 50 operazioni chiuse su quei dati.
+
+---
+
 *Questo è l'ultimo capitolo della guida. Da qui in poi, tutto il resto lo imparerai facendo — un'operazione alla volta, un giorno alla volta.*

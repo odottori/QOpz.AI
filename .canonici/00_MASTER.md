@@ -100,6 +100,67 @@ Ogni run/backtest deve loggare: `DATA_MODE`, `data_source`, (se sintetico) param
 
 Questa versione include `REGISTRO_INTEGRITA.md` nello ZIP: ogni variazione Ã¨ tracciata e motivata.
 
+---
+
+## Addendum v.T.11.14 — Operational Layer (Scheduler + Briefing + Control Plane)
+
+### Session Scheduler
+
+Il sistema esegue automaticamente due sessioni giornaliere (configurabili via `config/paper.toml` sezione `[sessions]`):
+
+| Sessione | Orario default | Scopo |
+|---|---|---|
+| `morning` | 09:00 CET | Scan universo, regime check, briefing |
+| `eod` | 16:30 CET | Snapshot equity, log chiusura |
+
+- Le sessioni sono eseguite come subprocess asincrono (non bloccano l'API)
+- Trigger: `auto` (scheduler) o `manual` (operatore via `POST /opz/session/run`)
+- Ogni sessione produce una riga in `session_logs` (DuckDB) — vedi `01_TECNICO.md` T7.4
+- Stato scheduler: `GET /opz/session/status` → `{enabled, running, last_morning, last_eod, next_morning, next_eod}`
+
+### Briefing Audio (NARRATORE)
+
+Il sistema genera un bollettino audio giornaliero (MP3 via edge-tts):
+
+- Generazione: `POST /opz/briefing/generate` (avvia in background)
+- Lista briefing: `GET /opz/briefing/list` (ultimi 20)
+- Play: `GET /opz/briefing/latest` (MP3 stream)
+- Anteprima testo: `GET /opz/briefing/text`
+- Il briefing viene inviato anche via Telegram (se observer attivo)
+- **Prerequisito**: `edge-tts` installato nell'ambiente
+
+### Control Plane (IBWR + Observer Telegram)
+
+**IBWR** — controllo connessione broker IBKR:
+
+- `POST /opz/ibwr/service` con `{"action": "start"|"stop"|"status"}`
+- `stop` blocca nuovi ordini (equivalente soft kill switch); probe su porte 4001/4002
+
+**Observer Telegram** — canale di notifica:
+
+- `POST /opz/execution/observer` con `{"action": "on"|"off"}`
+- `on`: notifiche attive (regime change, briefing, errori sessione)
+- `off`: silenzio totale (consigliato in manutenzione)
+- Kill switch forza observer OFF automaticamente
+
+### Flusso Operational Layer
+
+```
+[Session Scheduler] --> morning/eod subprocess (session_runner.py)
+        |
+        v
+   regime check --> universe scan --> briefing generate
+        |
+        v
+[session_logs DuckDB] <-- log riga per sessione
+        |
+        v
+[Briefing MP3] --> NARRATORE (UI player) + Telegram (se observer ON)
+
+[IBWR Control] --> porte 4001/4002 --> IBKR connection on/off
+[Observer]     --> Telegram bot --> notifiche operative
+```
+
 
 
 ---

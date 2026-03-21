@@ -16,15 +16,31 @@ Se l'API è online vedrai **API LIVE** verde in alto a destra. Se vedi **API DOW
 
 ## Routine mattutina (15 minuti)
 
-### 1. Ascolta il briefing audio
+### 1. Verifica lo scheduler e il briefing audio
 
-Apri la WAR ROOM → clicca **▶ BRIEFING**. Il sistema ti legge:
+Se lo scheduler è abilitato in config, la sessione morning è già partita alle 09:00 ora New York e ha preparato i dati del giorno. Puoi verificarlo in pochi secondi:
+
+```
+GET /opz/session/status
+```
+
+Se `"last_morning"` è di oggi e `"last_result.ok": true`, il sistema ha già fatto il suo lavoro. Passa direttamente al punto 2.
+
+Se la sessione non è partita (scheduler disabilitato o API offline durante la notte), avviala manualmente:
+
+```
+POST /opz/session/run {"type": "morning", "profile": "paper"}
+```
+
+**Briefing audio**
+
+Apri la WAR ROOM → apri il drawer **NARRATORE** → clicca **▶ PLAY**. Il sistema ti legge:
 - Regime corrente + trend
 - Equity e drawdown attuali
 - Exit urgenti (se presenti)
 - Opportunità principali del giorno
 
-Se il briefing non è aggiornato, clicca **GENERA** per produrne uno nuovo.
+Se il briefing non è aggiornato, clicca **GENERA** nel drawer del NARRATORE (oppure chiama `POST /opz/briefing/generate`).
 
 ---
 
@@ -87,7 +103,7 @@ Se qualcosa non torna, passa al candidato successivo. Il sistema ne mostra 5-10 
 
 Quando hai scelto:
 
-1. Vai in **WAR ROOM** → pannello **EXEC PREVIEW/CONFIRM**
+1. Vai nel tab **PIPELINE** → pannello **EXEC PREVIEW/CONFIRM**
 2. Verifica symbol e strategy (già precompilati dallo scan)
 3. Aggiusta il payload JSON se necessario
 4. Clicca **PREVIEW** → il sistema mostra l'ordine che invierebbe
@@ -120,6 +136,34 @@ Questa registrazione è fondamentale: è il dato che alimenta le statistiche e s
 □ Candidato analizzato
 □ Preview verificata
 □ Trade registrato nel log
+```
+
+---
+
+---
+
+## Verificare i session logs del giorno
+
+Al termine della giornata operativa (o il mattino successivo), vale la pena controllare cosa ha fatto il sistema:
+
+```
+GET /opz/session/logs?profile=paper&limit=10
+```
+
+Cosa guardare:
+
+| Campo | Cosa cercare |
+|-------|-------------|
+| `session_type` | `"morning"` e `"eod"` entrambi presenti per oggi? |
+| `regime` | Regime rilevato dalla sessione automatica |
+| `equity` | Equity registrata a fine sessione |
+| `errors` | Lista vuota = tutto OK. Se ci sono errori, leggi i messaggi |
+| `trigger` | `"auto"` = avviato dallo scheduler, `"manual"` = avviato da te |
+
+Se una sessione manca, puoi rieseguirla manualmente:
+
+```
+POST /opz/session/run {"type": "eod", "profile": "paper", "force": true}
 ```
 
 ---
@@ -195,8 +239,34 @@ Quando il ciclo ti è chiaro, attiva **Auto-Paper**. Il sistema opera da solo �
 | Regime corrente | Topbar, badge colorato |
 | Exit urgenti | WAR ROOM → EXIT CANDIDATES |
 | Scan opportunità | OPPORTUNITY → OPP SCAN |
-| Preview/Confirm | WAR ROOM → EXEC PREVIEW/CONFIRM |
+| Preview/Confirm | Tab PIPELINE → EXEC PREVIEW/CONFIRM |
 | Trade Log | TRADE LOG → AGGIUNGI TRADE |
 | Kill Switch | Topbar, pulsante rosso |
 | Stato API | Topbar → API /HEALTH |
 | Guida completa | Topbar → GUIDA |
+| Session logs | `GET /opz/session/logs` |
+| Stato scheduler | `GET /opz/session/status` |
+| Sessione manuale | WAR ROOM → banner scheduler → **▶ Morning** / **▶ EOD** |
+| IBWR on/off | `POST /opz/ibwr/service` |
+| Observer on/off | `POST /opz/execution/observer` |
+| Control plane | `GET /opz/control/status` |
+
+---
+
+### Manutenzione IBKR — procedura rapida
+
+Se devi riavviare TWS/IBG o fare modifiche al conto:
+
+```
+# 1. Ferma l'esecuzione
+POST /opz/ibwr/service  {"action": "off"}
+
+# 2. Fai la manutenzione
+
+# 3. Riattiva
+POST /opz/ibwr/service             {"action": "on"}
+POST /opz/execution/kill_switch    {"action": "deactivate"}
+POST /opz/execution/observer       {"action": "on"}
+```
+
+Per i dettagli completi vedi il **Capitolo 10 — Il Control Plane operativo**.
