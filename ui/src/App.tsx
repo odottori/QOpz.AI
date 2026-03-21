@@ -257,6 +257,8 @@ type IbkrAccountResponse = {
   buying_power: number | null; positions: IbkrAccountPosition[];
   message: string;
 };
+type SysLogRecord = { ts: string; level: string; name: string; msg: string; };
+type SysLogResponse = { ok: boolean; n: number; records: SysLogRecord[]; };
 type ActivityEvent = {
   ts: string; source: string; type: string;
   symbol?: string | null; detail: string;
@@ -799,6 +801,9 @@ export default function App() {
   const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
   const [activityStream, setActivityStream] = useState<ActivityStreamResponse | null>(null);
   const [activityOpen, setActivityOpen] = useState<boolean>(true);
+  const [sysLog, setSysLog] = useState<SysLogRecord[]>([]);
+  const [sysLogOpen, setSysLogOpen] = useState<boolean>(true);
+  const sysLogRef = React.useRef<HTMLDivElement>(null);
   const [wheelPositions, setWheelPositions] = useState<WheelPositionsResponse | null>(null);
   const [wheelFetchedAt, setWheelFetchedAt] = useState<number | null>(null);
   const [tierInfo, setTierInfo] = useState<TierResponse | null>(null);
@@ -1181,6 +1186,7 @@ export default function App() {
       void doFetchRegimeCurrent();
       void doFetchExitCandidates();
       void doFetchActivityStream();
+      void doFetchSysLog();
       void doFetchWheelPositions();
       void doFetchTier();
       void doFetchBriefingList();
@@ -1665,6 +1671,17 @@ export default function App() {
     try {
       const r = await apiJson<ActivityStreamResponse>(`${API_BASE}/opz/activity/stream?n=30`);
       setActivityStream(r);
+    } catch { /* non critico */ }
+  }
+
+  async function doFetchSysLog() {
+    try {
+      const r = await apiJson<SysLogResponse>(`${API_BASE}/opz/system/log?n=150`);
+      setSysLog(r.records ?? []);
+      // auto-scroll al fondo
+      setTimeout(() => {
+        if (sysLogRef.current) sysLogRef.current.scrollTop = sysLogRef.current.scrollHeight;
+      }, 50);
     } catch { /* non critico */ }
   }
 
@@ -2160,9 +2177,17 @@ export default function App() {
       void doFetchSessionStatus(); // stato scheduler sessioni
       void doFetchControlStatus(); // observer + ibwr + control plane
       void doFetchActivityStream(); // activity stream — refresh ogni 5 min
+      void doFetchSysLog();         // system log — refresh ogni 5 min
     }, 5 * 60_000);
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh syslog ogni 30s — log è leggero e utile per debug in tempo reale
+  useEffect(() => {
+    if (!apiOnline) return;
+    const id = window.setInterval(() => void doFetchSysLog(), 30_000);
+    return () => window.clearInterval(id);
+  }, [apiOnline]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-fetch tier when regime changes — block_visibility depends on regime
   useEffect(() => {
@@ -2477,198 +2502,99 @@ export default function App() {
 
             <div className="terminal-main">
         <aside className="leftnav">
-          <div className="nav-section left-ops-section">
-            <div className="left-grouphead" onClick={() => setLeftPipelineGroupOpen((v) => !v)} role="button" tabIndex={0}>
-              <span className="left-grouphead-title"><span className="group-arrow">{leftPipelineGroupOpen ? "▾" : "▸"}</span>PIPELINE</span>
-            </div>
-            {leftPipelineGroupOpen && (
-              <>
-                <div className="left-subhead left-subhead-inline" onClick={() => setLeftPipelineDataOpen((v) => !v)} role="button" tabIndex={0}>
-                  <span>{leftPipelineDataOpen ? "▾" : "▸"} Feed Dati</span>
-                  <span className={pipelineFeedHealth === "ok" ? "sev-ok" : pipelineFeedHealth === "warn" ? "sev-warn" : pipelineFeedHealth === "alert" ? "sev-error" : "sev-neutral"}>{pipelineFeedLabel}</span>
-                </div>
-                {leftPipelineDataOpen && (
-                  <>
-                    <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(yfinanceHealth)}`} /> yfinance / CBOE <span className={`nav-badge ${healthToBadgeClass(yfinanceHealth)}`}>{yfinanceLabel}</span></div>
-                    <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(fredHealth)}`} /> FRED API <span className={`nav-badge ${healthToBadgeClass(fredHealth)}`}>{fredLabel}</span></div>
-                    <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(oratsHealth)}`} /> ORATS (5 ticker) <span className={`nav-badge ${healthToBadgeClass(oratsHealth)}`}>{oratsLabel}</span></div>
-                    <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(ibwrHealth)}`} /> IBWR Feed <span className={`nav-badge ${healthToBadgeClass(ibwrHealth)}`}>{ibwrState}</span></div>
-                  </>
-                )}
-                <div className="left-subhead" onClick={() => setLeftLiveStatusOpen((v) => !v)} role="button" tabIndex={0}>
-                  <span>{leftLiveStatusOpen ? "▾" : "▸"} Servizi & Controlli</span>
-                  <span style={{ display: "inline-flex", gap: 8 }}>
-                    <span className={apiOnline ? "sev-ok" : "sev-error"}>{apiOnline ? "API OK" : "API DOWN"}</span>
-                    <span className={healthToSevClass(ibwrHealth)}>{`IBWR ${ibwrState}`}</span>
-                  </span>
-                </div>
-                {leftLiveStatusOpen && (
-                  <div className="left-subbody">
-                    <div className="left-kpi-row"><span>api</span><b className={apiOnline ? "sev-ok" : "sev-error"}>{apiOnline ? "ONLINE" : "OFFLINE"}</b></div>
-                    <div className="left-kpi-row"><span>ibkr</span><b className={ibkrAccount?.connected ? "sev-ok" : "sev-warn"}>{ibkrAccount?.connected ? "CONNECTED" : "FALLBACK"}</b></div>
-                    <div className="left-kpi-row"><span>observer</span><b className={controlStatus?.observer?.state === "ON" ? "sev-ok" : "sev-warn"}>{controlStatus?.observer?.state ?? "N/D"}</b></div>
-                    <div className="left-kpi-row"><span>ibwr</span><b className={healthToSevClass(ibwrHealth)}>{ibwrState}</b></div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                      <button className="btn btn-ghost" style={{ fontSize: "0.62rem", padding: "2px 6px", flex: 1 }}
-                        disabled={ibwrBusy || !apiOnline}
-                        onClick={() => void doIbwrService("on")}>IBWR ON</button>
-                      <button className="btn btn-ghost" style={{ fontSize: "0.62rem", padding: "2px 6px", flex: 1 }}
-                        disabled={ibwrBusy || !apiOnline}
-                        onClick={() => void doIbwrService("off")}>IBWR OFF</button>
-                      <button className="btn btn-ghost" style={{ fontSize: "0.62rem", padding: "2px 6px" }}
-                        disabled={ibwrBusy}
-                        onClick={() => void doIbwrService("status")}>⟳</button>
-                    </div>
-                    <div className="left-kpi-row"><span>regime</span><b className={sevClassForRegime(regimeCurrent?.regime)}>{regimeCurrent?.regime ?? "UNKNOWN"}</b></div>
-                    <div className="left-kpi-row"><span>history</span><b className={historyReadiness?.ready ? "sev-ok" : "sev-warn"}>{historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "—"}</b></div>
-                    <div className="left-kpi-row"><span>last update</span><b className="sev-meta">{paperSummary?.as_of_date ?? "-"}</b></div>
-                  </div>
-                )}
-                <div className="left-subhead" onClick={() => setLeftDataHealthOpen((v) => !v)} role="button" tabIndex={0}>
-                  <span>{leftDataHealthOpen ? "▾" : "▸"} Data Health</span>
-                  <span className={healthToSevClass(dataHealthOverall)}>{dataHealthLabel}</span>
-                </div>
-                {leftDataHealthOpen && (
-                  <div className="left-subbody">
-                    <div className="left-kpi-row"><span>Stato pipeline</span><b className={healthToSevClass(pipelineStateHealth)}>{pipelineStateLabel}</b></div>
-                    <div className="left-kpi-row"><span>Criticita aperte</span><b className={healthToSevClass(pipelineCriticalityHealth)}>{apiOnline ? (pipelineCriticality ?? 0) : "N/D"}</b></div>
-                    <div className="left-kpi-row"><span>Quantita dati</span><b className={healthToSevClass(qtyHealth)}>{dataQtyPct === null ? "N/D" : `${dataQtyPct}%`}</b></div>
-                    <div className="left-kpi-row"><span>Qualita dati</span><b className={healthToSevClass(qualityHealth)}>{dataQualityPct === null ? "N/D" : `${dataQualityPct}%`}</b></div>
-                    <div className="left-kpi-row"><span>Significativita</span><b className={healthToSevClass(significanceHealth)}>{significanceLabel}</b></div>
-                    <div className="left-kpi-row"><span>Ingest feed</span><b className={healthToSevClass(ingestHealth)}>{ingestLabel}</b></div>
-                    <div className="left-kpi-row"><span>Data mode</span><b className={apiOnline ? (dataModeUpper.includes("SYNTH") ? "sev-neutral" : "sev-ok") : "sev-neutral"}>{apiOnline ? (dataModeUpper || "N/D") : "N/D"}</b></div>
-                    <div className="left-kpi-row"><span>Base dati locale</span><b className={healthToSevClass(localDbHealth)}>{apiOnline ? `${localRecords} rec` : "N/D"}</b></div>
-                    <div className="left-kpi-row"><span>Fonte yfinance/CBOE</span><b className={healthToSevClass(yfinanceHealth)}>{yfinanceLabel}</b></div>
-                    <div className="left-kpi-row"><span>Fonte FRED</span><b className={healthToSevClass(fredHealth)}>{fredLabel}</b></div>
-                    <div className="left-kpi-row"><span>Fonte ORATS</span><b className={healthToSevClass(oratsHealth)}>{oratsLabel}</b></div>
-                    <div className="left-kpi-row"><span>Source IBKR</span><b className={apiOnline ? (sysStatus?.ibkr_source_system === "ibkr_live" ? "sev-ok" : "sev-warn") : "sev-neutral"}>{apiOnline ? (sysStatus?.ibkr_source_system ?? "N/D") : "N/D"}</b></div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
           <div className="nav-section left-ops-section left-dev-group">
             <div className="left-grouphead" onClick={() => setLeftDevelopmentOpen((v) => !v)} role="button" tabIndex={0}>
-              <span className="left-grouphead-title"><span className="group-arrow">{leftDevelopmentOpen ? "▾" : "▸"}</span>SVILUPPO</span>
+              <span className="left-grouphead-title"><span className="group-arrow">{leftDevelopmentOpen ? "▾" : "▸"}</span>AVANZAMENTO</span>
             </div>
             {leftDevelopmentOpen && (
               <>
-            <div className="left-subhead" onClick={() => setLeftPipelineProgressOpen((v) => !v)} role="button" tabIndex={0}>
-              <span>{leftPipelineProgressOpen ? "▾" : "▸"} PROGRESSIONE</span>
-              <span className="sev-data">{phaseProgress.f1}%/{phaseProgress.f2}%/{phaseProgress.f3}%/{phaseProgress.f4}%</span>
-            </div>
-            {leftPipelineProgressOpen && (
-              <div className="dev-phase-stack">
-                <div className="phase-row"><span>F1 Pipeline</span><b className={phaseProgress.f1 === 100 ? "ok" : "warn"}>{phaseProgress.f1}%</b></div>
-                <div className="phase-bar"><span style={{ width: `${phaseProgress.f1}%` }} /></div>
-                <div className="phase-row"><span>F2 Regime</span><b className={phaseProgress.f2 === 100 ? "ok" : "warn"}>{phaseProgress.f2}%</b></div>
-                <div className="phase-bar"><span style={{ width: `${phaseProgress.f2}%` }} /></div>
-                <div className="phase-row"><span>F3 Paper</span><b className={phaseProgress.f3 === 100 ? "ok" : phaseProgress.f3 > 0 ? "warn" : "dim"}>{phaseProgress.f3}%</b></div>
-                <div className="phase-bar"><span style={{ width: `${phaseProgress.f3}%` }} /></div>
-                <div className="phase-row"><span>F4 Scoring</span><b className={phaseProgress.f4 === 100 ? "ok" : phaseProgress.f4 > 0 ? "warn" : "dim"}>{phaseProgress.f4}%</b></div>
-                <div className="phase-bar"><span style={{ width: `${phaseProgress.f4}%` }} /></div>
-              </div>
-            )}
-            <div className="left-subhead left-subhead-inline" onClick={() => setLeftPhaseOpen((v) => !v)} role="button" tabIndex={0}>
-              <span>{leftPhaseOpen ? "▾" : "▸"} FASE CORRENTE</span>
-              <span className="sev-data">{nextStep}</span>
-            </div>
-            {leftPhaseOpen && (
-              <div className="left-subbody">
-                <div className="left-kpi-row"><span>Blocked steps</span><b className="sev-data">{blockedCount}</b></div>
-                <div className="left-kpi-row"><span>equity points</span><b className="sev-data">{paperSummary?.equity_points ?? 0}</b></div>
-                <div className="left-kpi-row"><span>trade journal</span><b className="sev-data">{paperSummary?.trades ?? 0}</b></div>
-                <div className="left-kpi-row"><span>Data aggior.</span><b className="sev-meta">{paperSummary?.as_of_date ?? "-"}</b></div>
-              </div>
-            )}
-              </>
-            )}
-          </div>
-
-          <div className="nav-section">
-            <div className="nav-label">RISK</div>
-            <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(varHealth)}`} /> VaR/CVaR <span className={`nav-badge ${healthToBadgeClass(varHealth)}`}>{varLabel}</span></div>
-            <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(ddHealth)}`} /> DD Control <span className={`nav-badge ${healthToBadgeClass(ddHealth)}`}>{ddLabel}</span></div>
-            <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(tailHedgeHealth)}`} /> Tail Hedge <span className={`nav-badge ${healthToBadgeClass(tailHedgeHealth)}`}>{tailHedgeLabel}</span></div>
-          </div>
-
-          <div className="nav-section left-ops-section">
-            <div className="left-grouphead" onClick={() => setLeftOperationsOpen((v) => !v)} role="button" tabIndex={0}>
-              <span className="left-grouphead-title"><span className="group-arrow">{leftOperationsOpen ? "▾" : "▸"}</span>OPERATIVITA</span>
-            </div>
-            {leftOperationsOpen && (
-              <>
-                <div className="left-subhead left-subhead-inline" onClick={() => setLeftKellyOpen((v) => !v)} role="button" tabIndex={0}>
-                  <span>{leftKellyOpen ? "▾" : "▸"} Kelly Sizing</span>
-                  <span className={blk("kelly_sizing").visible ? "sev-ok" : "sev-neutral"}>{blk("kelly_sizing").visible ? "LIVE" : "LOCK"}</span>
+                <div className="left-subhead" onClick={() => setLeftPipelineProgressOpen((v) => !v)} role="button" tabIndex={0}>
+                  <span>{leftPipelineProgressOpen ? "▾" : "▸"} MILESTONE</span>
+                  <span className="sev-data">{phaseProgress.f1}%/{phaseProgress.f2}%/{phaseProgress.f3}%/{phaseProgress.f4}%</span>
                 </div>
-                {leftKellyOpen && (
-                  blk("kelly_sizing").visible ? (
-                    <div className="left-subbody">
-                      <div className="left-kpi-row"><span>Half-Kelly</span><b className="sev-data">{kellyHalf === null ? "-" : `${(kellyHalf * 100).toFixed(2)}%`}</b></div>
-                      <div className="left-kpi-row"><span>Win rate</span><b className="sev-data">{fmtPct(paperSummary?.win_rate ?? null)}</b></div>
-                      <div className="left-kpi-row"><span>Profit factor</span><b className="sev-data">{fmtNum(paperSummary?.profit_factor ?? null)}</b></div>
-                      <div className="left-kpi-row"><span>Avg slippage</span><b className="sev-data">{fmtNum(paperSummary?.avg_slippage_ticks ?? null)}</b></div>
-                    </div>
-                  ) : (
-                    <div className="left-subbody sev-meta">🔒 {blk("kelly_sizing").reason ?? "Kelly disabilitato"}</div>
-                  )
-                )}
-                <div className="left-subhead" onClick={() => setLeftExecWindowOpen((v) => !v)} role="button" tabIndex={0}>
-                  <span>{leftExecWindowOpen ? "▾" : "▸"} EXECUTION WINDOW</span>
-                  <span className="sev-ok">EST</span>
-                </div>
-                {leftExecWindowOpen && (
-                  <div className="left-subbody">
-                    <div className="sev-ok">10:00-11:30 EST</div>
-                    <div className="sev-meta">13:30-15:00 EST</div>
-                    <div className="sev-meta">Avoid: 09:30-09:45 | 15:30-16:00</div>
+                {leftPipelineProgressOpen && (
+                  <div className="dev-phase-stack">
+                    <div className="phase-row"><span>F1 Pipeline</span><b className={phaseProgress.f1 === 100 ? "ok" : "warn"}>{phaseProgress.f1}%</b></div>
+                    <div className="phase-bar"><span style={{ width: `${phaseProgress.f1}%` }} /></div>
+                    <div className="phase-row"><span>F2 Regime</span><b className={phaseProgress.f2 === 100 ? "ok" : "warn"}>{phaseProgress.f2}%</b></div>
+                    <div className="phase-bar"><span style={{ width: `${phaseProgress.f2}%` }} /></div>
+                    <div className="phase-row"><span>F3 Paper</span><b className={phaseProgress.f3 === 100 ? "ok" : phaseProgress.f3 > 0 ? "warn" : "dim"}>{phaseProgress.f3}%</b></div>
+                    <div className="phase-bar"><span style={{ width: `${phaseProgress.f3}%` }} /></div>
+                    <div className="phase-row"><span>F4 Scoring</span><b className={phaseProgress.f4 === 100 ? "ok" : phaseProgress.f4 > 0 ? "warn" : "dim"}>{phaseProgress.f4}%</b></div>
+                    <div className="phase-bar"><span style={{ width: `${phaseProgress.f4}%` }} /></div>
                   </div>
                 )}
+                <div className="left-subhead left-subhead-inline" onClick={() => setLeftPhaseOpen((v) => !v)} role="button" tabIndex={0}>
+                  <span>{leftPhaseOpen ? "▾" : "▸"} STEP ATTIVO</span>
+                  <span className="sev-data">{nextStep}</span>
+                </div>
+                {leftPhaseOpen && (
+                  <div className="left-subbody">
+                    <div className="left-kpi-row"><span>Step bloccati</span><b className="sev-data">{blockedCount}</b></div>
+                    <div className="left-kpi-row"><span>Equity points</span><b className="sev-data">{paperSummary?.equity_points ?? 0}</b></div>
+                    <div className="left-kpi-row"><span>Trade journal</span><b className="sev-data">{paperSummary?.trades ?? 0}</b></div>
+                    <div className="left-kpi-row"><span>Aggiornato</span><b className="sev-meta">{paperSummary?.as_of_date ?? "-"}</b></div>
+                  </div>
+                )}
+                <div className="left-subhead left-subhead-inline" style={{marginTop:4}}>
+                  <span className="sev-meta" style={{fontSize:"0.6rem"}}>SESSIONI AUTO</span>
+                  <span className={sessionStatus?.enabled ? "sev-ok" : "sev-neutral"} style={{fontSize:"0.6rem"}}>
+                    {sessionStatus?.enabled ? "ON" : "OFF"}
+                  </span>
+                </div>
+                <div className="left-subbody">
+                  <div className="left-kpi-row"><span>Prossima</span><b className="sev-meta" style={{fontSize:"0.6rem"}}>
+                    {sessionStatus?.next_morning ? sessionStatus.next_morning.slice(0,16).replace("T"," ") : "—"}
+                  </b></div>
+                  <div className="left-kpi-row"><span>Ultima morning</span><b className="sev-meta" style={{fontSize:"0.6rem"}}>
+                    {sessionStatus?.last_morning ? sessionStatus.last_morning.slice(0,16).replace("T"," ") : "mai"}
+                  </b></div>
+                </div>
               </>
             )}
           </div>
-          {/* ACTIVITY STREAM */}
-          <div className="nav-section left-ops-section activity-stream-section">
-            <div className="left-grouphead" onClick={() => setActivityOpen(v => !v)} role="button" tabIndex={0}>
+          {/* SYSTEM LOG */}
+          <div className="nav-section syslog-section">
+            <div className="left-grouphead syslog-header" onClick={() => setSysLogOpen(v => !v)} role="button" tabIndex={0}>
               <span className="left-grouphead-title">
-                <span className="group-arrow">{activityOpen ? "▾" : "▸"}</span>ATTIVITA
+                <span className="group-arrow">{sysLogOpen ? "▾" : "▸"}</span>SYSTEM LOG
               </span>
-              {activityStream && activityStream.n > 0 && (
-                <span className="sev-data" style={{fontSize:"0.6rem"}}>{activityStream.n}</span>
-              )}
+              <span style={{display:"flex", gap:5, alignItems:"center"}}>
+                {sysLog.some(r => r.level === "ERROR") && <span className="sev-error" style={{fontSize:"0.58rem"}}>ERR</span>}
+                {sysLog.some(r => r.level === "WARNING") && <span className="sev-warn" style={{fontSize:"0.58rem"}}>WARN</span>}
+                <span className="sev-meta" style={{fontSize:"0.58rem"}}>{sysLog.length}</span>
+              </span>
             </div>
-            {activityOpen && (
-              <div className="activity-feed">
-                {!activityStream && (
-                  <div className="activity-empty sev-meta">—</div>
-                )}
-                {activityStream && activityStream.n === 0 && (
-                  <div className="activity-empty sev-meta">Nessun evento registrato</div>
-                )}
-                {activityStream && activityStream.events.map((ev, i) => {
-                  const ts = ev.ts ? ev.ts.slice(11, 19) : ""; // HH:MM:SS
-                  const icon = ev.source === "regime" ? "⬡" : ev.type === "filled" || ev.type === "opened" ? "✓" : ev.type === "error" || ev.type === "rejected" ? "✗" : "·";
-                  return (
-                    <div key={i} className="activity-row">
-                      <span className="activity-ts">{ts}</span>
-                      <span className={`activity-icon sev-${ev.severity}`}>{icon}</span>
-                      <span className="activity-body">
-                        {ev.symbol && <span className="activity-sym">{ev.symbol} </span>}
-                        <span className={`sev-${ev.severity}`}>{ev.type}</span>
-                        {ev.detail && <span className="activity-detail"> {ev.detail}</span>}
-                      </span>
+            {sysLogOpen && (
+              <>
+                <div className="syslog-feed" ref={sysLogRef}>
+                  {sysLog.length === 0 && (
+                    <div className="syslog-empty">{apiOnline ? "In attesa di eventi..." : "API offline"}</div>
+                  )}
+                  {sysLog.map((r, i) => (
+                    <div key={i} className={`syslog-row syslog-${r.level.toLowerCase()}`}>
+                      <span className="syslog-ts">{r.ts}</span>
+                      <span className="syslog-lvl">{r.level.slice(0,1)}</span>
+                      <span className="syslog-name">{r.name}</span>
+                      <span className="syslog-msg">{r.msg}</span>
                     </div>
-                  );
-                })}
-                <div style={{display:"flex", justifyContent:"flex-end", marginTop:4}}>
-                  <button className="btn btn-ghost"
-                    style={{fontSize:"0.58rem", padding:"1px 5px"}}
-                    disabled={!apiOnline}
-                    onClick={() => void doFetchActivityStream()}>⟳</button>
+                  ))}
                 </div>
-              </div>
+                <div className="syslog-toolbar">
+                  <button className="btn btn-ghost syslog-btn" disabled={!apiOnline}
+                    onClick={() => void doFetchSysLog()}>⟳ aggiorna</button>
+                  <button className="btn btn-ghost syslog-btn"
+                    onClick={() => {
+                      const txt = sysLog.map(r => `${r.ts} [${r.level}] ${r.name}: ${r.msg}`).join("\n");
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(new Blob([txt], {type:"text/plain"}));
+                      a.download = `syslog_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.txt`;
+                      a.click();
+                    }}>⬇ salva</button>
+                  <button className="btn btn-ghost syslog-btn"
+                    onClick={() => setSysLog([])}>✕ pulisci</button>
+                </div>
+              </>
             )}
           </div>
         </aside><section className="centerpane">

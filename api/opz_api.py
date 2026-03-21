@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 
 import logging
+from collections import deque
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -24,6 +25,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 logger = logging.getLogger("opz_api")
+
+# ---------------------------------------------------------------------------
+# In-memory log buffer — ultimi 500 record da tutti i logger dell'API
+# ---------------------------------------------------------------------------
+_LOG_BUFFER: deque[dict] = deque(maxlen=500)
+
+class _MemoryLogHandler(logging.Handler):
+    """Handler che accumula record nel buffer circolare _LOG_BUFFER."""
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            _LOG_BUFFER.append({
+                "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%H:%M:%S"),
+                "level": record.levelname,
+                "name": record.name.split(".")[-1],
+                "msg": self.format(record),
+            })
+        except Exception:
+            pass
+
+_mem_handler = _MemoryLogHandler()
+_mem_handler.setFormatter(logging.Formatter("%(message)s"))
+logging.getLogger().addHandler(_mem_handler)  # root logger → cattura tutto
 
 from execution.paper_metrics import (
     build_history_readiness,
@@ -3285,7 +3308,7 @@ def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
     from execution.storage import _connect
     events: list[Dict[str, Any]] = []
     try:
-        con = _connect(profile)
+        con = _connect()
         # Order events
         rows = con.execute(
             """
@@ -3325,34 +3348,33 @@ def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
         logger.warning("activity_stream order_events: %s", exc)
 
     try:
-        con2 = _connect(profile)
-        reg_rows = con2.execute(
+        con2 = _connect()
+        sess_rows = con2.execute(
             """
-            SELECT asof_ts, regime, xgb_prob, hmm_prob_shock
-            FROM regime_snapshots
-            ORDER BY asof_ts DESC
+            SELECT started_at, session_type, regime, errors
+            FROM session_logs
+            ORDER BY started_at DESC
             LIMIT ?
             """,
             [max(5, n // 4)],
         ).fetchall()
-        for rr in reg_rows:
-            ts2, regime, xgb_p, hmm_p = rr
-            sev2 = "error" if regime == "SHOCK" else ("warn" if regime == "CAUTION" else "ok")
-            prob_str = ""
-            if xgb_p is not None:
-                prob_str += f"xgb={float(xgb_p):.2f}"
-            if hmm_p is not None:
-                prob_str += f"  hmm={float(hmm_p):.2f}"
+        for sr in sess_rows:
+            ts2, stype, regime, err_json = sr
+            errs = json.loads(err_json) if err_json else []
+            sev2 = "error" if errs else "ok"
+            detail = f"{stype}  regime={regime or '?'}"
+            if errs:
+                detail += f"  {len(errs)} err"
             events.append({
                 "ts": str(ts2) if ts2 else "",
-                "source": "regime",
-                "type": "regime_change",
+                "source": "session",
+                "type": "session_run",
                 "symbol": None,
-                "detail": f"{regime}  {prob_str}".strip(),
+                "detail": detail,
                 "severity": sev2,
             })
     except Exception as exc:
-        logger.warning("activity_stream regime_snapshots: %s", exc)
+        logger.warning("activity_stream session_logs: %s", exc)
 
     # Sort all events by ts desc, take top n
     events.sort(key=lambda e: e["ts"], reverse=True)
@@ -3363,5 +3385,19 @@ def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
         "n": len(events),
         "events": events,
         "as_of": events[0]["ts"] if events else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# System log endpoint — espone il buffer in-memory del logger
+# ---------------------------------------------------------------------------
+@app.get("/opz/system/log")
+def opz_system_log(n: int = 150) -> Dict[str, Any]:
+    """Ultimi N record dal buffer in-memory del logger Python dell'API."""
+    records = list(_LOG_BUFFER)[-n:]
+    return {
+        "ok": True,
+        "n": len(records),
+        "records": records,
     }
 
