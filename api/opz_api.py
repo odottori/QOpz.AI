@@ -9,13 +9,12 @@ import secrets
 import shlex
 import subprocess
 import sys
-import threading
 import time
 import uuid
 from contextlib import asynccontextmanager, contextmanager
 from datetime import date, datetime, time as time_cls, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional
 
 import logging
 
@@ -23,7 +22,6 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger("opz_api")
 
@@ -47,123 +45,68 @@ from execution.universe import (
     run_universe_scan_from_ibkr_settings,
     UniverseDataUnavailableError,
 )
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Response TypedDicts — ROC6-14 endpoints
-# Forniscono type-checking statico (mypy/pyright) senza overhead a runtime.
-# ─────────────────────────────────────────────────────────────────────────────
-
-class _Signal(TypedDict):
-    name: str
-    status: str   # "OK" | "WARN" | "ALERT" | "DISABLED"
-    detail: str
-
-class HistoryReadinessOut(TypedDict):
-    profile: str
-    window_days: int
-    target_days: int
-    days_observed: int
-    days_remaining: int
-    target_events: int
-    events_observed: int
-    events_remaining: int
-    event_breakdown: Dict[str, int]
-    quality_completeness: float
-    quality_target: float
-    quality_gap: float
-    compliance_violations_window: int
-    pace_events_per_day: float
-    eta_days: Optional[int]
-    eta_date_utc: Optional[str]
-    blockers: List[str]
-    ready: bool
-    score_pct: float
-
-class IbkrStatusOut(TypedDict):
-    ok: bool; connected: bool; host: str; port: Optional[int]
-    client_id: Optional[int]; source_system: str
-    connected_at: Optional[str]; ports_probed: List[int]; message: str
-
-class IbkrAccountPositionOut(TypedDict):
-    symbol: str; sec_type: str; expiry: Optional[str]
-    strike: Optional[float]; right: Optional[str]
-    quantity: float; avg_cost: float; market_price: float
-    market_value: float; unrealized_pnl: float; realized_pnl: float
-
-class IbkrAccountOut(TypedDict):
-    ok: bool; connected: bool; source_system: str
-    account_id: Optional[str]; net_liquidation: Optional[float]
-    realized_pnl: Optional[float]; unrealized_pnl: Optional[float]
-    buying_power: Optional[float]; positions: List[IbkrAccountPositionOut]
-    message: str
-
-class RegimeCurrentOut(TypedDict):
-    ok: bool; regime: str; n_recent: int
-    regime_counts: Dict[str, int]; regime_pct: Dict[str, float]
-    last_scan_ts: Optional[str]; source: str
-
-class SystemStatusOut(TypedDict):
-    ok: bool; timestamp_utc: str; api_online: bool
-    kill_switch_active: bool; data_mode: str; kelly_enabled: bool
-    ibkr_connected: bool; ibkr_port: Optional[int]
-    ibkr_source_system: str; ibkr_connected_at: Optional[str]
-    execution_config_ready: bool; n_closed_trades: int
-    regime: str; signals: List[_Signal]
-    history_readiness: HistoryReadinessOut
-
-class EquityPointOut(TypedDict):
-    date: str; equity: float
-
-class EquityHistoryOut(TypedDict):
-    ok: bool; profile: str; n_points: int
-    latest_equity: Optional[float]; initial_equity: Optional[float]
-    min_date: Optional[str]; max_date: Optional[str]
-    points: List[EquityPointOut]
-
-class ExitCandidateOut(TypedDict):
-    symbol: str; expiry: Optional[str]; strike: Optional[float]
-    right: Optional[str]; quantity: float; avg_cost: float
-    market_price: Optional[float]; unrealized_pnl: Optional[float]
-    exit_score: int; exit_reasons: List[str]; source: str
-
-class _ExitThresholds(TypedDict):
-    theta_decay_pct: float; loss_limit_pct: float; time_stop_dte: int
-
-class ExitCandidatesOut(TypedDict):
-    ok: bool; source: str; today: str
-    n_total: int; n_flagged: int
-    candidates: List[ExitCandidateOut]; thresholds: _ExitThresholds
-
-
-ROOT = Path(__file__).resolve().parents[1]
-STATE_PATH = ROOT / ".qoaistate.json"
-LOG_DIR = ROOT / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-TUTORIAL_TEXT2SPEECH_PATH = ROOT / "docs" / "TUTORIAL_APPLICAZIONE.md"
-ALLOWED_SETTINGS_ROOT = ROOT / "docs"
-ALLOWED_TUTORIAL_ROOT = ROOT / "docs"
-ALLOWED_OCR_ROOTS = [ROOT / "data", ROOT / "docs"]
-TTS_FALLBACK_PID_PATH = LOG_DIR / "tts_fallback_pid.txt"
-TTS_FALLBACK_STATE_PATH = LOG_DIR / "tts_fallback_state.txt"
-_TTS_FALLBACK_PID_MEM: Optional[int] = None
-_TTS_FALLBACK_STATE_MEM: str = ""
-_TTS_LOCK = threading.Lock()
-
+from api.models import (
+    AiChatRequest,
+    AiPromptRequest,
+    ConfirmRequest,
+    DemoPipelineAutoRequest,
+    EquityHistoryOut,
+    EquitySnapshotRequest,
+    ExitCandidatesOut,
+    HistoryReadinessOut,
+    IbkrAccountOut,
+    IbwrServiceRequest,
+    IbkrStatusOut,
+    KillSwitchRequest,
+    NarratorTtsRequest,
+    ObserverSwitchRequest,
+    OpportunityDecisionRequest,
+    PreviewRequest,
+    PreviewResponse,
+    RegimeCurrentOut,
+    ScanFullRequest,
+    SessionLogRequest,
+    SessionRunRequest,
+    SystemStatusOut,
+    TradeJournalRequest,
+    UniverseScanRequest,
+    WheelNewRequest,
+    WheelTransitionRequest,
+)
+from api.state import (
+    ALLOWED_OCR_ROOTS,
+    ALLOWED_SETTINGS_ROOT,
+    ALLOWED_TUTORIAL_ROOT,
+    LOG_DIR,
+    ROOT,
+    STATE_PATH,
+    TTS_FALLBACK_PID_PATH,
+    TTS_FALLBACK_STATE_PATH,
+    TUTORIAL_TEXT2SPEECH_PATH,
+    _SESSION_STATE,
+    _SESSION_TASK,
+    _TTS_FALLBACK_PID_MEM,
+    _TTS_FALLBACK_STATE_MEM,
+    _TTS_LOCK,
+)
+from api.routers import briefing as briefing_router
+from api.routers import control_plane as control_plane_router
+from api.routers import execution as execution_router
+from api.routers import health as health_router
+from api.routers import ibkr as ibkr_router
+from api.routers import journal as journal_router
+from api.routers import meta as meta_router
+from api.routers import narrator as narrator_router
+from api.routers import opportunity as opportunity_router
+from api.routers import pipeline as pipeline_router
+from api.routers import regime as regime_router
+from api.routers import sessions as sessions_router
+from api.routers import universe as universe_router
+from api.routers import wheel as wheel_router
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Session scheduler — asyncio-based, no external deps
 # ─────────────────────────────────────────────────────────────────────────────
-
-_SESSION_STATE: dict[str, Any] = {
-    "last_morning":  None,   # ISO timestamp ultima morning session
-    "last_eod":      None,   # ISO timestamp ultima eod session
-    "next_morning":  None,   # ISO timestamp prossima morning session
-    "next_eod":      None,   # ISO timestamp prossima eod session
-    "last_result":   None,   # dict risultato ultima sessione eseguita
-    "running":       False,  # True durante esecuzione
-    "enabled":       False,  # True se scheduler attivo
-}
-_SESSION_TASK: Optional[asyncio.Task] = None  # type: ignore[type-arg]
 
 
 def _load_sessions_config() -> dict[str, Any]:
@@ -330,6 +273,21 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-API-Key"],
 )
 
+app.include_router(health_router.router)
+app.include_router(narrator_router.router)
+app.include_router(briefing_router.router)
+app.include_router(regime_router.router)
+app.include_router(meta_router.router)
+app.include_router(execution_router.router)
+app.include_router(control_plane_router.router)
+app.include_router(ibkr_router.router)
+app.include_router(opportunity_router.router)
+app.include_router(journal_router.router)
+app.include_router(universe_router.router)
+app.include_router(pipeline_router.router)
+app.include_router(wheel_router.router)
+app.include_router(sessions_router.router)
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 # Gestita da nginx (basic auth). FastAPI è interno alla rete Docker.
 # DESIGN CHOICE: nessun auth middleware in FastAPI per scelta architetturale —
@@ -344,116 +302,6 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
         status_code=500,
         content={"ok": False, "stage": "internal", "reason": f"{type(exc).__name__}: {exc}"},
     )
-
-
-class PreviewRequest(BaseModel):
-    symbol: str = Field(..., min_length=1)
-    strategy: str = Field(..., min_length=1)
-    payload: Dict[str, Any] = Field(default_factory=dict)
-
-
-class EquitySnapshotRequest(BaseModel):
-    profile: str = Field(default="paper", min_length=1)
-    asof_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
-    equity: float
-    note: str = Field(default="")
-    trigger: str = Field(default="manual", pattern="^(auto|manual)$")
-
-
-class TradeJournalRequest(BaseModel):
-    profile: str = Field(default="paper", min_length=1)
-    symbol: str = Field(..., min_length=1)
-    strategy: str = Field(..., min_length=1)
-    entry_ts_utc: Optional[str] = None
-    exit_ts_utc: Optional[str] = None
-    strikes: Optional[list[float]] = None
-    regime_at_entry: Optional[str] = None
-    score_at_entry: Optional[float] = None
-    kelly_fraction: Optional[float] = None
-    exit_reason: Optional[str] = None
-    pnl: float
-    pnl_pct: Optional[float] = None
-    slippage_ticks: Optional[float] = None
-    violations: int = Field(default=0, ge=0)
-    note: str = Field(default="")
-    trigger: str = Field(default="manual", pattern="^(auto|manual)$")
-
-
-class PreviewResponse(BaseModel):
-    confirm_token: str
-    preview: Dict[str, Any]
-
-
-class ConfirmRequest(BaseModel):
-    confirm_token: str
-    operator: str = Field(default="operator")
-    decision: str = Field(..., pattern="^(APPROVE|REJECT)$")
-    payload: Dict[str, Any] = Field(default_factory=dict)
-
-
-class OpportunityDecisionRequest(BaseModel):
-    profile: str = Field(default="paper", min_length=1)
-    batch_id: Optional[str] = None
-    symbol: str = Field(..., min_length=1)
-    strategy: Optional[str] = None
-    score: Optional[float] = None
-    regime: Optional[str] = None
-    scanner_name: Optional[str] = None
-    source: Optional[str] = None
-    decision: str = Field(..., pattern="^(APPROVE|REJECT|MODIFY)$")
-    confidence: int = Field(..., ge=1, le=5)
-    note: str = Field(default="")
-
-class UniverseScanRequest(BaseModel):
-    profile: str = Field(default="paper", min_length=1)
-    symbols: Optional[list[str]] = None
-    regime: str = Field(default="NORMAL")
-    top_n: int = Field(default=8, ge=1, le=50)
-    source: str = Field(default="auto")  # auto|manual|ibkr_settings
-    scanner_name: Optional[str] = None
-    settings_path: Optional[str] = None
-
-
-class ScanFullRequest(BaseModel):
-    profile: str = Field(default="paper", min_length=1)
-    regime: str = Field(default="NORMAL")
-    symbols: list[str] = Field(default_factory=list)
-    top_n: int = Field(default=5, ge=1, le=50)
-    account_size: float = Field(default=10_000.0, gt=0)
-    min_score: float = Field(default=60.0, ge=0.0, le=100.0)
-    signal_map: Optional[Dict[str, str]] = None
-    signal_pct_map: Optional[Dict[str, float]] = None
-    use_cache: bool = Field(default=True)
-
-
-class DemoPipelineAutoRequest(BaseModel):
-    profile: str = Field(default="paper", min_length=1)
-    symbols: Optional[list[str]] = None
-    settings_path: Optional[str] = None
-    fetch_limit: int = Field(default=12, ge=1, le=100)
-    top_n: int = Field(default=8, ge=1, le=50)
-    regime: str = Field(default="NORMAL")
-    extract_backend: str = Field(default="json-pass")  # json-pass|ollama
-    auto_scan: bool = Field(default=True)
-
-
-class NarratorTtsRequest(BaseModel):
-    action: str = Field(..., pattern="^(play|pause|stop)$")
-    text: str = Field(default="")
-
-
-class AiPromptRequest(BaseModel):
-    prompt: str = Field(..., min_length=1, max_length=12000)
-
-
-class AiChatMessage(BaseModel):
-    role: str = Field(..., pattern="^(system|user|assistant)$")
-    content: str = Field(..., min_length=1, max_length=12000)
-
-
-class AiChatRequest(BaseModel):
-    messages: list[AiChatMessage] = Field(default_factory=list)
-    prompt: Optional[str] = None
 
 
 def _clean_text(value: str, field_name: str) -> str:
@@ -1129,7 +977,6 @@ def _stringify_scalar(value: Any) -> str:
     return str(value).strip()
 
 
-@app.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
 
@@ -1137,7 +984,6 @@ def health() -> Dict[str, str]:
 _CONSOLE_HTML = Path(__file__).parent / "console_operatore.html"
 
 
-@app.get("/console", response_class=FileResponse)
 def console():
     if not _CONSOLE_HTML.exists():
         raise HTTPException(status_code=404, detail="console not found")
@@ -1150,8 +996,6 @@ _GUIDE_BASE = os.environ.get("GUIDE_URL", "http://qopz-guide")
 _GUIDE_LOCAL_FALLBACK = ROOT / "docs" / "guide" / "guida_completa.md"
 
 
-@app.get("/guide/{path:path}")
-@app.get("/guide")
 async def guide_proxy(request: Request, path: str = ""):
     target = f"{_GUIDE_BASE}/{path}" if path else f"{_GUIDE_BASE}/"
     try:
@@ -1169,17 +1013,14 @@ async def guide_proxy(request: Request, path: str = ""):
         raise HTTPException(status_code=503, detail="guide service unavailable and local fallback missing")
 
 
-@app.get("/opz/state")
 def opz_state() -> Dict[str, Any]:
     return _load_state()
 
 
-@app.get("/opz/release_status")
 def opz_release_status() -> Dict[str, Any]:
     return {"format": "md", "content": _run_release_status_md()}
 
 
-@app.post("/opz/bootstrap")
 def opz_bootstrap(profile: str = "paper", allow_demo: bool = False) -> Dict[str, Any]:
     profile_norm = _clean_text(profile, "profile")
     raise HTTPException(
@@ -1192,7 +1033,6 @@ def opz_bootstrap(profile: str = "paper", allow_demo: bool = False) -> Dict[str,
     )
 
 
-@app.get("/opz/narrator/tutorial")
 def opz_narrator_tutorial(path: Optional[str] = None) -> Dict[str, Any]:
     tutorial_path = _resolve_safe_path(path, field_name="path", allowed_roots=[ALLOWED_TUTORIAL_ROOT])
     out = _read_tutorial_markdown(path=tutorial_path)
@@ -1205,17 +1045,14 @@ def opz_narrator_tutorial(path: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
-@app.post("/opz/narrator/tts")
 def opz_narrator_tts(req: NarratorTtsRequest) -> Dict[str, Any]:
     return _run_qwen_tts(action=req.action, text=req.text)
 
 
-@app.post("/opz/ai/prompt")
 def opz_ai_prompt(req: AiPromptRequest) -> Dict[str, Any]:
     return _run_ollama_prompt(prompt=req.prompt)
 
 
-@app.post("/opz/ai/chat")
 def opz_ai_chat(req: AiChatRequest) -> Dict[str, Any]:
     normalized = _normalize_ai_chat_messages(req.messages, req.prompt)
     if not normalized:
@@ -1239,7 +1076,6 @@ def opz_ai_chat(req: AiChatRequest) -> Dict[str, Any]:
         "returncode": int(out.get("returncode", 1)),
         "duration_ms": int(out.get("duration_ms", 0)),
     }
-@app.get("/opz/last_actions")
 def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
     n = max(1, min(int(limit), 20))
     init_execution_schema()
@@ -1365,7 +1201,6 @@ def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
     }
 
 
-@app.get("/opz/paper/summary")
 def opz_paper_summary(profile: str = "paper", window_days: int = 60, asof_date: Optional[str] = None) -> Dict[str, Any]:
     d = None
     if asof_date:
@@ -1392,7 +1227,6 @@ def opz_paper_summary(profile: str = "paper", window_days: int = 60, asof_date: 
     }
 
 
-@app.get("/opz/paper/equity_history")
 def opz_paper_equity_history(
     profile: str = "paper",
     limit: int = 60,
@@ -1471,7 +1305,6 @@ def opz_paper_equity_history(
     }
 
 
-@app.post("/opz/paper/equity_snapshot")
 def opz_paper_equity_snapshot(req: EquitySnapshotRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")
     equity = _require_finite(req.equity, "equity")
@@ -1487,7 +1320,6 @@ def opz_paper_equity_snapshot(req: EquitySnapshotRequest) -> Dict[str, Any]:
     return {"ok": True, "snapshot_id": sid}
 
 
-@app.post("/opz/paper/trade")
 def opz_paper_trade(req: TradeJournalRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")
     symbol = _clean_text(req.symbol, "symbol")
@@ -1532,7 +1364,6 @@ def opz_paper_trade(req: TradeJournalRequest) -> Dict[str, Any]:
     return {"ok": True, "trade_id": tid}
 
 
-@app.post("/opz/execution/preview", response_model=PreviewResponse)
 def execution_preview(req: PreviewRequest) -> PreviewResponse:
     symbol = _clean_text(req.symbol, "symbol")
     strategy = _clean_text(req.strategy, "strategy")
@@ -1550,7 +1381,6 @@ def execution_preview(req: PreviewRequest) -> PreviewResponse:
     return PreviewResponse(confirm_token=token, preview=preview)
 
 
-@app.post("/opz/execution/confirm")
 def execution_confirm(req: ConfirmRequest) -> Dict[str, Any]:
     # Kill switch check — must be the first gate (invariante CLAUDE.md)
     if (ROOT / "ops" / "kill_switch.trigger").exists():
@@ -1581,24 +1411,6 @@ def execution_confirm(req: ConfirmRequest) -> Dict[str, Any]:
     with (LOG_DIR / "operator_confirms.jsonl").open("a", encoding="utf-8") as _fh:
         _fh.write(json.dumps(event, ensure_ascii=False) + "\n")
     return {"ok": True, "event": event}
-
-
-class KillSwitchRequest(BaseModel):
-    action: str = Field(..., description="'activate' oppure 'deactivate'")
-
-
-class ObserverSwitchRequest(BaseModel):
-    action: str = Field(..., description="'on' oppure 'off' (alias: yes/no, activate/deactivate)")
-    notify_telegram: bool = Field(default=True, description="Invia conferma su Telegram")
-    telegram_chat_id: Optional[str] = Field(default=None, description="Override chat id telegram")
-    source: str = Field(default="operator_ui")
-
-
-class IbwrServiceRequest(BaseModel):
-    action: str = Field(..., description="'on', 'off', 'status' (alias: start/stop)")
-    notify_telegram: bool = Field(default=False, description="Invia conferma su Telegram")
-    telegram_chat_id: Optional[str] = Field(default=None, description="Override chat id telegram")
-    source: str = Field(default="operator_ui")
 
 
 def _load_telegram_cfg() -> dict:
@@ -1713,7 +1525,6 @@ def _ibkr_connected_for_observer() -> tuple[bool, str]:
         return False, f"ibkr=DISCONNECTED manager_error={type(exc).__name__}"
 
 
-@app.post("/opz/execution/kill_switch")
 def execution_kill_switch(req: KillSwitchRequest) -> Dict[str, Any]:
     """Attiva o disattiva il kill switch operativo.
 
@@ -1742,7 +1553,6 @@ def execution_kill_switch(req: KillSwitchRequest) -> Dict[str, Any]:
         return {"ok": True, "kill_switch_active": False, "action": "deactivate", "ts_utc": ts_now, "was_active": removed}
 
 
-@app.post("/opz/execution/observer")
 def execution_observer_switch(req: ObserverSwitchRequest) -> Dict[str, Any]:
     """
     OBSERVER ON/OFF command surface with Telegram acknowledgement.
@@ -1814,7 +1624,6 @@ def execution_observer_switch(req: ObserverSwitchRequest) -> Dict[str, Any]:
     }
 
 
-@app.post("/opz/ibwr/service")
 def ibwr_service_switch(req: IbwrServiceRequest) -> Dict[str, Any]:
     action = _normalize_ibwr_action(req.action)
     result = _control_api_json(
@@ -1856,7 +1665,6 @@ def ibwr_service_switch(req: IbwrServiceRequest) -> Dict[str, Any]:
     return out
 
 
-@app.get("/opz/control/status")
 def opz_control_status() -> Dict[str, Any]:
     ts_now = datetime.now(timezone.utc).isoformat()
     system = opz_system_status()
@@ -1898,7 +1706,6 @@ def opz_control_status() -> Dict[str, Any]:
     }
 
 
-@app.post("/opz/opportunity/decision")
 def opz_opportunity_decision(req: OpportunityDecisionRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")
     symbol = _clean_text(req.symbol, "symbol").upper()
@@ -1963,12 +1770,10 @@ def opz_opportunity_decision(req: OpportunityDecisionRequest) -> Dict[str, Any]:
     }
 
 
-@app.get("/opz/universe/latest")
 def opz_universe_latest() -> Dict[str, Any]:
     return fetch_latest_universe_batch()
 
 
-@app.get("/opz/universe/ibkr_context")
 def opz_universe_ibkr_context(settings_path: Optional[str] = None) -> Dict[str, Any]:
     safe_settings_path = _resolve_safe_path(
         settings_path,
@@ -1979,7 +1784,6 @@ def opz_universe_ibkr_context(settings_path: Optional[str] = None) -> Dict[str, 
 
 
 
-@app.get("/opz/universe/provenance")
 def opz_universe_provenance(
     settings_path: Optional[str] = None,
     ocr_path: Optional[str] = None,
@@ -2002,7 +1806,6 @@ def opz_universe_provenance(
     safe_batch_id = batch_id.strip() if batch_id else None
     return build_universe_compare(settings_path=safe_settings_path, ocr_path=safe_ocr_path, regime=reg, batch_id=safe_batch_id)
 
-@app.post("/opz/universe/scan")
 def opz_universe_scan(req: UniverseScanRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")
     regime = req.regime.strip().upper() if req.regime else "NORMAL"
@@ -2050,7 +1853,6 @@ def opz_universe_scan(req: UniverseScanRequest) -> Dict[str, Any]:
 
 
 
-@app.post("/opz/opportunity/scan_full")
 def opz_opportunity_scan_full(req: ScanFullRequest) -> Dict[str, Any]:
     """Full opportunity scan: IV history -> chain fetch -> analytics -> 4-pillar score.
 
@@ -2122,7 +1924,6 @@ def opz_opportunity_scan_full(req: ScanFullRequest) -> Dict[str, Any]:
     }
 
 
-@app.get("/opz/opportunity/ev_report")
 def opz_opportunity_ev_report(
     profile: str = "paper",
     window_days: int = 30,
@@ -2206,7 +2007,6 @@ def opz_opportunity_ev_report(
 # ROC5 — GET /opz/ibkr/status
 # ─────────────────────────────────────────────────────────────────────────────
 
-@app.get("/opz/ibkr/status")
 def opz_ibkr_status(try_connect: bool = False) -> IbkrStatusOut:
     """
     Stato della connessione IBKR (TWS/Gateway).
@@ -2309,7 +2109,6 @@ def _empty_account_response(connected: bool, message: str) -> Dict[str, Any]:
         "message": message,
     }
 
-@app.get("/opz/ibkr/account")
 def opz_ibkr_account() -> IbkrAccountOut:
     """
     Sommario account IBKR (net liquidation, P&L, posizioni aperte).
@@ -2423,7 +2222,6 @@ def opz_ibkr_account() -> IbkrAccountOut:
             logger.debug("IBKR account timeout restore skipped: %s", exc)
 
 
-@app.get("/opz/regime/current")
 def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
     """
     Regime corrente basato sugli ultimi N candidati registrati in DuckDB.
@@ -2842,7 +2640,6 @@ def _build_history_readiness(profile: str = "paper") -> HistoryReadinessOut:
     }
 
 
-@app.get("/opz/system/status")
 def opz_system_status() -> SystemStatusOut:
     """
     Snapshot aggregato dello stato operativo del sistema.
@@ -2980,7 +2777,6 @@ def opz_system_status() -> SystemStatusOut:
     }
 
 
-@app.post("/opz/demo_pipeline/auto")
 def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
     profile = _clean_text(req.profile, "profile")
     safe_settings_path = _resolve_safe_path(
@@ -3130,7 +2926,6 @@ def _score_position(pos: dict, today: date | None = None) -> tuple[int, list[str
     return score, reasons
 
 
-@app.get("/opz/opportunity/exit_candidates")
 def opz_exit_candidates(top_n: int = 10, min_score: int = 1) -> ExitCandidatesOut:
     """
     Score open option positions for exit urgency.
@@ -3247,24 +3042,6 @@ def opz_exit_candidates(top_n: int = 10, min_score: int = 1) -> ExitCandidatesOu
 # ── Wheel positions ────────────────────────────────────────────────────────────
 
 
-class WheelNewRequest(BaseModel):
-    symbol: str = Field(..., description="Underlying symbol, e.g. IWM")
-    profile: str = Field("dev")
-    run_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-
-
-class WheelTransitionRequest(BaseModel):
-    event_type: str = Field(..., description="open_csp | expire_csp | assign | open_cc | expire_cc | call_away")
-    profile: str = Field("dev")
-    run_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    # fields required by each event type
-    strike: Optional[float] = None
-    expiry: Optional[str] = None      # YYYYMMDD
-    premium: Optional[float] = None
-    shares: int = 100
-
-
-@app.get("/opz/tier")
 def opz_tier(profile: str = "dev", regime: str = "NORMAL") -> Dict[str, Any]:
     """
     Return capital_tier, active_mode and block_visibility from config/<profile>.toml.
@@ -3458,7 +3235,6 @@ def _resolve_latest_briefing_path() -> Optional[Path]:
     return files[0] if files else None
 
 
-@app.get("/opz/briefing/list")
 def opz_briefing_list() -> list:
     """Lista dei briefing MP3 disponibili, ordinati per data discendente (max 20)."""
     if not _AUDIO_DIR.exists():
@@ -3470,7 +3246,6 @@ def opz_briefing_list() -> list:
     return files[:20]
 
 
-@app.get("/opz/briefing/file/{filename}")
 def opz_briefing_file(filename: str):
     """Serve un briefing MP3 specifico per filename."""
     if not filename.startswith("briefing_") or not filename.endswith(".mp3"):
@@ -3481,7 +3256,6 @@ def opz_briefing_file(filename: str):
     return FileResponse(path=str(path), media_type="audio/mpeg", filename=filename)
 
 
-@app.get("/opz/briefing/latest")
 def opz_briefing_latest():
     """Serve l'ultimo briefing audio MP3 generato."""
     latest_path = _resolve_latest_briefing_path()
@@ -3494,7 +3268,6 @@ def opz_briefing_latest():
     )
 
 
-@app.post("/opz/briefing/generate")
 async def opz_briefing_generate(no_telegram: bool = False) -> Dict[str, Any]:
     """
     Avvia la generazione del briefing audio in background.
@@ -3530,7 +3303,6 @@ async def opz_briefing_generate(no_telegram: bool = False) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@app.get("/opz/briefing/text")
 def opz_briefing_text() -> Dict[str, Any]:
     """Restituisce il testo del briefing senza generare audio (debug/preview)."""
     import importlib.util
@@ -3543,7 +3315,6 @@ def opz_briefing_text() -> Dict[str, Any]:
     return {"ok": True, "text": text, "chars": len(text)}
 
 
-@app.get("/opz/wheel/positions")
 def opz_wheel_positions(profile: str = "dev", symbol: Optional[str] = None) -> Dict[str, Any]:
     """List active Wheel positions (excludes CLOSED). Optionally filter by symbol."""
     from strategy.wheel import WheelState
@@ -3571,7 +3342,6 @@ def opz_wheel_positions(profile: str = "dev", symbol: Optional[str] = None) -> D
     return {"ok": True, "profile": profile, "n": len(positions), "positions": positions}
 
 
-@app.post("/opz/wheel/new")
 def opz_wheel_new(req: WheelNewRequest) -> Dict[str, Any]:
     """Create a new IDLE Wheel position for tracking. Returns position_id."""
     from strategy.wheel import WheelPosition
@@ -3589,7 +3359,6 @@ def opz_wheel_new(req: WheelNewRequest) -> Dict[str, Any]:
     return {"ok": True, "position_id": position_id, "symbol": symbol, "state": "IDLE"}
 
 
-@app.post("/opz/wheel/{position_id}/transition")
 def opz_wheel_transition(position_id: str, req: WheelTransitionRequest) -> Dict[str, Any]:
     """
     Apply a state transition to a tracked Wheel position.
@@ -3663,7 +3432,6 @@ def opz_wheel_transition(position_id: str, req: WheelTransitionRequest) -> Dict[
 # Session scheduler endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
-@app.get("/opz/session/status")
 def opz_session_status() -> Dict[str, Any]:
     """
     Stato dello scheduler di sessioni automatiche.
@@ -3681,13 +3449,6 @@ def opz_session_status() -> Dict[str, Any]:
     }
 
 
-class SessionRunRequest(BaseModel):
-    type: str = Field(default="morning", pattern="^(morning|eod)$")
-    profile: str = Field(default="paper")
-    force: bool = Field(default=False, description="Esegui anche se non è giorno di trading")
-
-
-@app.post("/opz/session/run")
 async def opz_session_run(req: SessionRunRequest) -> Dict[str, Any]:
     """
     Trigger manuale di una sessione morning o eod.
@@ -3742,20 +3503,6 @@ async def opz_session_run(req: SessionRunRequest) -> Dict[str, Any]:
         _SESSION_STATE["running"] = False
 
 
-class SessionLogRequest(BaseModel):
-    profile: str = Field(default="paper")
-    session_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
-    session_type: str = Field(..., pattern="^(morning|eod)$")
-    regime: Optional[str] = None
-    equity: Optional[float] = None
-    n_symbols: Optional[int] = None
-    errors: Optional[list[str]] = None
-    trigger: str = Field(default="auto", pattern="^(auto|manual)$")
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
-
-
-@app.post("/opz/session/log")
 def opz_session_log(req: SessionLogRequest) -> Dict[str, Any]:
     """
     Registra il risultato di una sessione morning/eod in DuckDB (session_logs).
@@ -3792,7 +3539,6 @@ def opz_session_log(req: SessionLogRequest) -> Dict[str, Any]:
     return {"ok": True, "log_id": log_id}
 
 
-@app.get("/opz/session/logs")
 def opz_session_logs(
     profile: str = "paper",
     limit: int = 30,
