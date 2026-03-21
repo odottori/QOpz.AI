@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
 type ReleaseStatusResponse = { format: string; content: string };
@@ -16,6 +16,7 @@ type PaperSummaryResponse = {
   profit_factor: number | null;
   avg_slippage_ticks: number | null;
   compliance_violations: number;
+  pnl_cumulative?: number | null;
   gates: {
     go_nogo: GateStatus;
     f6_t1_acceptance: GateStatus;
@@ -368,7 +369,37 @@ type AiPromptLegacyResponse = {
   duration_ms: number;
 };
 
-type TabKey = "warroom" | "pipeline" | "universe" | "opportunity" | "trades" | "regime" | "tests";
+type ControlStatusResponse = {
+  ok: boolean;
+  timestamp_utc: string;
+  observer: { state: string; kill_switch_active: boolean; reason: string };
+  ibwr: { service_state?: string; reason?: string; ts_utc?: string };
+  ibkr: { connected: boolean; port: number | null; source_system: string | null; connected_at: string | null };
+  vm: { services: Record<string, unknown>; control_plane_ok: boolean; control_plane_error: string | null };
+  regime: string | null;
+  data_mode: string | null;
+  history_readiness: unknown;
+};
+
+type IbwrServiceResponse = {
+  ok: boolean;
+  requested_action: string;
+  applied_action: string;
+  service_state: string;
+  reason: string;
+  ts_utc?: string;
+  kill_switch_active?: boolean;
+  kill_switch_forced?: boolean;
+  telegram_notified?: boolean;
+  telegram_error?: string | null;
+  message?: string;
+};
+
+type TabKey = "warroom" | "premarket" | "pipeline" | "universe" | "opportunity" | "trades" | "regime" | "tests";
+type CenterPhase = "ante" | "op" | "post" | "old";
+type AnteSubTab = "dati" | "analisi" | "briefing";
+type OpSubTab = "trading" | "wheel" | "metriche" | "backtest";
+type PostSubTab = "chiusura" | "report";
 type UniverseSubTab = "titoli" | "indici" | "opzioni" | "ciclo" | "palinsesto";
 type MarkdownTable = { headers: string[]; rows: string[][] };
 type ReleaseMdView = { before: string; table: MarkdownTable | null; after: string };
@@ -526,6 +557,52 @@ function shortToken(token: string | null): string {
   return `${token.slice(0, 6)}...${token.slice(-4)}`;
 }
 
+function sanitizeSignalDetail(detail: string, status: SystemSignal["status"]): string {
+  const raw = (detail ?? "").trim();
+  if (!raw) return "-";
+  const token = status.toUpperCase();
+  if (raw.toUpperCase() === token) return "-";
+  const cleaned = raw.replace(new RegExp(`(?:\\s*[|:/\\-—–]?\\s*)${token}$`, "i"), "").trim();
+  return cleaned || raw;
+}
+
+function sevClassForSignalStatus(status: SystemSignal["status"]): string {
+  if (status === "OK") return "sev-ok";
+  if (status === "WARN") return "sev-warn";
+  if (status === "ALERT") return "sev-error";
+  return "sev-neutral";
+}
+
+function sevClassForRegime(regime: string | null | undefined): string {
+  if (regime === "NORMAL") return "sev-ok";
+  if (regime === "CAUTION") return "sev-warn";
+  if (regime === "SHOCK") return "sev-error";
+  return "sev-neutral";
+}
+
+type UiHealth = "ok" | "warn" | "alert" | "neutral";
+
+function healthToDotClass(h: UiHealth): string {
+  if (h === "ok") return "dot-green";
+  if (h === "warn") return "dot-amber";
+  if (h === "alert") return "dot-red";
+  return "dot-gray";
+}
+
+function healthToBadgeClass(h: UiHealth): string {
+  if (h === "ok") return "ok";
+  if (h === "warn") return "warn";
+  if (h === "alert") return "alert";
+  return "neutral";
+}
+
+function healthToSevClass(h: UiHealth): string {
+  if (h === "ok") return "sev-ok";
+  if (h === "warn") return "sev-warn";
+  if (h === "alert") return "sev-error";
+  return "sev-neutral";
+}
+
 function GateBadge({ pass }: { pass: boolean }) {
   return <span className={`gate-badge ${pass ? "ok" : "ko"}`}>{pass ? "PASS" : "FAIL"}</span>;
 }
@@ -668,6 +745,10 @@ export default function App() {
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [activeTab, setActiveTab] = useState<TabKey>("warroom");
+  const [centerPhase, setCenterPhase] = useState<CenterPhase>("old");
+  const [anteSubTab, setAnteSubTab] = useState<AnteSubTab>("dati");
+  const [opSubTab, setOpSubTab] = useState<OpSubTab>("trading");
+  const [postSubTab, setPostSubTab] = useState<PostSubTab>("chiusura");
   const [clockText, setClockText] = useState<string>("");
   const [universeLatest, setUniverseLatest] = useState<UniverseLatestResponse | null>(null);
   const [universeSymbols, setUniverseSymbols] = useState<string>("SPY,QQQ,IWM,AAPL,MSFT,NVDA,AMZN,META,TSLA,AMD");
@@ -741,6 +822,34 @@ export default function App() {
   const [exitCandidatesFetchedAt, setExitCandidatesFetchedAt] = useState<number | null>(null);
   const [fetchErrors, setFetchErrors] = useState<Set<string>>(new Set());
   const [aiDrawerOpen, setAiDrawerOpen] = useState<boolean>(false);
+  const [warEquityOpen, setWarEquityOpen] = useState<boolean>(true);
+  const [warSystemOpen, setWarSystemOpen] = useState<boolean>(true);
+  const [warIbkrOpen, setWarIbkrOpen] = useState<boolean>(true);
+  const [warDrawdownOpen, setWarDrawdownOpen] = useState<boolean>(false);
+  const [warGateOpen, setWarGateOpen] = useState<boolean>(false);
+  const [warHistoryOpen, setWarHistoryOpen] = useState<boolean>(false);
+  const [warRegimeOpen, setWarRegimeOpen] = useState<boolean>(false);
+  const [warPipelineOpen, setWarPipelineOpen] = useState<boolean>(false);
+  const [warIbkrPositionsOpen, setWarIbkrPositionsOpen] = useState<boolean>(true);
+  const [warIbkrExitOpen, setWarIbkrExitOpen] = useState<boolean>(true);
+  const [warWheelOpen, setWarWheelOpen] = useState<boolean>(true);
+  const [leftKellyOpen, setLeftKellyOpen] = useState<boolean>(false);
+  const [leftPhaseOpen, setLeftPhaseOpen] = useState<boolean>(false);
+  const [leftExecWindowOpen, setLeftExecWindowOpen] = useState<boolean>(false);
+  const [leftPipelineGroupOpen, setLeftPipelineGroupOpen] = useState<boolean>(true);
+  const [leftOperationsOpen, setLeftOperationsOpen] = useState<boolean>(true);
+  const [leftLiveStatusOpen, setLeftLiveStatusOpen] = useState<boolean>(false);
+  const [leftPipelineDataOpen, setLeftPipelineDataOpen] = useState<boolean>(true);
+  const [leftPipelineProgressOpen, setLeftPipelineProgressOpen] = useState<boolean>(true);
+  const [leftDataHealthOpen, setLeftDataHealthOpen] = useState<boolean>(false);
+  const [leftDevelopmentOpen, setLeftDevelopmentOpen] = useState<boolean>(false);
+  const [slideDataPipelineOpen, setSlideDataPipelineOpen] = useState<boolean>(false);
+  const [slideDataRecordsOpen, setSlideDataRecordsOpen] = useState<boolean>(false);
+  const [slideDataModeOpen, setSlideDataModeOpen] = useState<boolean>(false);
+  const [slideDataLatencyOpen, setSlideDataLatencyOpen] = useState<boolean>(false);
+  const [slideStepDataOpen, setSlideStepDataOpen] = useState<boolean>(true);
+  const [controlStatus, setControlStatus] = useState<ControlStatusResponse | null>(null);
+  const [ibwrBusy, setIbwrBusy] = useState<boolean>(false);
   const [narratorTutorial, setNarratorTutorial] = useState<NarratorTutorialResponse | null>(null);
   const [narratorBusy, setNarratorBusy] = useState<boolean>(false);
   const [narratorVoiceState, setNarratorVoiceState] = useState<"idle" | "playing" | "paused">("idle");
@@ -1063,6 +1172,7 @@ export default function App() {
       void doFetchWheelPositions();
       void doFetchTier();
       void doFetchBriefingList();
+      void doFetchControlStatus();
       if (!universeScannerName && ic?.scanners && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
@@ -1546,6 +1656,34 @@ export default function App() {
     } catch { /* non critico */ }
   }
 
+  async function doFetchControlStatus() {
+    try {
+      const r = await apiJson<ControlStatusResponse>(`${API_BASE}/opz/control/status`);
+      setControlStatus(r);
+      clearFetchErr("controlStatus");
+    } catch {
+      markFetchErr("controlStatus");
+    }
+  }
+
+  async function doIbwrService(action: "status" | "on" | "off") {
+    setIbwrBusy(true);
+    try {
+      const r = await apiJson<IbwrServiceResponse>(`${API_BASE}/opz/ibwr/service`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, notify_telegram: false, source: "operator_ui" }),
+      });
+      setMessage(r.message || `IBWR ${action.toUpperCase()} -> ${r.service_state}`);
+      await doFetchControlStatus();
+    } catch (e) {
+      setError(String(e));
+      setMessage("");
+    } finally {
+      setIbwrBusy(false);
+    }
+  }
+
   async function doRunSession(type: "morning" | "eod") {
     try {
       await apiJson(`${API_BASE}/opz/session/run`, {
@@ -1739,6 +1877,79 @@ export default function App() {
   const selectedOpportunity = universeItems.find((x) => opportunityKeyOf(x) === selectedOpportunityKey) ?? opportunityTop;
   const opportunityReady = universeItems.filter((x) => x.score >= 0.55).length;
   const scanCandidates: ScanFullCandidate[] = oppScanResult?.candidates ?? [];
+  const premarketUsesScanFull = scanCandidates.length > 0;
+  const premarketShortlistCount = premarketUsesScanFull ? scanCandidates.length : universeItems.length;
+  const premarketReadyCount = premarketUsesScanFull
+    ? scanCandidates.filter((c) => c.score >= 75).length
+    : universeItems.filter((x) => x.score >= 0.55).length;
+  const premarketTopScorePct = premarketUsesScanFull
+    ? (scanCandidates[0]?.score ?? null)
+    : (universeItems[0] ? (universeItems[0].score * 100) : null);
+  const premarketRegime = regimeCurrent?.regime ?? universeLatest?.regime ?? "UNKNOWN";
+  const premarketScanAt = oppScanResult?.scan_ts ?? regimeCurrent?.last_scan_ts ?? universeLatest?.created_at_utc ?? null;
+  const premarketSource = premarketUsesScanFull ? "scan_full" : (universeLatest?.source ?? "universe_latest");
+  const pipelineRecords = universeLatest?.market_rows_available ?? 0;
+  const pipelineBatch = universeLatest?.batch_id ?? "N/D";
+  const pipelineLatencyState = fetchErrors.size > 0 ? "STALE" : "FRESH";
+  const pipelineReadinessLine = historyReadiness
+    ? `${historyReadiness.days_observed}/${historyReadiness.target_days} giorni · ${(historyReadiness.quality_completeness * 100).toFixed(1)}% qualita`
+    : "N/D";
+  const premarketRows = premarketUsesScanFull
+    ? scanCandidates.map((c, i) => ({
+      rank: i + 1,
+      symbol: c.symbol,
+      strategy: c.strategy,
+      scorePct: c.score,
+      spreadPct: c.spread_pct * 100,
+      ivRankPct: null as number | null,
+      source: c.source ?? premarketSource,
+    }))
+    : universeItems.map((u) => ({
+      rank: u.rank,
+      symbol: u.symbol,
+      strategy: u.strategy,
+      scorePct: u.score * 100,
+      spreadPct: u.spread_pct * 100,
+      ivRankPct: u.iv_rank * 100,
+      source: premarketSource,
+    }));
+  const premarketPrimary =
+    scanCandidates.find((c) => `${c.symbol}::${c.strategy}::${c.expiry}` === selectedScanKey) ?? scanCandidates[0] ?? null;
+  const premarketUniversePrimary = universeItems[0] ?? null;
+  const toTen = (value: number | null | undefined): number | null => {
+    if (value === null || value === undefined || !Number.isFinite(value)) return null;
+    const v = Number(value);
+    if (v <= 1) return Math.max(0, Math.min(10, v * 10));
+    if (v <= 10) return Math.max(0, Math.min(10, v));
+    if (v <= 100) return Math.max(0, Math.min(10, v / 10));
+    return 10;
+  };
+  const clampTen = (value: number): number => Math.max(0, Math.min(10, value));
+  const preP1 = premarketPrimary
+    ? toTen(premarketPrimary.score_breakdown.vol_edge)
+    : premarketUniversePrimary
+      ? toTen(premarketUniversePrimary.iv_rank)
+      : null;
+  const preP2 = premarketPrimary
+    ? toTen(premarketPrimary.score_breakdown.liquidity)
+    : premarketUniversePrimary
+      ? clampTen(10 - (premarketUniversePrimary.spread_pct * 100))
+      : null;
+  const preP3 = premarketPrimary
+    ? toTen(premarketPrimary.score_breakdown.risk_reward)
+    : premarketUniversePrimary
+      ? toTen(premarketUniversePrimary.score)
+      : null;
+  const preP4 = premarketPrimary
+    ? toTen(premarketPrimary.score_breakdown.regime_align)
+    : premarketUniversePrimary
+      ? toTen(premarketUniversePrimary.regime_fit)
+      : null;
+  const preFinal = premarketPrimary
+    ? toTen(premarketPrimary.score)
+    : premarketUniversePrimary
+      ? toTen(premarketUniversePrimary.score)
+      : null;
   const selectedScanCandidate: ScanFullCandidate | null =
     scanCandidates.find((c) => `${c.symbol}::${c.strategy}::${c.expiry}` === selectedScanKey) ?? scanCandidates[0] ?? null;
   const nonOptionsRows = universeSubTab === "opzioni" ? [] : rowsByTab[universeSubTab as Exclude<UniverseSubTab, "opzioni">];
@@ -1772,6 +1983,103 @@ export default function App() {
     const full = p - (1 - p) / b;
     return Math.max(0, Math.min(0.25, full / 2));
   }, [paperSummary?.win_rate, paperSummary?.profit_factor]);
+
+  const signalToHealth = (status: SystemSignal["status"]): UiHealth => {
+    if (status === "OK") return "ok";
+    if (status === "WARN") return "warn";
+    if (status === "ALERT") return "alert";
+    return "neutral";
+  };
+  const maxHealth = (...vals: UiHealth[]): UiHealth => {
+    if (vals.includes("alert")) return "alert";
+    if (vals.includes("warn")) return "warn";
+    if (vals.includes("ok")) return "ok";
+    return "neutral";
+  };
+
+  const dataModeUpper = String(sysStatus?.data_mode ?? "").toUpperCase();
+  const hasRealData = apiOnline && !dataModeUpper.includes("SYNTH");
+  const feedStale = fetchErrors.size > 0;
+  const yfinanceHealth: UiHealth = !apiOnline ? "neutral" : feedStale ? "warn" : dataModeUpper.includes("SYNTH") ? "neutral" : "ok";
+  const yfinanceLabel = !apiOnline ? "N/D" : feedStale ? "STALE" : dataModeUpper.includes("SYNTH") ? "SYNTH" : "OK";
+  const fredHealth: UiHealth = !apiOnline ? "neutral" : fetchErrors.has("regime") ? "warn" : "ok";
+  const fredLabel = !apiOnline ? "N/D" : fetchErrors.has("regime") ? "STALE" : "OK";
+  const oratsHealth: UiHealth = "neutral";
+  const oratsLabel = "N/D";
+  const pipelineFeedHealth = !apiOnline ? "neutral" : maxHealth(yfinanceHealth, fredHealth);
+  const pipelineFeedLabel = !apiOnline ? "N/D" : pipelineFeedHealth === "ok" ? "OK" : pipelineFeedHealth === "warn" ? "WARN" : pipelineFeedHealth === "alert" ? "ALERT" : "N/D";
+
+  const ddValue = paperSummary?.max_drawdown;
+  const ddHealth: UiHealth = !apiOnline ? "neutral" : ddValue == null ? "neutral" : ddValue >= 0.15 ? "alert" : ddValue >= 0.10 ? "warn" : "ok";
+  const ddLabel = !apiOnline ? "N/D" : ddValue == null ? "N/D" : `${(ddValue * 100).toFixed(1)}%`;
+  const varSignal = (sysStatus?.signals ?? []).find((s) => /var|cvar/i.test(s.name));
+  const varHealth: UiHealth = !apiOnline ? "neutral" : varSignal ? signalToHealth(varSignal.status) : "neutral";
+  const varLabel = !apiOnline ? "N/D" : varSignal ? varSignal.status : "N/D";
+  const tailHedgeOn = Boolean(tierInfo?.features?.hedge_active);
+  const tailHedgeHealth: UiHealth = !apiOnline ? "neutral" : tailHedgeOn ? "ok" : "neutral";
+  const tailHedgeLabel = !apiOnline ? "N/D" : tailHedgeOn ? "ON" : "OFF";
+
+  const dataQtyPct = historyReadiness
+    ? Math.min(
+      100,
+      Math.round(
+        50 * (historyReadiness.days_observed / Math.max(1, historyReadiness.target_days)) +
+        50 * (historyReadiness.events_observed / Math.max(1, historyReadiness.target_events))
+      )
+    )
+    : null;
+  const dataQualityPct = historyReadiness ? Math.round(historyReadiness.quality_completeness * 100) : null;
+  const localRecords = (paperSummary?.equity_points ?? 0) + (paperSummary?.trades ?? 0);
+  const localDbHealth: UiHealth = !apiOnline ? "neutral" : localRecords > 0 ? "ok" : "neutral";
+  const ingestHealth: UiHealth = !apiOnline ? "neutral" : fetchErrors.size > 0 ? "warn" : "ok";
+  const ingestLabel = !apiOnline ? "N/D" : fetchErrors.size > 0 ? `${fetchErrors.size} err` : "OK";
+  const qtyHealth: UiHealth = !apiOnline ? "neutral" : dataQtyPct === null ? "neutral" : dataQtyPct >= 80 ? "ok" : dataQtyPct >= 50 ? "warn" : "alert";
+  const qualityHealth: UiHealth = !apiOnline ? "neutral" : dataQualityPct === null ? "neutral" : dataQualityPct >= 95 ? "ok" : dataQualityPct >= 80 ? "warn" : "alert";
+  const dataHealthOverall: UiHealth = !apiOnline ? "neutral" : maxHealth(qtyHealth, qualityHealth, ingestHealth);
+  const dataHealthLabel = !apiOnline ? "N/D" : dataHealthOverall === "ok" ? "OK" : dataHealthOverall === "warn" ? "WARN" : dataHealthOverall === "alert" ? "ALERT" : "N/D";
+  const pipelineCriticality = !apiOnline ? null : fetchErrors.size + (historyReadiness?.blockers.length ?? 0);
+  const pipelineCriticalityHealth: UiHealth = !apiOnline ? "neutral" : (pipelineCriticality ?? 0) > 2 ? "alert" : (pipelineCriticality ?? 0) > 0 ? "warn" : "ok";
+  const pipelineStateHealth: UiHealth = !apiOnline ? "neutral" : maxHealth(ingestHealth, pipelineCriticalityHealth, (regimeCurrent?.n_recent ?? 0) > 0 ? "ok" : "warn");
+  const pipelineStateLabel = !apiOnline ? "N/D" : pipelineStateHealth === "ok" ? "STABLE" : pipelineStateHealth === "warn" ? "DEGRADED" : "CRITICAL";
+  const significanceScore = !apiOnline
+    ? null
+    : Math.round(
+      0.4 * Math.min(100, localRecords * 2) +
+      0.3 * (dataQtyPct ?? 0) +
+      0.3 * (dataQualityPct ?? 0)
+    );
+  const significanceHealth: UiHealth = !apiOnline ? "neutral" : significanceScore === null ? "neutral" : significanceScore >= 80 ? "ok" : significanceScore >= 50 ? "warn" : "alert";
+  const significanceLabel = !apiOnline
+    ? "N/D"
+    : significanceScore === null
+      ? "N/D"
+      : significanceScore >= 80
+        ? `HIGH ${significanceScore}%`
+        : significanceScore >= 50
+          ? `MED ${significanceScore}%`
+          : `LOW ${significanceScore}%`;
+  const ibwrState = String(controlStatus?.ibwr?.service_state ?? "N/D").toUpperCase();
+  const ibwrHealth: UiHealth = !apiOnline ? "neutral" : ibwrState === "ON" ? "ok" : ibwrState === "OFF" ? "warn" : "neutral";
+  const stepDataHealth: UiHealth = !apiOnline
+    ? "neutral"
+    : !hasRealData
+      ? "warn"
+      : maxHealth(pipelineStateHealth, dataHealthOverall);
+  const stepDataStatusLabel = !apiOnline
+    ? "OFFLINE"
+    : !hasRealData
+      ? "SYNTH"
+      : stepDataHealth === "ok"
+        ? "OK"
+        : stepDataHealth === "warn"
+          ? "WARN"
+          : "ALERT";
+  const stepDataSummary = `pipeline ${pipelineStateLabel} · rec ${pipelineRecords.toLocaleString("it-IT")} · mode ${dataModeUpper || "N/D"} · readiness ${pipelineReadinessLine}`;
+  const stepDataHint = !apiOnline
+    ? "API offline: feed non raggiungibile"
+    : !hasRealData
+      ? "Data mode sintetico: blocco in monitoraggio"
+      : "Feed reale attivo: blocco operativo";
 
   useEffect(() => {
     if (!message && !error) return;
@@ -1821,6 +2129,7 @@ export default function App() {
     void doFetchEquityHistory();
     void doFetchExitCandidates();
     void doFetchSessionStatus();
+    void doFetchControlStatus();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Heartbeat ogni 5 minuti — solo status leggeri (nessun dato daily ridondante)
@@ -1829,6 +2138,7 @@ export default function App() {
       void doCheckIbkr(false);   // TCP probe IBG — rileva disconnessioni
       void doFetchSysStatus();   // 1 query DuckDB — kill switch, kelly, data_mode
       void doFetchSessionStatus(); // stato scheduler sessioni
+      void doFetchControlStatus(); // observer + ibwr + control plane
     }, 5 * 60_000);
     return () => window.clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1844,8 +2154,9 @@ export default function App() {
       ?? { visible: true, interactive: true, gate: "unknown", reason: null };
   }
 
-  const navItems: Array<{ id: TabKey; label: string }> = [
+  const oldNavItems: Array<{ id: TabKey; label: string }> = [
     { id: "warroom", label: "WAR ROOM" },
+    { id: "premarket", label: "PRE-MARKET SCORE" },
     { id: "universe", label: "UNIVERSE SCANNER" },
     { id: "opportunity", label: "OPPORTUNITY" },
     { id: "pipeline", label: "PIPELINE AUTO" },
@@ -1853,6 +2164,17 @@ export default function App() {
     { id: "regime", label: "REGIME MATRIX" },
     { id: "tests", label: "TEST SUITE" },
   ];
+  const resolvedTab: TabKey = centerPhase === "old"
+    ? activeTab
+    : centerPhase === "ante"
+      ? (anteSubTab === "dati" ? "premarket" : anteSubTab === "analisi" ? "opportunity" : "warroom")
+      : centerPhase === "op"
+        ? (opSubTab === "metriche" ? "regime" : opSubTab === "backtest" ? "trades" : "warroom")
+        : (postSubTab === "report" ? "tests" : "warroom");
+  const openOldTab = (tab: TabKey): void => {
+    setCenterPhase("old");
+    setActiveTab(tab);
+  };
   const releaseView = useMemo(() => parseReleaseMd(releaseMd), [releaseMd]);
   const ddPct = (paperSummary?.max_drawdown ?? 0) * 100;
   const ddFill = Math.max(0, Math.min(100, (ddPct / 20) * 100));
@@ -1864,10 +2186,210 @@ export default function App() {
   const pipeRegimeStep = pipeHasRegime ? "done" : "wait";
   const pipeScoreStep  = pipeHasScore  ? "run"  : "wait"; // 'run' = pulsing = active scoring
   const pipeKellyStep  = pipeKellyReady ? "done" : "wait";
-
+  const wheelAvailable = tierInfo?.features_available?.wheel ?? false;
+  const wheelValidated =
+    (paperSummary?.trades ?? 0) >= 50 &&
+    (paperSummary?.sharpe_annualized ?? 0) >= 0.6 &&
+    (paperSummary?.compliance_violations ?? 0) === 0;
+  const wheelWarning = wheelAvailable && !wheelValidated ? "Strategia non validata sul track record." : null;
   // ── ROC16: High-urgency exit signal ───────────────────────────────────────
   const urgentExits = (exitCandidates?.candidates ?? []).filter(c => c.exit_score >= 5);
   const hasUrgentExit = urgentExits.length > 0;
+
+  const phaseKey: string = centerPhase === "ante"
+    ? `ante-${anteSubTab}`
+    : centerPhase === "op"
+      ? `op-${opSubTab}`
+      : `post-${postSubTab}`;
+  const phaseTemplate = (() => {
+    const baseScanTs = premarketScanAt ? fmtTs(premarketScanAt) : "N/D";
+    if (phaseKey === "ante-dati") {
+      return {
+        step: "STEP 1-2 - DATI",
+        title: "Ingest e Consolidamento",
+        subtitle: `Ultimo aggiornamento: ${baseScanTs}`,
+        kpis: [
+          { label: "Pipeline", value: pipelineStateLabel, tone: healthToSevClass(pipelineStateHealth), sub: "stato ingest" },
+          { label: "Data mode", value: dataModeUpper || "N/D", tone: hasRealData ? "sev-ok" : "sev-neutral", sub: "fonte dati" },
+          { label: "Base locale", value: `${localRecords} rec`, tone: healthToSevClass(localDbHealth), sub: "duckdb + journal" },
+          { label: "History", value: historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "N/D", tone: historyReadiness?.ready ? "sev-ok" : "sev-warn", sub: "readiness" },
+        ],
+        screenTitle: "ingest_pipeline.log",
+        screenLines: [
+          `feed: ${pipelineFeedLabel}`,
+          `yfinance/cboe: ${yfinanceLabel} | fred: ${fredLabel} | orats: ${oratsLabel}`,
+          `data_mode: ${dataModeUpper || "N/D"}`,
+          `base_locale_records: ${localRecords}`,
+          `history_readiness: ${historyReadiness ? `${historyReadiness.days_observed}/${historyReadiness.target_days} giorni` : "N/D"}`,
+        ],
+      };
+    }
+    if (phaseKey === "ante-analisi") {
+      return {
+        step: "STEP 3-4 - ANALISI",
+        title: "Risultato Scoring Pre-Market",
+        subtitle: `Regime ${premarketRegime} - shortlist ${premarketShortlistCount}`,
+        kpis: [
+          { label: "Regime", value: premarketRegime, tone: sevClassForRegime(premarketRegime), sub: `${regimeCurrent?.n_recent ?? 0} sample` },
+          { label: "Top score", value: premarketTopScorePct === null ? "N/D" : `${premarketTopScorePct.toFixed(1)}/100`, tone: premarketTopScorePct !== null && premarketTopScorePct >= 75 ? "sev-ok" : "sev-warn", sub: "candidato #1" },
+          { label: "Shortlist", value: `${premarketShortlistCount}`, tone: "sev-data", sub: `pronti ${premarketReadyCount}` },
+          { label: "Source", value: premarketSource, tone: "sev-meta", sub: `scan ${baseScanTs}` },
+        ],
+        screenTitle: "scoring_engine.py",
+        screenLines: [
+          `regime: ${premarketRegime}`,
+          `source: ${premarketSource}`,
+          `shortlist: ${premarketShortlistCount}`,
+          `ready: ${premarketReadyCount}`,
+          `top_score: ${premarketTopScorePct === null ? "N/D" : premarketTopScorePct.toFixed(1)}`,
+        ],
+      };
+    }
+    if (phaseKey === "ante-briefing") {
+      return {
+        step: "STEP 5 - BRIEFING",
+        title: "Briefing Operativo",
+        subtitle: briefingLabel,
+        kpis: [
+          { label: "Audio", value: briefingPlaying ? "PLAYING" : "STOP", tone: briefingPlaying ? "sev-ok" : "sev-neutral", sub: "player unificato" },
+          { label: "Archivio", value: `${briefingList.length}`, tone: briefingList.length > 0 ? "sev-ok" : "sev-neutral", sub: "file briefing" },
+          { label: "Auto-open", value: briefingAutoOpen ? "ON" : "OFF", tone: briefingAutoOpen ? "sev-data" : "sev-neutral", sub: "drawer ai" },
+          { label: "Auto-play", value: briefingAutoPlay ? "ON" : "OFF", tone: briefingAutoPlay ? "sev-data" : "sev-neutral", sub: "narratore" },
+        ],
+        screenTitle: "briefing_runner.log",
+        screenLines: [
+          `api: ${apiOnline ? "ONLINE" : "OFFLINE"}`,
+          `current: ${briefingLabel}`,
+          `files: ${briefingList.length}`,
+          `auto_open: ${briefingAutoOpen ? "on" : "off"}`,
+          `auto_play: ${briefingAutoPlay ? "on" : "off"}`,
+        ],
+      };
+    }
+    if (phaseKey === "op-trading") {
+      return {
+        step: "STEP 6-15 - TRADING",
+        title: "Execution e Monitoraggio",
+        subtitle: "Flusso operativo in sessione",
+        kpis: [
+          { label: "Go/No-Go", value: goGate ? (goGate.pass ? "GO" : "NO-GO") : "N/D", tone: goGate?.pass ? "sev-ok" : "sev-error", sub: "gate operativo" },
+          { label: "Kill switch", value: sysStatus?.kill_switch_active ? "ON" : "OFF", tone: sysStatus?.kill_switch_active ? "sev-error" : "sev-ok", sub: "controllo rischio" },
+          { label: "Trades", value: `${sysStatus?.n_closed_trades ?? 0}`, tone: "sev-data", sub: "completati" },
+          { label: "Exit flag", value: `${urgentExits.length}`, tone: urgentExits.length > 0 ? "sev-warn" : "sev-neutral", sub: "alta urgenza" },
+        ],
+        screenTitle: "execution_window.log",
+        screenLines: [
+          `window: 10:00-11:30 EST`,
+          `avoid: 09:30-09:45 | 15:30-16:00`,
+          `kill_switch: ${sysStatus?.kill_switch_active ? "active" : "off"}`,
+          `urgent_exits: ${urgentExits.length}`,
+          `closed_trades: ${sysStatus?.n_closed_trades ?? 0}`,
+        ],
+      };
+    }
+    if (phaseKey === "op-wheel") {
+      return {
+        step: "STEP 16-20 - WHEEL",
+        title: "Ciclo Wheel",
+        subtitle: "Stato macchina e capitale dedicato",
+        kpis: [
+          { label: "Disponibilita", value: wheelAvailable ? "ENABLED" : "LOCKED", tone: wheelAvailable ? "sev-ok" : "sev-warn", sub: wheelWarning ?? "feature gate" },
+          { label: "Posizioni", value: `${wheelPositions?.positions?.length ?? 0}`, tone: "sev-data", sub: "attive" },
+          { label: "Tier", value: tierInfo?.active_mode ?? "N/D", tone: "sev-data", sub: "capital mode" },
+          { label: "Kelly", value: blk("kelly_sizing").visible ? "LIVE" : "LOCK", tone: blk("kelly_sizing").visible ? "sev-ok" : "sev-neutral", sub: "sizing gate" },
+        ],
+        screenTitle: "wheel_state_machine.log",
+        screenLines: [
+          `tier: ${tierInfo?.active_mode ?? "N/D"}`,
+          `wheel_enabled: ${wheelAvailable ? "yes" : "no"}`,
+          `active_positions: ${wheelPositions?.positions?.length ?? 0}`,
+          `warning: ${wheelWarning ?? "none"}`,
+          `kelly: ${blk("kelly_sizing").visible ? "live" : "lock"}`,
+        ],
+      };
+    }
+    if (phaseKey === "op-metriche") {
+      return {
+        step: "STEP 21-22 - METRICHE",
+        title: "Portfolio Metrics",
+        subtitle: "Snapshot operativo consolidato",
+        kpis: [
+          { label: "Win rate", value: fmtPct(paperSummary?.win_rate ?? null), tone: "sev-data", sub: "paper summary" },
+          { label: "Sharpe", value: fmtNum(paperSummary?.sharpe_annualized ?? null), tone: "sev-data", sub: "annualizzato" },
+          { label: "Max DD", value: fmtPct(paperSummary?.max_drawdown ?? null), tone: ddHealth === "alert" ? "sev-error" : ddHealth === "warn" ? "sev-warn" : "sev-ok", sub: "rischio" },
+          { label: "Net Liq", value: ibkrAccount?.net_liquidation != null ? `€${ibkrAccount.net_liquidation.toLocaleString("it-IT", { minimumFractionDigits: 0 })}` : "N/D", tone: "sev-ok", sub: "conto ibkr" },
+        ],
+        screenTitle: "portfolio_agg.log",
+        screenLines: [
+          `trades: ${paperSummary?.trades ?? 0}`,
+          `win_rate: ${fmtPct(paperSummary?.win_rate ?? null)}`,
+          `sharpe: ${fmtNum(paperSummary?.sharpe_annualized ?? null)}`,
+          `max_dd: ${fmtPct(paperSummary?.max_drawdown ?? null)}`,
+          `net_liq: ${ibkrAccount?.net_liquidation ?? "N/D"}`,
+        ],
+      };
+    }
+    if (phaseKey === "op-backtest") {
+      return {
+        step: "BACKTEST",
+        title: "Paper Closed + WFA Storico",
+        subtitle: "Valutazione segnali e coerenza operativa",
+        kpis: [
+          { label: "Trade chiusi", value: `${paperSummary?.trades ?? 0}`, tone: "sev-data", sub: "journal paper" },
+          { label: "History", value: historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "N/D", tone: historyReadiness?.ready ? "sev-ok" : "sev-warn", sub: "copertura dati" },
+          { label: "Violazioni", value: `${paperSummary?.compliance_violations ?? 0}`, tone: (paperSummary?.compliance_violations ?? 0) > 0 ? "sev-warn" : "sev-ok", sub: "compliance" },
+          { label: "Profit factor", value: fmtNum(paperSummary?.profit_factor ?? null), tone: "sev-data", sub: "qualita edge" },
+        ],
+        screenTitle: "backtest_audit.log",
+        screenLines: [
+          `closed_trades: ${paperSummary?.trades ?? 0}`,
+          `history_ready: ${historyReadiness?.ready ? "yes" : "no"}`,
+          `history_score: ${historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "N/D"}`,
+          `profit_factor: ${fmtNum(paperSummary?.profit_factor ?? null)}`,
+          `compliance_violations: ${paperSummary?.compliance_violations ?? 0}`,
+        ],
+      };
+    }
+    if (phaseKey === "post-chiusura") {
+      return {
+        step: "STEP 23 - CHIUSURA",
+        title: "Sessione EOD",
+        subtitle: "Chiusura e stato scheduler",
+        kpis: [
+          { label: "Scheduler", value: sessionStatus?.enabled ? "ON" : "OFF", tone: sessionStatus?.enabled ? "sev-ok" : "sev-neutral", sub: "session engine" },
+          { label: "Running", value: sessionStatus?.running ? "YES" : "NO", tone: sessionStatus?.running ? "sev-warn" : "sev-ok", sub: "stato sessione" },
+          { label: "Last morning", value: sessionStatus?.last_morning ? sessionStatus.last_morning.slice(0, 16) : "N/D", tone: "sev-meta", sub: "UTC" },
+          { label: "Last EOD", value: sessionStatus?.last_eod ? sessionStatus.last_eod.slice(0, 16) : "N/D", tone: "sev-meta", sub: "UTC" },
+        ],
+        screenTitle: "session_logs.eod",
+        screenLines: [
+          `scheduler: ${sessionStatus?.enabled ? "on" : "off"}`,
+          `running: ${sessionStatus?.running ? "yes" : "no"}`,
+          `last_morning: ${sessionStatus?.last_morning ?? "N/D"}`,
+          `last_eod: ${sessionStatus?.last_eod ?? "N/D"}`,
+          `next_eod: ${sessionStatus?.next_eod ?? "N/D"}`,
+        ],
+      };
+    }
+    return {
+      step: "STEP 24 - REPORT",
+      title: "Consolidamento Report",
+      subtitle: "Esito giornata e stato release",
+      kpis: [
+        { label: "P&L cumulato", value: fmtNum(paperSummary?.pnl_cumulative ?? null), tone: (paperSummary?.pnl_cumulative ?? 0) >= 0 ? "sev-ok" : "sev-error", sub: "paper" },
+        { label: "Trades", value: `${paperSummary?.trades ?? 0}`, tone: "sev-data", sub: "totali" },
+        { label: "Release note", value: releaseMd ? "PRESENTE" : "N/D", tone: releaseMd ? "sev-ok" : "sev-neutral", sub: "status doc" },
+        { label: "Data agg", value: paperSummary?.as_of_date ?? "N/D", tone: "sev-meta", sub: "snapshot" },
+      ],
+      screenTitle: "report_eod.log",
+      screenLines: [
+        `pnl_cumulative: ${fmtNum(paperSummary?.pnl_cumulative ?? null)}`,
+        `trades: ${paperSummary?.trades ?? 0}`,
+        `as_of_date: ${paperSummary?.as_of_date ?? "N/D"}`,
+        `release_loaded: ${releaseMd ? "yes" : "no"}`,
+      ],
+    };
+  })();
 
   // Web Audio beep: triggered once when urgentExits count transitions 0→>0
   const prevUrgentCount = useRef(0);
@@ -1934,39 +2456,157 @@ export default function App() {
 
             <div className="terminal-main">
         <aside className="leftnav">
-          <div className="nav-section">
-            <div className="nav-label">MODULI CORE</div>
-            {navItems.map((tab) => (
-              <button key={tab.id} className={`nav-item ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)}>
-                <span className={`nav-dot ${activeTab === tab.id ? "dot-green" : "dot-gray"}`} /> {tab.label}
-              </button>
-            ))}
+          <div className="nav-section left-ops-section">
+            <div className="left-grouphead" onClick={() => setLeftPipelineGroupOpen((v) => !v)} role="button" tabIndex={0}>
+              <span className="left-grouphead-title"><span className="group-arrow">{leftPipelineGroupOpen ? "▾" : "▸"}</span>PIPELINE</span>
+            </div>
+            {leftPipelineGroupOpen && (
+              <>
+                <div className="left-subhead left-subhead-inline" onClick={() => setLeftPipelineDataOpen((v) => !v)} role="button" tabIndex={0}>
+                  <span>{leftPipelineDataOpen ? "▾" : "▸"} Feed Dati</span>
+                  <span className={pipelineFeedHealth === "ok" ? "sev-ok" : pipelineFeedHealth === "warn" ? "sev-warn" : pipelineFeedHealth === "alert" ? "sev-error" : "sev-neutral"}>{pipelineFeedLabel}</span>
+                </div>
+                {leftPipelineDataOpen && (
+                  <>
+                    <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(yfinanceHealth)}`} /> yfinance / CBOE <span className={`nav-badge ${healthToBadgeClass(yfinanceHealth)}`}>{yfinanceLabel}</span></div>
+                    <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(fredHealth)}`} /> FRED API <span className={`nav-badge ${healthToBadgeClass(fredHealth)}`}>{fredLabel}</span></div>
+                    <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(oratsHealth)}`} /> ORATS (5 ticker) <span className={`nav-badge ${healthToBadgeClass(oratsHealth)}`}>{oratsLabel}</span></div>
+                    <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(ibwrHealth)}`} /> IBWR Feed <span className={`nav-badge ${healthToBadgeClass(ibwrHealth)}`}>{ibwrState}</span></div>
+                  </>
+                )}
+                <div className="left-subhead" onClick={() => setLeftLiveStatusOpen((v) => !v)} role="button" tabIndex={0}>
+                  <span>{leftLiveStatusOpen ? "▾" : "▸"} Servizi & Controlli</span>
+                  <span style={{ display: "inline-flex", gap: 8 }}>
+                    <span className={apiOnline ? "sev-ok" : "sev-error"}>{apiOnline ? "API OK" : "API DOWN"}</span>
+                    <span className={healthToSevClass(ibwrHealth)}>{`IBWR ${ibwrState}`}</span>
+                  </span>
+                </div>
+                {leftLiveStatusOpen && (
+                  <div className="left-subbody">
+                    <div className="left-kpi-row"><span>api</span><b className={apiOnline ? "sev-ok" : "sev-error"}>{apiOnline ? "ONLINE" : "OFFLINE"}</b></div>
+                    <div className="left-kpi-row"><span>ibkr</span><b className={ibkrAccount?.connected ? "sev-ok" : "sev-warn"}>{ibkrAccount?.connected ? "CONNECTED" : "FALLBACK"}</b></div>
+                    <div className="left-kpi-row"><span>observer</span><b className={controlStatus?.observer?.state === "ON" ? "sev-ok" : "sev-warn"}>{controlStatus?.observer?.state ?? "N/D"}</b></div>
+                    <div className="left-kpi-row"><span>ibwr</span><b className={healthToSevClass(ibwrHealth)}>{ibwrState}</b></div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                      <button className="btn btn-ghost" style={{ fontSize: "0.62rem", padding: "2px 6px", flex: 1 }}
+                        disabled={ibwrBusy || !apiOnline}
+                        onClick={() => void doIbwrService("on")}>IBWR ON</button>
+                      <button className="btn btn-ghost" style={{ fontSize: "0.62rem", padding: "2px 6px", flex: 1 }}
+                        disabled={ibwrBusy || !apiOnline}
+                        onClick={() => void doIbwrService("off")}>IBWR OFF</button>
+                      <button className="btn btn-ghost" style={{ fontSize: "0.62rem", padding: "2px 6px" }}
+                        disabled={ibwrBusy}
+                        onClick={() => void doIbwrService("status")}>⟳</button>
+                    </div>
+                    <div className="left-kpi-row"><span>regime</span><b className={sevClassForRegime(regimeCurrent?.regime)}>{regimeCurrent?.regime ?? "UNKNOWN"}</b></div>
+                    <div className="left-kpi-row"><span>history</span><b className={historyReadiness?.ready ? "sev-ok" : "sev-warn"}>{historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "—"}</b></div>
+                    <div className="left-kpi-row"><span>last update</span><b className="sev-meta">{paperSummary?.as_of_date ?? "-"}</b></div>
+                  </div>
+                )}
+                <div className="left-subhead" onClick={() => setLeftDataHealthOpen((v) => !v)} role="button" tabIndex={0}>
+                  <span>{leftDataHealthOpen ? "▾" : "▸"} Data Health</span>
+                  <span className={healthToSevClass(dataHealthOverall)}>{dataHealthLabel}</span>
+                </div>
+                {leftDataHealthOpen && (
+                  <div className="left-subbody">
+                    <div className="left-kpi-row"><span>Stato pipeline</span><b className={healthToSevClass(pipelineStateHealth)}>{pipelineStateLabel}</b></div>
+                    <div className="left-kpi-row"><span>Criticita aperte</span><b className={healthToSevClass(pipelineCriticalityHealth)}>{apiOnline ? (pipelineCriticality ?? 0) : "N/D"}</b></div>
+                    <div className="left-kpi-row"><span>Quantita dati</span><b className={healthToSevClass(qtyHealth)}>{dataQtyPct === null ? "N/D" : `${dataQtyPct}%`}</b></div>
+                    <div className="left-kpi-row"><span>Qualita dati</span><b className={healthToSevClass(qualityHealth)}>{dataQualityPct === null ? "N/D" : `${dataQualityPct}%`}</b></div>
+                    <div className="left-kpi-row"><span>Significativita</span><b className={healthToSevClass(significanceHealth)}>{significanceLabel}</b></div>
+                    <div className="left-kpi-row"><span>Ingest feed</span><b className={healthToSevClass(ingestHealth)}>{ingestLabel}</b></div>
+                    <div className="left-kpi-row"><span>Data mode</span><b className={apiOnline ? (dataModeUpper.includes("SYNTH") ? "sev-neutral" : "sev-ok") : "sev-neutral"}>{apiOnline ? (dataModeUpper || "N/D") : "N/D"}</b></div>
+                    <div className="left-kpi-row"><span>Base dati locale</span><b className={healthToSevClass(localDbHealth)}>{apiOnline ? `${localRecords} rec` : "N/D"}</b></div>
+                    <div className="left-kpi-row"><span>Fonte yfinance/CBOE</span><b className={healthToSevClass(yfinanceHealth)}>{yfinanceLabel}</b></div>
+                    <div className="left-kpi-row"><span>Fonte FRED</span><b className={healthToSevClass(fredHealth)}>{fredLabel}</b></div>
+                    <div className="left-kpi-row"><span>Fonte ORATS</span><b className={healthToSevClass(oratsHealth)}>{oratsLabel}</b></div>
+                    <div className="left-kpi-row"><span>Source IBKR</span><b className={apiOnline ? (sysStatus?.ibkr_source_system === "ibkr_live" ? "sev-ok" : "sev-warn") : "sev-neutral"}>{apiOnline ? (sysStatus?.ibkr_source_system ?? "N/D") : "N/D"}</b></div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          <div className="nav-section">
-            <div className="nav-label">PIPELINE DATI</div>
-            <div className="nav-item static"><span className="nav-dot dot-green" /> yfinance / CBOE <span className="nav-badge ok">OK</span></div>
-            <div className="nav-item static"><span className="nav-dot dot-green" /> FRED API <span className="nav-badge ok">OK</span></div>
-            <div className="nav-item static"><span className="nav-dot dot-amber" /> ORATS (5 ticker) <span className="nav-badge warn">LAG</span></div>
+          <div className="nav-section left-ops-section left-dev-group">
+            <div className="left-grouphead" onClick={() => setLeftDevelopmentOpen((v) => !v)} role="button" tabIndex={0}>
+              <span className="left-grouphead-title"><span className="group-arrow">{leftDevelopmentOpen ? "▾" : "▸"}</span>SVILUPPO</span>
+            </div>
+            {leftDevelopmentOpen && (
+              <>
+            <div className="left-subhead" onClick={() => setLeftPipelineProgressOpen((v) => !v)} role="button" tabIndex={0}>
+              <span>{leftPipelineProgressOpen ? "▾" : "▸"} PROGRESSIONE</span>
+              <span className="sev-data">{phaseProgress.f1}%/{phaseProgress.f2}%/{phaseProgress.f3}%/{phaseProgress.f4}%</span>
+            </div>
+            {leftPipelineProgressOpen && (
+              <div className="dev-phase-stack">
+                <div className="phase-row"><span>F1 Pipeline</span><b className={phaseProgress.f1 === 100 ? "ok" : "warn"}>{phaseProgress.f1}%</b></div>
+                <div className="phase-bar"><span style={{ width: `${phaseProgress.f1}%` }} /></div>
+                <div className="phase-row"><span>F2 Regime</span><b className={phaseProgress.f2 === 100 ? "ok" : "warn"}>{phaseProgress.f2}%</b></div>
+                <div className="phase-bar"><span style={{ width: `${phaseProgress.f2}%` }} /></div>
+                <div className="phase-row"><span>F3 Paper</span><b className={phaseProgress.f3 === 100 ? "ok" : phaseProgress.f3 > 0 ? "warn" : "dim"}>{phaseProgress.f3}%</b></div>
+                <div className="phase-bar"><span style={{ width: `${phaseProgress.f3}%` }} /></div>
+                <div className="phase-row"><span>F4 Scoring</span><b className={phaseProgress.f4 === 100 ? "ok" : phaseProgress.f4 > 0 ? "warn" : "dim"}>{phaseProgress.f4}%</b></div>
+                <div className="phase-bar"><span style={{ width: `${phaseProgress.f4}%` }} /></div>
+              </div>
+            )}
+            <div className="left-subhead left-subhead-inline" onClick={() => setLeftPhaseOpen((v) => !v)} role="button" tabIndex={0}>
+              <span>{leftPhaseOpen ? "▾" : "▸"} FASE CORRENTE</span>
+              <span className="sev-data">{nextStep}</span>
+            </div>
+            {leftPhaseOpen && (
+              <div className="left-subbody">
+                <div className="left-kpi-row"><span>Blocked steps</span><b className="sev-data">{blockedCount}</b></div>
+                <div className="left-kpi-row"><span>equity points</span><b className="sev-data">{paperSummary?.equity_points ?? 0}</b></div>
+                <div className="left-kpi-row"><span>trade journal</span><b className="sev-data">{paperSummary?.trades ?? 0}</b></div>
+                <div className="left-kpi-row"><span>Data aggior.</span><b className="sev-meta">{paperSummary?.as_of_date ?? "-"}</b></div>
+              </div>
+            )}
+              </>
+            )}
           </div>
 
           <div className="nav-section">
             <div className="nav-label">RISK</div>
-            <div className="nav-item static"><span className="nav-dot dot-green" /> VaR/CVaR <span className="nav-badge ok">OK</span></div>
-            <div className="nav-item static"><span className="nav-dot dot-amber" /> DD Control <span className="nav-badge warn">{fmtPct(paperSummary?.max_drawdown ?? null)}</span></div>
-            <div className="nav-item static"><span className="nav-dot dot-gray" /> Tail Hedge <span className="nav-badge">OFF</span></div>
+            <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(varHealth)}`} /> VaR/CVaR <span className={`nav-badge ${healthToBadgeClass(varHealth)}`}>{varLabel}</span></div>
+            <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(ddHealth)}`} /> DD Control <span className={`nav-badge ${healthToBadgeClass(ddHealth)}`}>{ddLabel}</span></div>
+            <div className="nav-item static"><span className={`nav-dot ${healthToDotClass(tailHedgeHealth)}`} /> Tail Hedge <span className={`nav-badge ${healthToBadgeClass(tailHedgeHealth)}`}>{tailHedgeLabel}</span></div>
           </div>
 
-          <div className="phases-box">
-            <div className="phases-title">PROGRESSIONE 90 GIORNI</div>
-            <div className="phase-row"><span>F1 Pipeline</span><b className={phaseProgress.f1 === 100 ? "ok" : "warn"}>{phaseProgress.f1}%</b></div>
-            <div className="phase-bar"><span style={{ width: `${phaseProgress.f1}%` }} /></div>
-            <div className="phase-row"><span>F2 Regime</span><b className={phaseProgress.f2 === 100 ? "ok" : "warn"}>{phaseProgress.f2}%</b></div>
-            <div className="phase-bar"><span style={{ width: `${phaseProgress.f2}%` }} /></div>
-            <div className="phase-row"><span>F3 Paper</span><b className={phaseProgress.f3 === 100 ? "ok" : phaseProgress.f3 > 0 ? "warn" : "dim"}>{phaseProgress.f3}%</b></div>
-            <div className="phase-bar"><span style={{ width: `${phaseProgress.f3}%` }} /></div>
-            <div className="phase-row"><span>F4 Scoring</span><b className={phaseProgress.f4 === 100 ? "ok" : phaseProgress.f4 > 0 ? "warn" : "dim"}>{phaseProgress.f4}%</b></div>
-            <div className="phase-bar"><span style={{ width: `${phaseProgress.f4}%` }} /></div>
+          <div className="nav-section left-ops-section">
+            <div className="left-grouphead" onClick={() => setLeftOperationsOpen((v) => !v)} role="button" tabIndex={0}>
+              <span className="left-grouphead-title"><span className="group-arrow">{leftOperationsOpen ? "▾" : "▸"}</span>OPERATIVITA</span>
+            </div>
+            {leftOperationsOpen && (
+              <>
+                <div className="left-subhead left-subhead-inline" onClick={() => setLeftKellyOpen((v) => !v)} role="button" tabIndex={0}>
+                  <span>{leftKellyOpen ? "▾" : "▸"} Kelly Sizing</span>
+                  <span className={blk("kelly_sizing").visible ? "sev-ok" : "sev-neutral"}>{blk("kelly_sizing").visible ? "LIVE" : "LOCK"}</span>
+                </div>
+                {leftKellyOpen && (
+                  blk("kelly_sizing").visible ? (
+                    <div className="left-subbody">
+                      <div className="left-kpi-row"><span>Half-Kelly</span><b className="sev-data">{kellyHalf === null ? "-" : `${(kellyHalf * 100).toFixed(2)}%`}</b></div>
+                      <div className="left-kpi-row"><span>Win rate</span><b className="sev-data">{fmtPct(paperSummary?.win_rate ?? null)}</b></div>
+                      <div className="left-kpi-row"><span>Profit factor</span><b className="sev-data">{fmtNum(paperSummary?.profit_factor ?? null)}</b></div>
+                      <div className="left-kpi-row"><span>Avg slippage</span><b className="sev-data">{fmtNum(paperSummary?.avg_slippage_ticks ?? null)}</b></div>
+                    </div>
+                  ) : (
+                    <div className="left-subbody sev-meta">🔒 {blk("kelly_sizing").reason ?? "Kelly disabilitato"}</div>
+                  )
+                )}
+                <div className="left-subhead" onClick={() => setLeftExecWindowOpen((v) => !v)} role="button" tabIndex={0}>
+                  <span>{leftExecWindowOpen ? "▾" : "▸"} EXECUTION WINDOW</span>
+                  <span className="sev-ok">EST</span>
+                </div>
+                {leftExecWindowOpen && (
+                  <div className="left-subbody">
+                    <div className="sev-ok">10:00-11:30 EST</div>
+                    <div className="sev-meta">13:30-15:00 EST</div>
+                    <div className="sev-meta">Avoid: 09:30-09:45 | 15:30-16:00</div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </aside><section className="centerpane">
           <div className="metrics-row">
@@ -2017,15 +2657,44 @@ export default function App() {
             </div>
           )}
 
-          <div className="tabs">
-            {navItems.map((tab) => (
-              <button key={tab.id} className={`tab ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)}>
-                {tab.label}
-              </button>
-            ))}
+          <div className="tabs phase-tabs">
+            <button className={`tab ${centerPhase === "ante" ? "active" : ""}`} onClick={() => setCenterPhase("ante")}>ANTE</button>
+            <button className={`tab ${centerPhase === "op" ? "active" : ""}`} onClick={() => setCenterPhase("op")}>OP</button>
+            <button className={`tab ${centerPhase === "post" ? "active" : ""}`} onClick={() => setCenterPhase("post")}>POST</button>
+            <button className={`tab ${centerPhase === "old" ? "active" : ""}`} onClick={() => setCenterPhase("old")}>OLD</button>
           </div>
+          {centerPhase === "ante" && (
+            <div className="tabs subtabs">
+              <button className={`tab ${anteSubTab === "dati" ? "active" : ""}`} onClick={() => setAnteSubTab("dati")}>DATI</button>
+              <button className={`tab ${anteSubTab === "analisi" ? "active" : ""}`} onClick={() => setAnteSubTab("analisi")}>ANALISI</button>
+              <button className={`tab ${anteSubTab === "briefing" ? "active" : ""}`} onClick={() => setAnteSubTab("briefing")}>BRIEFING</button>
+            </div>
+          )}
+          {centerPhase === "op" && (
+            <div className="tabs subtabs">
+              <button className={`tab ${opSubTab === "trading" ? "active" : ""}`} onClick={() => setOpSubTab("trading")}>TRADING</button>
+              <button className={`tab ${opSubTab === "wheel" ? "active" : ""}`} onClick={() => setOpSubTab("wheel")}>WHEEL</button>
+              <button className={`tab ${opSubTab === "metriche" ? "active" : ""}`} onClick={() => setOpSubTab("metriche")}>METRICHE</button>
+              <button className={`tab ${opSubTab === "backtest" ? "active" : ""}`} onClick={() => setOpSubTab("backtest")}>BACKTEST</button>
+            </div>
+          )}
+          {centerPhase === "post" && (
+            <div className="tabs subtabs">
+              <button className={`tab ${postSubTab === "chiusura" ? "active" : ""}`} onClick={() => setPostSubTab("chiusura")}>CHIUSURA</button>
+              <button className={`tab ${postSubTab === "report" ? "active" : ""}`} onClick={() => setPostSubTab("report")}>REPORT</button>
+            </div>
+          )}
+          {centerPhase === "old" && (
+            <div className="tabs subtabs old-tabs">
+              {oldNavItems.map((tab) => (
+                <button key={tab.id} className={`tab ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
 
-                    {activeTab === "warroom" && (
+                    {resolvedTab === "warroom" && (
             <>
             {/* ── BANNER SESSIONI ──────────────────────────────────────────────── */}
             {sessionStatus && (
@@ -2122,7 +2791,12 @@ export default function App() {
               <article className="panel">
                 {/* ── ROC10: equity sparkline header ── */}
                 <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Tooltip text={TOOLTIPS.equity_curve}><span>EQUITY CURVE</span></Tooltip>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarEquityOpen((v) => !v)}>
+                      {warEquityOpen ? "▾" : "▸"}
+                    </button>
+                    <Tooltip text={TOOLTIPS.equity_curve}><span>EQUITY CURVE</span></Tooltip>
+                  </span>
                   {equityHistory && equityHistory.n_points > 0 && (() => {
                     const init = equityHistory.initial_equity!;
                     const last = equityHistory.latest_equity!;
@@ -2136,9 +2810,10 @@ export default function App() {
                     );
                   })()}
                 </div>
-
+                {warEquityOpen && (
+                <>
                 {/* ── Navigazione temporale equity ── */}
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4, flexWrap: "nowrap", overflowX: "auto" }}>
                   <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px" }}
                     onClick={() => shiftDate(-1)} title="Giorno precedente">◀ -1g</button>
                   <input
@@ -2147,7 +2822,7 @@ export default function App() {
                     min={equityHistory?.min_date ?? undefined}
                     max={equityHistory?.max_date ?? new Date().toISOString().slice(0, 10)}
                     onChange={e => { setNavDate(e.target.value); void doFetchEquityHistory(e.target.value); }}
-                    style={{ fontSize: "0.65rem", background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 3, padding: "1px 4px" }}
+                    style={{ fontSize: "0.65rem", width: 118, minWidth: 118, background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 3, padding: "1px 4px" }}
                   />
                   <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px" }}
                     onClick={() => shiftDate(+1)} title="Giorno successivo">+1g ▶</button>
@@ -2155,93 +2830,149 @@ export default function App() {
                     <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px", color: "var(--p1)" }}
                       onClick={() => { setNavDate(""); void doFetchEquityHistory(""); }}>OGGI</button>
                   )}
-                  {navDate && <span style={{ fontSize: "0.62rem", color: "var(--muted)" }}>— vista al {navDate}</span>}
+                  {navDate && <span style={{ fontSize: "0.62rem", color: "var(--muted)", whiteSpace: "nowrap" }}>— vista al {navDate}</span>}
                 </div>
 
                 <EqSparkline points={equityHistory?.points ?? []} w={240} h={56} />
 
-                <div className="panel-title mt10"><Tooltip text={TOOLTIPS.drawdown_gauge}>DRAWDOWN - 3 LAYER</Tooltip></div>
-                <div className="dd-gauge">
-                  <div className="dd-track">
-                    <div className="dd-fill" style={{ width: `${ddFill}%` }} />
-                    <div className="dd-mark dd-mark10" />
-                    <div className="dd-mark dd-mark15" />
-                  </div>
-                  <div className="dd-labels">
-                    <span>0%</span><span>10%</span><span>15%</span><span>20%</span>
-                  </div>
+                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarDrawdownOpen((v) => !v)}>
+                      {warDrawdownOpen ? "▾" : "▸"}
+                    </button>
+                    <Tooltip text={TOOLTIPS.drawdown_gauge}>DRAWDOWN - 3 LAYER</Tooltip>
+                    <span className="sev-data">{fmtPct(paperSummary?.max_drawdown ?? null)}</span>
+                  </span>
                 </div>
-                <div className="dim">DD attuale: {fmtPct(paperSummary?.max_drawdown ?? null)} / limite 20%</div>
-                <div className="panel-title mt10">GATE STATUS</div>
-                <div className="gate-line"><span><Tooltip text={TOOLTIPS.go_nogo}>GO/NO-GO</Tooltip></span>{goGate ? <GateBadge pass={goGate.pass} /> : <span className="dim">-</span>}</div>
-                {goGate?.reasons.map((r) => <div key={`go-${r}`} className="reason">- {r}</div>)}
-                <div className="gate-line"><span><Tooltip text={TOOLTIPS.f6_t1}>F6-T1 acceptance</Tooltip></span>{f6Gate ? <GateBadge pass={f6Gate.pass} /> : <span className="dim">-</span>}</div>
-                {f6Gate?.reasons.map((r) => <div key={`f6-${r}`} className="reason">- {r}</div>)}
-                <div className="gate-line"><span><Tooltip text={TOOLTIPS.f6_t2}>F6-T2 completeness</Tooltip></span>{f6t2Gate ? <GateBadge pass={f6t2Gate.pass} /> : <span className="dim">-</span>}</div>
-                {f6t2Gate && <div className="dim">completeness: <Tooltip text={TOOLTIPS.f6_t2_ratio}>{(f6t2Gate.completeness_ratio * 100).toFixed(0)}%</Tooltip></div>}
+                {warDrawdownOpen ? (
+                  <>
+                    <div className="dd-gauge">
+                      <div className="dd-track">
+                        <div className="dd-fill" style={{ width: `${ddFill}%` }} />
+                        <div className="dd-mark dd-mark10" />
+                        <div className="dd-mark dd-mark15" />
+                      </div>
+                      <div className="dd-labels">
+                        <span>0%</span><span>10%</span><span>15%</span><span>20%</span>
+                      </div>
+                    </div>
+                    <div className="sev-meta">DD attuale: {fmtPct(paperSummary?.max_drawdown ?? null)} / limite 20%</div>
+                  </>
+                ) : (
+                  <div className="subgroup-summary sev-meta">DD attuale {fmtPct(paperSummary?.max_drawdown ?? null)} · limite 20%</div>
+                )}
+
+                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarGateOpen((v) => !v)}>
+                      {warGateOpen ? "▾" : "▸"}
+                    </button>
+                    GATE STATUS
+                    <span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "GO" : "NO-GO"}</span>
+                  </span>
+                </div>
+                {warGateOpen ? (
+                  <>
+                    <div className="gate-line"><span><Tooltip text={TOOLTIPS.go_nogo}>GO/NO-GO</Tooltip></span>{goGate ? <GateBadge pass={goGate.pass} /> : <span className="sev-neutral">-</span>}</div>
+                    {goGate?.reasons.map((r) => <div key={`go-${r}`} className="reason">- {r}</div>)}
+                    <div className="gate-line"><span><Tooltip text={TOOLTIPS.f6_t1}>F6-T1 acceptance</Tooltip></span>{f6Gate ? <GateBadge pass={f6Gate.pass} /> : <span className="sev-neutral">-</span>}</div>
+                    {f6Gate?.reasons.map((r) => <div key={`f6-${r}`} className="reason">- {r}</div>)}
+                    <div className="gate-line"><span><Tooltip text={TOOLTIPS.f6_t2}>F6-T2 completeness</Tooltip></span>{f6t2Gate ? <GateBadge pass={f6t2Gate.pass} /> : <span className="sev-neutral">-</span>}</div>
+                    {f6t2Gate && <div className="sev-meta">completeness: <Tooltip text={TOOLTIPS.f6_t2_ratio}>{(f6t2Gate.completeness_ratio * 100).toFixed(0)}%</Tooltip></div>}
+                  </>
+                ) : (
+                  <div className="subgroup-summary sev-meta">
+                    {goGate ? `GO/NO-GO ${goGate.pass ? "PASS" : "FAIL"}` : "GO/NO-GO —"} ·
+                    {f6Gate ? ` F6-T1 ${f6Gate.pass ? "PASS" : "FAIL"}` : " F6-T1 —"} ·
+                    {f6t2Gate ? ` F6-T2 ${(f6t2Gate.completeness_ratio * 100).toFixed(0)}%` : " F6-T2 —"}
+                  </div>
+                )}
+                </>
+                )}
               </article>
 
               <article className="panel">
                 <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>SYSTEM STATUS</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarSystemOpen((v) => !v)}>
+                      {warSystemOpen ? "▾" : "▸"}
+                    </button>
+                    <span>SYSTEM STATUS</span>
+                  </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: "0.62rem", color: "#555" }}>agg: {_agoLabel(sysStatusFetchedAt)}</span>
                     <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "2px 6px" }}
                       onClick={() => void doFetchSysStatus()}>⟳</button>
                   </span>
                 </div>
-
+                {warSystemOpen && (
+                <>
                 {/* Signal grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "3px 8px", alignItems: "center", fontSize: "0.72rem", marginTop: 4 }}>
                   {(sysStatus?.signals ?? []).map((sig) => {
-                    const color = sig.status === "OK" ? "#4ade80"
-                      : sig.status === "ALERT" ? "#f87171"
-                      : sig.status === "DISABLED" ? "#666"
-                      : "#fbbf24"; // WARN
+                    const detail = sanitizeSignalDetail(sig.detail, sig.status);
                     return [
                       <span key={`sn-${sig.name}`} className="dim" style={{ whiteSpace: "nowrap" }}>{sig.name}</span>,
-                      <span key={`sd-${sig.name}`} style={{ color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sig.detail}</span>,
-                      <span key={`ss-${sig.name}`} style={{ color, fontWeight: 700, textAlign: "right" }}>{sig.status}</span>,
+                      <span key={`sd-${sig.name}`} className="sev-neutral" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{detail}</span>,
+                      <span key={`ss-${sig.name}`} className={sevClassForSignalStatus(sig.status)} style={{ fontWeight: 700, textAlign: "right" }}>{sig.status}</span>,
                     ];
                   })}
 
                   {/* Campi aggiuntivi */}
                   <span className="dim">regime</span>
-                  <span style={{ color: sysStatus?.regime === "SHOCK" ? "#f87171" : sysStatus?.regime === "CAUTION" ? "#fbbf24" : "#4ade80" }}>
+                  <span className={sevClassForRegime(sysStatus?.regime)}>
                     {sysStatus?.regime ?? "—"}
                   </span>
                   <span />
 
                   <span className="dim">trades completati</span>
-                  <span>{sysStatus?.n_closed_trades ?? "—"}</span>
+                  <span className="sev-data">{sysStatus?.n_closed_trades ?? "—"}</span>
                   <span />
 
                   <span className="dim">api</span>
-                  <span>{apiOnline ? "ONLINE" : "OFFLINE"}</span>
-                  <span style={{ color: apiOnline ? "#4ade80" : "#f87171", fontWeight: 700 }}>{apiOnline ? "OK" : "ALERT"}</span>
+                  <span className="sev-neutral">{apiOnline ? "ONLINE" : "OFFLINE"}</span>
+                  <span className={apiOnline ? "sev-ok" : "sev-error"} style={{ fontWeight: 700 }}>{apiOnline ? "OK" : "ALERT"}</span>
                 </div>
 
-                <div className="panel-title mt10"><Tooltip text={TOOLTIPS.history_readiness}>HISTORY READINESS</Tooltip></div>
-                {historyReadiness ? (
-                  <div className={`history-readiness-box ${historyStatusClass}`}>
-                    <div className="history-readiness-head">
-                      <span>{historyReadiness.ready ? "READY" : "BUILDING"}</span>
-                      <span>{historyReadiness.score_pct.toFixed(1)}%</span>
-                    </div>
-                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_window}>Finestra</Tooltip></span><span>{historyReadiness.window_days}g</span></div>
-                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_days}>Giorni coperti</Tooltip></span><span>{historyReadiness.days_observed}/{historyReadiness.target_days}</span></div>
-                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_events}>Eventi</Tooltip></span><span>{historyReadiness.events_observed}/{historyReadiness.target_events}</span></div>
-                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_quality}>Qualita journal</Tooltip></span><span>{(historyReadiness.quality_completeness * 100).toFixed(1)}%</span></div>
-                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_violations}>Violazioni window</Tooltip></span><span>{historyReadiness.compliance_violations_window}</span></div>
-                    <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_eta}>ETA</Tooltip></span><span>{historyEtaLabel}</span></div>
-                    {!historyReadiness.ready && historyReadiness.blockers.length > 0 && (
-                      <div className="history-blockers">
-                        {historyReadiness.blockers.join(" | ")}
+                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarHistoryOpen((v) => !v)}>
+                      {warHistoryOpen ? "▾" : "▸"}
+                    </button>
+                    <Tooltip text={TOOLTIPS.history_readiness}>HISTORY READINESS</Tooltip>
+                    <span className={historyReadiness?.ready ? "sev-ok" : "sev-warn"}>
+                      {historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "…"}
+                    </span>
+                  </span>
+                </div>
+                {warHistoryOpen ? (
+                  historyReadiness ? (
+                    <div className={`history-readiness-box ${historyStatusClass}`}>
+                      <div className="history-readiness-head">
+                        <span>{historyReadiness.ready ? "READY" : "BUILDING"}</span>
+                        <span>{historyReadiness.score_pct.toFixed(1)}%</span>
                       </div>
-                    )}
-                  </div>
+                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_window}>Finestra</Tooltip></span><span>{historyReadiness.window_days}g</span></div>
+                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_days}>Giorni coperti</Tooltip></span><span>{historyReadiness.days_observed}/{historyReadiness.target_days}</span></div>
+                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_events}>Eventi</Tooltip></span><span>{historyReadiness.events_observed}/{historyReadiness.target_events}</span></div>
+                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_quality}>Qualita journal</Tooltip></span><span>{(historyReadiness.quality_completeness * 100).toFixed(1)}%</span></div>
+                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_violations}>Violazioni window</Tooltip></span><span>{historyReadiness.compliance_violations_window}</span></div>
+                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_eta}>ETA</Tooltip></span><span>{historyEtaLabel}</span></div>
+                      {!historyReadiness.ready && historyReadiness.blockers.length > 0 && (
+                        <div className="history-blockers">
+                          {historyReadiness.blockers.join(" | ")}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="sev-meta" style={{ fontSize: "0.7rem" }}>Caricamento readiness...</div>
+                  )
                 ) : (
-                  <div className="dim" style={{ fontSize: "0.7rem" }}>Caricamento readiness...</div>
+                  <div className="subgroup-summary sev-meta">
+                    {historyReadiness
+                      ? `${historyReadiness.ready ? "READY" : "BUILDING"} · giorni ${historyReadiness.days_observed}/${historyReadiness.target_days} · eventi ${historyReadiness.events_observed}/${historyReadiness.target_events}`
+                      : "Readiness in caricamento..."}
+                  </div>
                 )}
 
                 {sysStatus?.kill_switch_active && (
@@ -2257,86 +2988,126 @@ export default function App() {
                 )}
 
                 {/* ── ROC9: Regime distribution bar ──────────────────────── */}
-                <div className="panel-title mt10" style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>REGIME ({regimeCurrent?.n_recent ?? 0} sample)</span>
-                  <span style={{
-                    fontWeight: 700, fontSize: "0.72rem",
-                    color: regimeCurrent?.regime === "SHOCK" ? "#f87171"
-                      : regimeCurrent?.regime === "CAUTION" ? "#fbbf24"
-                      : regimeCurrent?.regime === "NORMAL" ? "#4ade80"
-                      : "#666",
-                  }}>
-                    {regimeCurrent?.regime ?? "—"}
+                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarRegimeOpen((v) => !v)}>
+                      {warRegimeOpen ? "▾" : "▸"}
+                    </button>
+                    REGIME
+                    <span className="sev-data">({regimeCurrent?.n_recent ?? 0} sample)</span>
+                    <span
+                      className={
+                        regimeCurrent?.regime === "SHOCK"
+                          ? "sev-error"
+                          : regimeCurrent?.regime === "CAUTION"
+                            ? "sev-warn"
+                            : regimeCurrent?.regime === "NORMAL"
+                              ? "sev-ok"
+                              : "sev-neutral"
+                      }
+                      style={{ fontWeight: 700, fontSize: "0.72rem" }}
+                    >
+                      {regimeCurrent?.regime ?? "—"}
+                    </span>
                   </span>
                 </div>
 
-                {regimeCurrent && regimeCurrent.n_recent > 0 ? (
-                  <>
-                    {/* Stacked bar */}
-                    <div style={{ display: "flex", height: 10, borderRadius: 4, overflow: "hidden", gap: 1, marginTop: 2 }}>
-                      {(["NORMAL", "CAUTION", "SHOCK"] as const).map((lbl) => {
-                        const pct = regimeCurrent.regime_pct[lbl] ?? 0;
-                        const color = lbl === "NORMAL" ? "#4ade80" : lbl === "CAUTION" ? "#fbbf24" : "#f87171";
-                        return pct > 0 ? (
-                          <div key={lbl} style={{ width: `${pct}%`, background: color, transition: "width 0.4s" }} title={`${lbl}: ${pct}%`} />
-                        ) : null;
-                      })}
+                {warRegimeOpen ? (
+                  regimeCurrent && regimeCurrent.n_recent > 0 ? (
+                    <>
+                      {/* Stacked bar */}
+                      <div style={{ display: "flex", height: 10, borderRadius: 4, overflow: "hidden", gap: 1, marginTop: 2 }}>
+                        {(["NORMAL", "CAUTION", "SHOCK"] as const).map((lbl) => {
+                          const pct = regimeCurrent.regime_pct[lbl] ?? 0;
+                          const color = lbl === "NORMAL" ? "#4ade80" : lbl === "CAUTION" ? "#fbbf24" : "#f87171";
+                          return pct > 0 ? (
+                            <div key={lbl} style={{ width: `${pct}%`, background: color, transition: "width 0.4s" }} title={`${lbl}: ${pct}%`} />
+                          ) : null;
+                        })}
+                      </div>
+                      {/* Legend */}
+                      <div style={{ display: "flex", gap: 10, fontSize: "0.65rem", marginTop: 3 }}>
+                        {(["NORMAL", "CAUTION", "SHOCK"] as const).map((lbl) => {
+                          const color = lbl === "NORMAL" ? "#4ade80" : lbl === "CAUTION" ? "#fbbf24" : "#f87171";
+                          const pct = regimeCurrent.regime_pct[lbl] ?? 0;
+                          const cnt = regimeCurrent.regime_counts[lbl] ?? 0;
+                          return (
+                            <span key={lbl} style={{ color }}>
+                              {lbl[0]}{lbl.slice(1).toLowerCase()} {pct}% ({cnt})
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="sev-meta" style={{ fontSize: "0.7rem" }}>
+                      {regimeCurrent ? "Nessun dato campione" : "Caricamento…"}
                     </div>
-                    {/* Legend */}
-                    <div style={{ display: "flex", gap: 10, fontSize: "0.65rem", marginTop: 3 }}>
-                      {(["NORMAL", "CAUTION", "SHOCK"] as const).map((lbl) => {
-                        const color = lbl === "NORMAL" ? "#4ade80" : lbl === "CAUTION" ? "#fbbf24" : "#f87171";
-                        const pct = regimeCurrent.regime_pct[lbl] ?? 0;
-                        const cnt = regimeCurrent.regime_counts[lbl] ?? 0;
-                        return (
-                          <span key={lbl} style={{ color }}>
-                            {lbl[0]}{lbl.slice(1).toLowerCase()} {pct}% ({cnt})
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </>
+                  )
                 ) : (
-                  <div className="dim" style={{ fontSize: "0.7rem" }}>
-                    {regimeCurrent ? "Nessun dato campione" : "Caricamento…"}
+                  <div className="subgroup-summary sev-meta">
+                    {regimeCurrent
+                      ? `${regimeCurrent.regime} · sample ${regimeCurrent.n_recent}`
+                      : "Regime in caricamento..."}
                   </div>
                 )}
 
-                <div className="panel-title mt10">AUTOMATION PIPELINE</div>
-                <div className="pipeline-row">
-                  <Tooltip text={TOOLTIPS.pipe_data}><span className="pipe-step done">DATA</span></Tooltip>
-                  <span className="pipe-arrow">→</span>
-                  <Tooltip text={TOOLTIPS.pipe_ivr}><span className="pipe-step done">IVR</span></Tooltip>
-                  <span className="pipe-arrow">→</span>
-                  <Tooltip text={TOOLTIPS.pipe_regime}><span className={`pipe-step ${pipeRegimeStep}`}>REGIME</span></Tooltip>
-                  <span className="pipe-arrow">→</span>
-                  <Tooltip text={TOOLTIPS.pipe_score}><span className={`pipe-step ${pipeScoreStep}`}>SCORE</span></Tooltip>
-                  <span className="pipe-arrow">→</span>
-                  <Tooltip text={TOOLTIPS.pipe_kelly}><span className={`pipe-step ${pipeKellyStep}`}>KELLY</span></Tooltip>
+                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarPipelineOpen((v) => !v)}>
+                      {warPipelineOpen ? "▾" : "▸"}
+                    </button>
+                    AUTOMATION PIPELINE
+                    <span className={pipeHasRegime ? "sev-ok" : "sev-warn"}>{pipeHasRegime ? "READY" : "WAIT"}</span>
+                  </span>
                 </div>
-                <div className="dim" style={{ fontSize: "0.65rem", marginTop: 3 }}>
-                  {pipeHasRegime
-                    ? `${regimeCurrent?.n_recent ?? 0} sample · ultimo scan ${regimeCurrent?.last_scan_ts ? new Date(regimeCurrent.last_scan_ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "—"}`
-                    : "In attesa dati regime…"}
-                </div>
+                {warPipelineOpen ? (
+                  <>
+                    <div className="pipeline-row">
+                      <Tooltip text={TOOLTIPS.pipe_data}><span className="pipe-step done">DATA</span></Tooltip>
+                      <span className="pipe-arrow">→</span>
+                      <Tooltip text={TOOLTIPS.pipe_ivr}><span className="pipe-step done">IVR</span></Tooltip>
+                      <span className="pipe-arrow">→</span>
+                      <Tooltip text={TOOLTIPS.pipe_regime}><span className={`pipe-step ${pipeRegimeStep}`}>REGIME</span></Tooltip>
+                      <span className="pipe-arrow">→</span>
+                      <Tooltip text={TOOLTIPS.pipe_score}><span className={`pipe-step ${pipeScoreStep}`}>SCORE</span></Tooltip>
+                      <span className="pipe-arrow">→</span>
+                      <Tooltip text={TOOLTIPS.pipe_kelly}><span className={`pipe-step ${pipeKellyStep}`}>KELLY</span></Tooltip>
+                    </div>
+                    <div className="sev-meta" style={{ fontSize: "0.65rem", marginTop: 3 }}>
+                      {pipeHasRegime
+                        ? `${regimeCurrent?.n_recent ?? 0} sample · ultimo scan ${regimeCurrent?.last_scan_ts ? new Date(regimeCurrent.last_scan_ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "—"}`
+                        : "In attesa dati regime…"}
+                    </div>
+                  </>
+                ) : (
+                  <div className="subgroup-summary sev-meta">
+                    {`DATA→IVR→${pipeRegimeStep.toUpperCase()}→${pipeScoreStep.toUpperCase()}→${pipeKellyStep.toUpperCase()}`}
+                  </div>
+                )}
 
                 {/* ── ROC16: Quick-nav action strip ───────────────────── */}
                 <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
                   <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "3px 8px", flex: 1 }}
-                    onClick={() => setActiveTab("universe" as TabKey)}>
+                    onClick={() => openOldTab("universe")}>
                     → SCAN
                   </button>
                   <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "3px 8px", flex: 1 }}
-                    onClick={() => setActiveTab("pipeline" as TabKey)}>
+                    onClick={() => openOldTab("pipeline")}>
                     → PIPELINE
                   </button>
                 </div>
+                </>
+                )}
               </article>
 
               {/* ── ROC7: IBKR ACCOUNT panel ──────────────────────────────── */}
               <article className="panel">
                 <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarIbkrOpen((v) => !v)}>
+                      {warIbkrOpen ? "▾" : "▸"}
+                    </button>
                     IBKR ACCOUNT
                     {hasUrgentExit && (
                       <span style={{
@@ -2361,7 +3132,8 @@ export default function App() {
                     </span>
                   </span>
                 </div>
-
+                {warIbkrOpen && (
+                <>
                 {ibkrAccountLoading && <div className="dim">Caricamento account…</div>}
 
                 {!ibkrAccount && !ibkrAccountLoading && (
@@ -2409,42 +3181,49 @@ export default function App() {
                       })()}
                     </div>
 
-                    <div className="panel-title mt10">
-                      POSIZIONI APERTE ({ibkrAccount.positions.length})
+                    <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button type="button" className="panel-fold-btn" onClick={() => setWarIbkrPositionsOpen((v) => !v)}>
+                          {warIbkrPositionsOpen ? "▾" : "▸"}
+                        </button>
+                        POSIZIONI APERTE <span className="sev-data">({ibkrAccount.positions.length})</span>
+                      </span>
                     </div>
-                    {ibkrAccount.positions.length === 0 ? (
-                      <div className="dim">Nessuna posizione aperta.</div>
-                    ) : (
-                      <div style={{ overflowX: "auto", maxHeight: 150, overflowY: "auto" }}>
-                        <table style={{ width: "100%", fontSize: "0.7rem", borderCollapse: "collapse" }}>
-                          <thead>
-                            <tr style={{ color: "#666", borderBottom: "1px solid #333" }}>
-                              <th style={{ textAlign: "left", padding: "2px 4px" }}>Sym</th>
-                              <th style={{ textAlign: "left", padding: "2px 4px" }}>Exp</th>
-                              <th style={{ textAlign: "right", padding: "2px 4px" }}>Strike</th>
-                              <th style={{ textAlign: "center", padding: "2px 4px" }}>P/C</th>
-                              <th style={{ textAlign: "right", padding: "2px 4px" }}>Qty</th>
-                              <th style={{ textAlign: "right", padding: "2px 4px" }}>MktVal</th>
-                              <th style={{ textAlign: "right", padding: "2px 4px" }}>uPnL</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {ibkrAccount.positions.map((pos, i) => (
-                              <tr key={i} style={{ borderBottom: "1px solid #222" }}>
-                                <td style={{ padding: "2px 4px" }}>{pos.symbol}</td>
-                                <td style={{ padding: "2px 4px", color: "#888" }}>{pos.expiry ?? "—"}</td>
-                                <td style={{ padding: "2px 4px", textAlign: "right" }}>{pos.strike ?? "—"}</td>
-                                <td style={{ padding: "2px 4px", textAlign: "center", color: pos.right === "C" ? "#60a5fa" : "#fb923c" }}>{pos.right ?? "—"}</td>
-                                <td style={{ padding: "2px 4px", textAlign: "right", color: (pos.quantity ?? 0) < 0 ? "#f87171" : "#4ade80" }}>{pos.quantity}</td>
-                                <td style={{ padding: "2px 4px", textAlign: "right" }}>{pos.market_value?.toFixed(0) ?? "—"}</td>
-                                <td style={{ padding: "2px 4px", textAlign: "right", color: (pos.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
-                                  {pos.unrealized_pnl != null ? `${pos.unrealized_pnl >= 0 ? "+" : ""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
-                                </td>
+                    {warIbkrPositionsOpen && (
+                      ibkrAccount.positions.length === 0 ? (
+                        <div className="dim">Nessuna posizione aperta.</div>
+                      ) : (
+                        <div style={{ overflowX: "auto", maxHeight: 150, overflowY: "auto" }}>
+                          <table style={{ width: "100%", fontSize: "0.7rem", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr style={{ color: "#666", borderBottom: "1px solid #333" }}>
+                                <th style={{ textAlign: "left", padding: "2px 4px" }}>Sym</th>
+                                <th style={{ textAlign: "left", padding: "2px 4px" }}>Exp</th>
+                                <th style={{ textAlign: "right", padding: "2px 4px" }}>Strike</th>
+                                <th style={{ textAlign: "center", padding: "2px 4px" }}>P/C</th>
+                                <th style={{ textAlign: "right", padding: "2px 4px" }}>Qty</th>
+                                <th style={{ textAlign: "right", padding: "2px 4px" }}>MktVal</th>
+                                <th style={{ textAlign: "right", padding: "2px 4px" }}>uPnL</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody>
+                              {ibkrAccount.positions.map((pos, i) => (
+                                <tr key={i} style={{ borderBottom: "1px solid #222" }}>
+                                  <td style={{ padding: "2px 4px" }}>{pos.symbol}</td>
+                                  <td style={{ padding: "2px 4px", color: "#888" }}>{pos.expiry ?? "—"}</td>
+                                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{pos.strike ?? "—"}</td>
+                                  <td style={{ padding: "2px 4px", textAlign: "center", color: pos.right === "C" ? "#60a5fa" : "#fb923c" }}>{pos.right ?? "—"}</td>
+                                  <td style={{ padding: "2px 4px", textAlign: "right", color: (pos.quantity ?? 0) < 0 ? "#f87171" : "#4ade80" }}>{pos.quantity}</td>
+                                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{pos.market_value?.toFixed(0) ?? "—"}</td>
+                                  <td style={{ padding: "2px 4px", textAlign: "right", color: (pos.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
+                                    {pos.unrealized_pnl != null ? `${pos.unrealized_pnl >= 0 ? "+" : ""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
                     )}
                   </>
                 )}
@@ -2459,65 +3238,81 @@ export default function App() {
                 </button>
 
                 {/* ── ROC14: Exit Candidates ──────────────────────────── */}
-                <div className="panel-title mt10" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>EXIT CANDIDATES</span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.62rem", color: "#555" }}>
-                    {exitCandidates ? `${exitCandidates.n_flagged}/${exitCandidates.n_total} flagged` : "—"}
-                    <span>agg: {_agoLabel(exitCandidatesFetchedAt)}</span>
+                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarIbkrExitOpen((v) => !v)}>
+                      {warIbkrExitOpen ? "▾" : "▸"}
+                    </button>
+                    EXIT CANDIDATES
+                    <span
+                      className={!exitCandidates ? "sev-neutral" : exitCandidates.n_flagged > 0 ? "sev-warn" : "sev-data"}
+                      style={{ fontSize: "0.62rem", marginLeft: 8 }}
+                    >
+                      {exitCandidates ? `${exitCandidates.n_flagged}/${exitCandidates.n_total} flagged` : "—"}
+                    </span>
+                    <span className="sev-meta" style={{ fontSize: "0.62rem", marginLeft: 8 }}>
+                      agg: {_agoLabel(exitCandidatesFetchedAt)}
+                    </span>
                   </span>
                 </div>
 
-                {!exitCandidates && (
-                  <div className="dim" style={{ fontSize: "0.7rem" }}>Caricamento…</div>
+                {warIbkrExitOpen && (
+                  <>
+                    {!exitCandidates && (
+                      <div className="dim" style={{ fontSize: "0.7rem" }}>Caricamento…</div>
+                    )}
+
+                    {exitCandidates && exitCandidates.candidates.length === 0 && (
+                      <div className="dim" style={{ fontSize: "0.7rem" }}>
+                        Nessuna posizione con segnale di uscita.
+                      </div>
+                    )}
+
+                    {exitCandidates && exitCandidates.candidates.map((c, i) => {
+                      const score = c.exit_score;
+                      const color = score >= 5 ? "#f87171" : score >= 3 ? "#fbbf24" : "#60a5fa";
+                      const dot   = score >= 5 ? "🔴" : score >= 3 ? "🟡" : "🔵";
+                      const pnlColor = (c.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171";
+                      return (
+                        <div key={i} style={{
+                          marginTop: 6, padding: "6px 8px",
+                          background: "#1a1a1a", borderRadius: 4,
+                          borderLeft: `3px solid ${color}`,
+                          fontSize: "0.72rem",
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontWeight: 700 }}>
+                              {dot} {c.symbol} {c.strike ?? "—"}{c.right ?? ""}
+                            </span>
+                            <span style={{ color, fontWeight: 700 }}>score {score}</span>
+                          </div>
+                          <div style={{ color: "#888", marginTop: 2 }}>
+                            exp {c.expiry ?? "—"}
+                            {c.unrealized_pnl != null && (
+                              <span style={{ color: pnlColor, marginLeft: 8 }}>
+                                uPnL {c.unrealized_pnl >= 0 ? "+" : ""}{c.unrealized_pnl.toFixed(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ color: "#666", marginTop: 2, fontStyle: "italic" }}>
+                            {c.exit_reasons.join(" · ")}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {exitCandidates && (
+                      <button
+                        className="btn btn-secondary mt10"
+                        style={{ fontSize: "0.7rem", padding: "3px 8px" }}
+                        onClick={() => void doFetchExitCandidates()}
+                      >
+                        ⟳ EXIT SCAN
+                      </button>
+                    )}
+                  </>
                 )}
-
-                {exitCandidates && exitCandidates.candidates.length === 0 && (
-                  <div className="dim" style={{ fontSize: "0.7rem" }}>
-                    Nessuna posizione con segnale di uscita.
-                  </div>
-                )}
-
-                {exitCandidates && exitCandidates.candidates.map((c, i) => {
-                  const score = c.exit_score;
-                  const color = score >= 5 ? "#f87171" : score >= 3 ? "#fbbf24" : "#60a5fa";
-                  const dot   = score >= 5 ? "🔴" : score >= 3 ? "🟡" : "🔵";
-                  const pnlColor = (c.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171";
-                  return (
-                    <div key={i} style={{
-                      marginTop: 6, padding: "6px 8px",
-                      background: "#1a1a1a", borderRadius: 4,
-                      borderLeft: `3px solid ${color}`,
-                      fontSize: "0.72rem",
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontWeight: 700 }}>
-                          {dot} {c.symbol} {c.strike ?? "—"}{c.right ?? ""}
-                        </span>
-                        <span style={{ color, fontWeight: 700 }}>score {score}</span>
-                      </div>
-                      <div style={{ color: "#888", marginTop: 2 }}>
-                        exp {c.expiry ?? "—"}
-                        {c.unrealized_pnl != null && (
-                          <span style={{ color: pnlColor, marginLeft: 8 }}>
-                            uPnL {c.unrealized_pnl >= 0 ? "+" : ""}{c.unrealized_pnl.toFixed(0)}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ color: "#666", marginTop: 2, fontStyle: "italic" }}>
-                        {c.exit_reasons.join(" · ")}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {exitCandidates && (
-                  <button
-                    className="btn btn-secondary mt10"
-                    style={{ fontSize: "0.7rem", padding: "3px 8px" }}
-                    onClick={() => void doFetchExitCandidates()}
-                  >
-                    ⟳ EXIT SCAN
-                  </button>
+                </>
                 )}
               </article>
 
@@ -2533,7 +3328,12 @@ export default function App() {
                 return (
               <article className="panel" style={{ gridColumn: "1 / -1", position: "relative" }}>
                 <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>🔄 WHEEL POSITIONS</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button type="button" className="panel-fold-btn" onClick={() => setWarWheelOpen((v) => !v)}>
+                      {warWheelOpen ? "▾" : "▸"}
+                    </button>
+                    🔄 WHEEL POSITIONS
+                  </span>
                   <span style={{ fontSize: "0.65rem", color: "#555", fontWeight: 400 }}>
                     {!wheelAvailable
                       ? <span style={{ color: "#a78bfa" }}>🔒 Capitale insufficiente</span>
@@ -2543,6 +3343,8 @@ export default function App() {
                     }
                   </span>
                 </div>
+                {warWheelOpen && (
+                  <>
 
                 {/* BLOCCO REALE: capitale insufficiente */}
                 {!wheelAvailable && (
@@ -2669,6 +3471,19 @@ export default function App() {
                     ⟳ WHEEL REFRESH
                   </button>
                 )}
+                  </>
+                )}
+                {!warWheelOpen && (
+                  <div className="dim" style={{ fontSize: "0.7rem", marginTop: 6 }}>
+                    {!wheelAvailable
+                      ? "Wheel bloccata: capitale insufficiente (richiede SMALL)."
+                      : wheelWarning
+                        ? "Strategia non ancora validata sul track record (gate operativo richiesto)."
+                        : wheelPositions?.positions?.length
+                          ? `${wheelPositions.positions.length} posizione/i Wheel attive.`
+                          : "Nessuna posizione Wheel attiva."}
+                  </div>
+                )}
               </article>
                 );
               })()}
@@ -2676,7 +3491,186 @@ export default function App() {
             </>
           )}
 
-          {activeTab === "pipeline" && (
+          {resolvedTab === "premarket" && (
+            <div className="panel-grid two premarket-step-grid">
+              <article className="panel">
+                <div className="panel-title">STEP 1 — DATI</div>
+                <div className="slide-step-card">
+                  <button className="slide-step-head" onClick={() => setSlideStepDataOpen((v) => !v)}>
+                    <span className="slide-step-title">
+                      <span className="group-arrow">{slideStepDataOpen ? "▾" : "▸"}</span>
+                      La pipeline si avvia
+                    </span>
+                    <span className={healthToSevClass(stepDataHealth)}>{stepDataStatusLabel}</span>
+                  </button>
+                  {!slideStepDataOpen ? (
+                    <div className="subgroup-summary sev-meta">{stepDataSummary}</div>
+                  ) : (
+                    <>
+                      <div className="sev-meta" style={{ marginBottom: 4 }}>
+                        {premarketScanAt ? `${fmtTs(premarketScanAt)} — ingest feed` : "Nessun timestamp pipeline disponibile"}
+                      </div>
+                      <div className="sev-meta" style={{ marginBottom: 8 }}>{stepDataHint}</div>
+                      <div className="adaptive-grid">
+                        <div className="slide-mini-card">
+                          <div className="slide-mini-headline">
+                            <span>PIPELINE</span>
+                            <span className="slide-mini-chevron">{slideDataPipelineOpen ? "▾" : "▸"}</span>
+                          </div>
+                          <button
+                            className={`slide-mini-value-btn ${healthToSevClass(pipelineStateHealth)}`}
+                            onClick={() => setSlideDataPipelineOpen((v) => !v)}
+                          >
+                            {pipelineStateLabel}
+                          </button>
+                          <div className="slide-mini-brief">
+                            <Tooltip text="Stato complessivo del flusso ingest: combina esito feed, criticita aperte e disponibilita della sorgente.">
+                              ingest + criticita + source
+                            </Tooltip>
+                          </div>
+                          {slideDataPipelineOpen && (
+                            <div className="slide-mini-detail">
+                              ingest: <b className={healthToSevClass(ingestHealth)}>{ingestLabel}</b><br />
+                              criticita: {pipelineCriticality ?? 0}<br />
+                              source: {premarketSource}
+                            </div>
+                          )}
+                        </div>
+                        <div className="slide-mini-card">
+                          <div className="slide-mini-headline">
+                            <span>RECORD RICEVUTI</span>
+                            <span className="slide-mini-chevron">{slideDataRecordsOpen ? "▾" : "▸"}</span>
+                          </div>
+                          <button
+                            className="slide-mini-value-btn sev-data"
+                            onClick={() => setSlideDataRecordsOpen((v) => !v)}
+                          >
+                            {pipelineRecords.toLocaleString("it-IT")}
+                          </button>
+                          <div className="slide-mini-brief">
+                            <Tooltip text="Volume record utili caricati nel batch pre-market: indica dimensione e significativita del dataset per le fasi successive.">
+                              volume batch + shortlist
+                            </Tooltip>
+                          </div>
+                          {slideDataRecordsOpen && (
+                            <div className="slide-mini-detail">
+                              batch: <code>{pipelineBatch}</code><br />
+                              shortlist: {premarketShortlistCount}<br />
+                              pronti: {premarketReadyCount}
+                            </div>
+                          )}
+                        </div>
+                        <div className="slide-mini-card">
+                          <div className="slide-mini-headline">
+                            <span>DATA_MODE</span>
+                            <span className="slide-mini-chevron">{slideDataModeOpen ? "▾" : "▸"}</span>
+                          </div>
+                          <button
+                            className={`slide-mini-value-btn ${apiOnline ? (hasRealData ? "sev-ok" : "sev-warn") : "sev-neutral"}`}
+                            onClick={() => setSlideDataModeOpen((v) => !v)}
+                          >
+                            {dataModeUpper || "N/D"}
+                          </button>
+                          <div className="slide-mini-brief">
+                            <Tooltip text="Origine dei dati usati dal sistema. VENDOR_REAL indica feed reale; modalita sintetica segnala fallback di sicurezza.">
+                              origine feed attivo
+                            </Tooltip>
+                          </div>
+                          {slideDataModeOpen && (
+                            <div className="slide-mini-detail">
+                              yfinance/cboe: {yfinanceLabel}<br />
+                              fred: {fredLabel}<br />
+                              orats: {oratsLabel}
+                            </div>
+                          )}
+                        </div>
+                        <div className="slide-mini-card">
+                          <div className="slide-mini-headline">
+                            <span>LATENZA FEED</span>
+                            <span className="slide-mini-chevron">{slideDataLatencyOpen ? "▾" : "▸"}</span>
+                          </div>
+                          <button
+                            className={`slide-mini-value-btn ${!apiOnline ? "sev-neutral" : pipelineLatencyState === "FRESH" ? "sev-ok" : "sev-warn"}`}
+                            onClick={() => setSlideDataLatencyOpen((v) => !v)}
+                          >
+                            {pipelineLatencyState}
+                          </button>
+                          <div className="slide-mini-brief">
+                            <Tooltip text="Freschezza dell'ultimo ciclo ingest, errori fetch e stato readiness storico. Misura il ritardo operativo del feed.">
+                              freshness + errors + readiness
+                            </Tooltip>
+                          </div>
+                          {slideDataLatencyOpen && (
+                            <div className="slide-mini-detail">
+                              fetch errors: {fetchErrors.size}<br />
+                              readiness: {pipelineReadinessLine}<br />
+                              data health: {dataHealthLabel}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </article>
+              <article className="panel">
+                <div className="adaptive-grid">
+                  <div className="slide-mini-card span-full">
+                    <div className="slide-mini-headline">
+                      <span>INGEST PIPELINE LOG — PRE-MARKET</span>
+                    </div>
+                    <pre className="console premarket-console">{[
+                      `[${premarketScanAt ? fmtTs(premarketScanAt) : "--"}] ${apiOnline ? "INFO" : "WARN"}  feed connected — source: ${premarketSource}`,
+                      `[${premarketScanAt ? fmtTs(premarketScanAt) : "--"}] RECV  chain records — ${pipelineRecords}`,
+                      `[${premarketScanAt ? fmtTs(premarketScanAt) : "--"}] META  DATA_MODE = ${dataModeUpper || "N/D"}`,
+                      `[${premarketScanAt ? fmtTs(premarketScanAt) : "--"}] META  batch_id = ${pipelineBatch}`,
+                      `[${premarketScanAt ? fmtTs(premarketScanAt) : "--"}] ${hasRealData ? "INFO" : "WARN"}  validation ${pipelineStateLabel}`,
+                    ].join("\n")}</pre>
+                  </div>
+
+                  <div className="slide-mini-card">
+                    <div className="slide-mini-headline">
+                      <span>SOURCE QUALITY</span>
+                    </div>
+                    <div className={`slide-mini-value ${healthToSevClass(dataHealthOverall)}`}>{dataHealthLabel}</div>
+                    <div className="slide-mini-brief">qualita dataset ingest</div>
+                  </div>
+                  <div className="slide-mini-card">
+                    <div className="slide-mini-headline">
+                      <span>HISTORY READINESS</span>
+                    </div>
+                    <div className={`slide-mini-value ${historyReadiness?.ready ? "sev-ok" : "sev-warn"}`}>
+                      {historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "N/D"}
+                    </div>
+                    <div className="slide-mini-brief">copertura e qualita storica</div>
+                  </div>
+                  <div className="slide-mini-card">
+                    <div className="slide-mini-headline">
+                      <span>PROSSIMA FASE</span>
+                    </div>
+                    <div className="slide-mini-value sev-data">ANALISI</div>
+                    <div className="slide-mini-brief">step successivo della pipeline</div>
+                  </div>
+                  <div className="slide-mini-card">
+                    <div className="slide-mini-headline">
+                      <span>RECORD SCRITTI</span>
+                    </div>
+                    <div className="slide-mini-value sev-data">{pipelineRecords.toLocaleString("it-IT")}</div>
+                    <div className="slide-mini-brief">record validati su batch corrente</div>
+                  </div>
+                  <div className="slide-mini-card">
+                    <div className="slide-mini-headline">
+                      <span>BATCH</span>
+                    </div>
+                    <div className="slide-mini-value sev-meta">{pipelineBatch}</div>
+                    <div className="slide-mini-brief">identificativo ingest corrente</div>
+                  </div>
+                </div>
+              </article>
+            </div>
+          )}
+
+          {resolvedTab === "pipeline" && (
             <div className="panel-grid three">
               <article className="panel">
                 <div className="panel-title">EQUITY SNAPSHOT</div>
@@ -2752,7 +3746,7 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === "universe" && (
+          {resolvedTab === "universe" && (
             <div className="panel-grid two">
                             <article className="panel">
                 <div className="panel-title">UNIVERSE CONFIG</div>
@@ -2892,7 +3886,7 @@ export default function App() {
                                     2
                                   )
                                 );
-                                setActiveTab("pipeline");
+                                openOldTab("pipeline");
                                 setError("");
                                 setMessage(`Candidate loaded: ${it.symbol}/${it.strategy}`);
                               }}
@@ -2936,7 +3930,7 @@ export default function App() {
               </article>
             </div>
           )}
-          {activeTab === "opportunity" && (
+          {resolvedTab === "opportunity" && (
             <div className="panel-grid two">
 
               {/* ── LEFT: SCAN OPZ ───────────────────────────────────────── */}
@@ -3178,7 +4172,7 @@ export default function App() {
                         },
                       }, null, 2));
                       setPreview(null); setPreviewSignature(null);
-                      setActiveTab("pipeline");
+                      openOldTab("pipeline");
                       setMessage(`Candidato caricato in pipeline: ${c.symbol}/${c.strategy}`);
                       setError("");
                     }}
@@ -3201,7 +4195,7 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === "trades" && (
+          {resolvedTab === "trades" && (
             <div className="panel-grid two">
               <article className="panel">
                 <div className="panel-title">LAST PAPER TRADES</div>
@@ -3243,7 +4237,7 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === "regime" && (
+          {resolvedTab === "regime" && (
             <div className="panel-grid two">
               <article className="panel">
                 <div className="panel-title">REGIME MATRIX</div>
@@ -3267,7 +4261,7 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === "tests" && (
+          {resolvedTab === "tests" && (
             <div className="panel-grid two">
               <article className="panel">
                 <div className="panel-title">STATE SNAPSHOT</div>
@@ -3311,40 +4305,14 @@ export default function App() {
         </section>
 
         <aside className="rightpanel">
-          {blk("kelly_sizing").visible ? (
-            <section className="rp-section">
-              <div className="rp-title"><Tooltip text={TOOLTIPS.kelly_sizing}>KELLY SIZING LIVE</Tooltip></div>
-              <div className="kelly-result">
-                <div className="kelly-val">{kellyHalf === null ? "-" : `${(kellyHalf * 100).toFixed(2)}%`}</div>
-                <div className="kelly-label"><Tooltip text={TOOLTIPS.kelly_half}>Half-Kelly target</Tooltip></div>
-              </div>
-              <div className="kelly-row"><span className="kelly-key"><Tooltip text={TOOLTIPS.win_rate}>Win rate</Tooltip></span><span className="kelly-v">{fmtPct(paperSummary?.win_rate ?? null)}</span></div>
-              <div className="kelly-row"><span className="kelly-key"><Tooltip text={TOOLTIPS.profit_factor}>Profit factor</Tooltip></span><span className="kelly-v">{fmtNum(paperSummary?.profit_factor ?? null)}</span></div>
-              <div className="kelly-row"><span className="kelly-key"><Tooltip text={TOOLTIPS.avg_slippage}>Avg slippage</Tooltip></span><span className="kelly-v">{fmtNum(paperSummary?.avg_slippage_ticks ?? null)}</span></div>
-            </section>
-          ) : (
-            <section className="rp-section">
-              <div className="rp-title">KELLY SIZING</div>
-              <div style={{ color: "#555", fontSize: "0.7rem", padding: "4px 0" }}>
-                🔒 {blk("kelly_sizing").reason ?? "Kelly disabilitato"}
-              </div>
-            </section>
-          )}
-
           <section className="rp-section">
-            <div className="rp-title">FASE CORRENTE</div>
-            <div className="phase-d-name">{nextStep}</div>
-            <div className="checklist-item"><span className="ci-label">Blocked steps</span><span>{blockedCount}</span></div>
-            <div className="checklist-item"><span className="ci-label">equity points</span><span>{paperSummary?.equity_points ?? 0}</span></div>
-            <div className="checklist-item"><span className="ci-label">trade journal</span><span>{paperSummary?.trades ?? 0}</span></div>
-            <div className="checklist-item"><span className="ci-label">Data aggiorn.</span><span>{paperSummary?.as_of_date ?? "-"}</span></div>
-          </section>
-
-          <section className="rp-section">
-            <div className="rp-title">EXECUTION WINDOW</div>
-            <div style={{ color: "var(--g1)", marginBottom: 4 }}>10:00-11:30 EST</div>
-            <div className="dim">13:30-15:00 EST</div>
-            <div className="dim">Avoid: 09:30-09:45 | 15:30-16:00</div>
+            <div className="rp-title">KPI MONITOR</div>
+            <div className="checklist-item"><span className="ci-label">trades</span><span className="sev-data">{paperSummary?.trades ?? "-"}</span></div>
+            <div className="checklist-item"><span className="ci-label">sharpe</span><span className="sev-data">{fmtNum(paperSummary?.sharpe_annualized ?? null)}</span></div>
+            <div className="checklist-item"><span className="ci-label">max dd</span><span className="sev-warn">{fmtPct(paperSummary?.max_drawdown ?? null)}</span></div>
+            <div className="checklist-item"><span className="ci-label">win rate</span><span className="sev-data">{fmtPct(paperSummary?.win_rate ?? null)}</span></div>
+            <div className="checklist-item"><span className="ci-label">compliance</span><span className={(paperSummary?.compliance_violations ?? 0) > 0 ? "sev-error" : "sev-ok"}>{paperSummary?.compliance_violations ?? "-"}</span></div>
+            <div className="checklist-item"><span className="ci-label">tier</span><span className="sev-data">{tierInfo?.active_mode ?? "-"}</span></div>
           </section>
         </aside>
 
@@ -3375,46 +4343,8 @@ export default function App() {
 
             <div className="narrator-briefing-label dim">{briefingLabel}</div>
 
-            {/* controlli player */}
-            <div className="narrator-controls">
-              <button className="btn" onClick={doBriefingPrev}
-                disabled={briefingListIdx >= briefingList.length - 1 || briefingList.length === 0}
-                title="Briefing precedente">◀ PREV</button>
-              <button
-                className={`btn ${briefingPlaying ? "btn-warning" : "btn-primary"}`}
-                onClick={briefingPlaying ? doBriefingStop : doBriefingPlay}
-                disabled={!apiOnline || (!briefingPlaying && briefingList.length === 0)}
-              >{briefingPlaying ? "■ STOP" : "▶ PLAY"}</button>
-              <button className="btn" onClick={doBriefingNext}
-                disabled={briefingListIdx <= 0}
-                title="Briefing successivo">NEXT ▶</button>
-              <button className="btn btn-ghost" onClick={() => void doBriefingGenerate()}
-                disabled={briefingBusy || !apiOnline}
-                title="Genera nuovo briefing e invia su Telegram"
-                style={{ gridColumn: "1 / -1" }}
-              >{briefingBusy ? "generazione..." : "⊕ GENERA NUOVO"}</button>
-            </div>
-
-            {/* switch automazione */}
-            <div className="narrator-switches">
-              <label className="narrator-switch-row">
-                <span>Auto-apri finestra</span>
-                <span className={`toggle-pill ${briefingAutoOpen ? "on" : ""}`}
-                  onClick={() => setBriefingAutoOpen(v => !v)} role="switch"
-                  aria-checked={briefingAutoOpen} tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && setBriefingAutoOpen(v => !v)}>
-                  <span className="toggle-knob" />
-                </span>
-              </label>
-              <label className="narrator-switch-row">
-                <span>Play automatico</span>
-                <span className={`toggle-pill ${briefingAutoPlay ? "on" : ""}`}
-                  onClick={() => setBriefingAutoPlay(v => !v)} role="switch"
-                  aria-checked={briefingAutoPlay} tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && setBriefingAutoPlay(v => !v)}>
-                  <span className="toggle-knob" />
-                </span>
-              </label>
+            <div className="sev-meta" style={{ fontSize: "0.68rem", margin: "4px 0 8px" }}>
+              Controlli audio unificati nel WAR ROOM (barra briefing).
             </div>
 
             {/* ricerca nel tutorial */}
