@@ -436,7 +436,14 @@
   .parent-brk { width:100%; height:4px; border-top:1px solid #282840; border-left:1px solid #282840; border-right:1px solid #282840; border-radius:2px 2px 0 0; transition:border-color .25s; }
   .parent-phase.parent-active .parent-lbl { color:rgba(255,109,0,.6); }
   .parent-phase.parent-active .parent-brk { border-color:rgba(255,109,0,.4); }
-  .sub-phases { display:flex; gap:4px; }
+  .sub-phases { display:flex; gap:0; }
+  .phase-group { display:flex; flex-direction:column; align-items:center; min-width:0; }
+  .phase-head  { display:flex; flex-direction:column; align-items:center; width:100%; margin-bottom:2px; }
+  .phase-lbl   { font-size:7px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#333350; margin-bottom:1px; transition:color .25s; white-space:nowrap; }
+  .phase-brk   { width:100%; height:3px; border-top:1px solid #282840; border-left:1px solid #282840; border-right:1px solid #282840; border-radius:2px 2px 0 0; transition:border-color .25s; }
+  .phase-dots  { display:flex; gap:4px; align-items:center; flex-wrap:nowrap; justify-content:center; padding-top:2px; }
+  .phase-group.phase-active .phase-lbl { color:rgba(255,109,0,.9); }
+  .phase-group.phase-active .phase-brk { border-color:rgba(255,109,0,.5); }
 </style>
 </head>
 <body>
@@ -768,7 +775,7 @@
     </div>
   </div>
 
-  <!-- STEP 6 —
+  <!-- STEP 6 — OP/TRADING: Dato in arrivo -->
   <div class="step" data-step="6">
     <div class="step-header">
       <div class="step-icon">📡</div>
@@ -2081,7 +2088,7 @@
 <footer>
   <button class="nav-btn" id="btnPrev" onclick="navigate(-1)" disabled>&#x2190; Indietro</button>
   <div class="phase-container">
-    <div class="parent-phases">
+    <div class="parent-phases" style="gap:0">
       <div class="parent-phase parent-active" data-parent="ante" style="flex:5">
         <span class="parent-lbl">ANTE</span><div class="parent-brk"></div>
       </div>
@@ -2093,35 +2100,35 @@
       </div>
     </div>
     <div class="sub-phases">
-      <div class="phase-group phase-active" data-phase="dati">
+      <div class="phase-group phase-active" data-phase="dati" style="flex:2">
         <div class="phase-head"><span class="phase-lbl">DATI</span><div class="phase-brk"></div></div>
         <div class="phase-dots" id="dots-dati"></div>
       </div>
-      <div class="phase-group" data-phase="analisi">
+      <div class="phase-group" data-phase="analisi" style="flex:2">
         <div class="phase-head"><span class="phase-lbl">ANALISI</span><div class="phase-brk"></div></div>
         <div class="phase-dots" id="dots-analisi"></div>
       </div>
-      <div class="phase-group" data-phase="briefing">
+      <div class="phase-group" data-phase="briefing" style="flex:1">
         <div class="phase-head"><span class="phase-lbl">BRIEFING</span><div class="phase-brk"></div></div>
         <div class="phase-dots" id="dots-briefing"></div>
       </div>
-      <div class="phase-group" data-phase="trading">
+      <div class="phase-group" data-phase="trading" style="flex:10">
         <div class="phase-head"><span class="phase-lbl">TRADING</span><div class="phase-brk"></div></div>
         <div class="phase-dots" id="dots-trading"></div>
       </div>
-      <div class="phase-group" data-phase="wheel">
+      <div class="phase-group" data-phase="wheel" style="flex:5">
         <div class="phase-head"><span class="phase-lbl">WHEEL</span><div class="phase-brk"></div></div>
         <div class="phase-dots" id="dots-wheel"></div>
       </div>
-      <div class="phase-group" data-phase="metriche">
+      <div class="phase-group" data-phase="metriche" style="flex:2">
         <div class="phase-head"><span class="phase-lbl">METRICHE</span><div class="phase-brk"></div></div>
         <div class="phase-dots" id="dots-metriche"></div>
       </div>
-      <div class="phase-group" data-phase="chiusura">
+      <div class="phase-group" data-phase="chiusura" style="flex:1">
         <div class="phase-head"><span class="phase-lbl">CHIUSURA</span><div class="phase-brk"></div></div>
         <div class="phase-dots" id="dots-chiusura"></div>
       </div>
-      <div class="phase-group" data-phase="report">
+      <div class="phase-group" data-phase="report" style="flex:1">
         <div class="phase-head"><span class="phase-lbl">REPORT</span><div class="phase-brk"></div></div>
         <div class="phase-dots" id="dots-report"></div>
       </div>
