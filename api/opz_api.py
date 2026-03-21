@@ -117,6 +117,7 @@ class EquityPointOut(TypedDict):
 class EquityHistoryOut(TypedDict):
     ok: bool; profile: str; n_points: int
     latest_equity: Optional[float]; initial_equity: Optional[float]
+    min_date: Optional[str]; max_date: Optional[str]
     points: List[EquityPointOut]
 
 class ExitCandidateOut(TypedDict):
