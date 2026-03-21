@@ -163,8 +163,8 @@ Riavvia TWS/IBG, aggiorna, fai le modifiche necessarie.
 | Ferma IBWR | `POST /opz/ibwr/service` | `{"action": "off"}` |
 | Avvia IBWR | `POST /opz/ibwr/service` | `{"action": "on"}` |
 | Stato IBWR | `POST /opz/ibwr/service` | `{"action": "status"}` |
-| Observer OFF | `POST /opz/execution/observer` | `{"action": "off"}` |
-| Observer ON | `POST /opz/execution/observer` | `{"action": "on"}` |
-| Kill switch ON | `POST /opz/execution/kill_switch` | `{"action": "activate"}` |
-| Kill switch OFF | `POST /opz/execution/kill_switch` | `{"action": "deactivate"}` |
-| Stato completo | `GET /opz/control/status` | — |
+| Ferma Observer | `POST /opz/execution/observer` | `{"action": "off"}` |
+| Avvia Observer | `POST /opz/execution/observer` | `{"action": "on"}` |
+| Attiva kill switch | `POST /opz/execution/kill_switch` | `{"action": "activate"}` |
+| Disattiva kill switch | `POST /opz/execution/kill_switch` | `{"action": "deactivate"}` |
+| Stato sistema | `GET /opz/control/status` | — |
