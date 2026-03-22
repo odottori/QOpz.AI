@@ -3125,7 +3125,7 @@ export default function App() {
                       (segnaliStrategyFilter !== "tutte" ? 1 : 0) +
                       ((segnaliFrom || segnaliTo) ? 1 : 0);
                     const filterBtnStyle = (active: boolean, color: string, hasData = true) => ({
-                      fontSize:"0.6rem" as const, padding:"2px 7px", borderRadius:3,
+                      fontSize:"0.55rem" as const, padding:"1px 4px", borderRadius:3,
                       cursor: hasData ? "pointer" as const : "default" as const,
                       border:`1px solid ${active ? color : hasData ? "#3d3d3d" : "#252525"}`,
                       background: active ? `${color}22` : "transparent",
@@ -3538,7 +3538,7 @@ export default function App() {
                       (posStrategyFilter !== "tutte" ? 1 : 0) +
                       ((storicoFrom || storicoTo) ? 1 : 0);
                     const fbs = (active: boolean, color: string, hasData = true) => ({
-                      fontSize:"0.6rem" as const, padding:"2px 7px", borderRadius:3,
+                      fontSize:"0.55rem" as const, padding:"1px 4px", borderRadius:3,
                       cursor: hasData ? "pointer" as const : "default" as const,
                       border:`1px solid ${active ? color : hasData ? "#3d3d3d" : "#252525"}`,
                       background: active ? `${color}22` : "transparent",
@@ -3577,24 +3577,6 @@ export default function App() {
                             ))}
                           </div>
 
-                          {/* data */}
-                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
-                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>data:</span>
-                            <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
-                            <input type="date" value={storicoFrom} onChange={e => setStoricoFrom(e.target.value)}
-                              style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
-                                border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
-                            <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>al</span>
-                            <input type="date" value={storicoTo} onChange={e => setStoricoTo(e.target.value)}
-                              style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
-                                border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
-                            {(storicoFrom || storicoTo) && (
-                              <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"0 4px"}}
-                                onClick={() => { setStoricoFrom(""); setStoricoTo(""); }}>✕</button>
-                            )}
-                          </div>
-
                           {/* strategia */}
                           <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
                             <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
@@ -3610,6 +3592,24 @@ export default function App() {
                                 </button>
                               );
                             })}
+                          </div>
+
+                          {/* data — sempre ultimo */}
+                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
+                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>data:</span>
+                            <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
+                            <input type="date" value={storicoFrom} onChange={e => setStoricoFrom(e.target.value)}
+                              style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                                border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                            <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>al</span>
+                            <input type="date" value={storicoTo} onChange={e => setStoricoTo(e.target.value)}
+                              style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                                border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                            {(storicoFrom || storicoTo) && (
+                              <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"0 4px"}}
+                                onClick={() => { setStoricoFrom(""); setStoricoTo(""); }}>✕</button>
+                            )}
                           </div>
                         </>)}
                       </div>
