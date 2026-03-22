@@ -829,6 +829,9 @@ export default function App() {
   const [execWindowOpen, setExecWindowOpen] = useState<boolean>(false);  // collassato di default
   const [dumpOpen, setDumpOpen] = useState<boolean>(false);              // DUMP block collassato di default
   const [scoreFilter, setScoreFilter] = useState<"all"|"high"|"mid"|"low">("all"); // filtro segnali per soglia score
+  const [segnaliStrategyFilter, setSegnaliStrategyFilter] = useState<string>("tutte");
+  const [segnaliFrom, setSegnaliFrom] = useState<string>("");
+  const [segnaliTo, setSegnaliTo] = useState<string>("");
   const [kpiExpanded, setKpiExpanded] = useState<string|null>(null); // blocco KPI espanso nel tab TRADING
   const [pinnedKpis, setPinnedKpis] = useState<string[]>([]);        // KPI bloccati nella colonna destra
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -3076,20 +3079,14 @@ export default function App() {
                     </span>
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}} onClick={refreshAll} disabled={busy}>⟳</button>
                   </div>
-                  {/* Filtri score — legenda cliccabile */}
-                  <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap", alignItems:"center"}}>
+                  {/* ── Riga filtri 1 — score + date scan (stessa riga) ── */}
+                  <div style={{display:"flex", gap:4, marginBottom:4, flexWrap:"wrap", alignItems:"center"}}>
                     {(["all","high","mid","low"] as const).map(f => {
                       const labels: Record<typeof f, string> = {
-                        all:  "TUTTO",
-                        high: "≥65 ottimo",
-                        mid:  "50–64 borderline",
-                        low:  "<50 basso",
+                        all:"TUTTO", high:"≥65 ottimo", mid:"50–64 borderline", low:"<50 basso",
                       };
                       const colors: Record<typeof f, string> = {
-                        all:  "#888",
-                        high: "#4ade80",
-                        mid:  "#fbbf24",
-                        low:  "#f87171",
+                        all:"#888", high:"#4ade80", mid:"#fbbf24", low:"#f87171",
                       };
                       const active = scoreFilter === f;
                       const count = f === "all" ? premarketRows.length
@@ -3097,113 +3094,191 @@ export default function App() {
                         : f === "mid"  ? premarketRows.filter(c => (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65).length
                         : premarketRows.filter(c => (c.scorePct ?? 0) < 50).length;
                       return (
-                        <button key={f}
-                          onClick={() => setScoreFilter(f)}
-                          style={{
-                            fontSize:"0.6rem", padding:"2px 7px", borderRadius:3, cursor:"pointer",
-                            border: `1px solid ${active ? colors[f] : "#333"}`,
-                            background: active ? `${colors[f]}18` : "transparent",
-                            color: active ? colors[f] : "#555",
-                            fontWeight: active ? 600 : 400,
-                            transition:"all 0.15s",
-                          }}>
+                        <button key={f} onClick={() => setScoreFilter(f)} style={{
+                          fontSize:"0.6rem", padding:"2px 7px", borderRadius:3, cursor:"pointer",
+                          border:`1px solid ${active ? colors[f] : "#333"}`,
+                          background: active ? `${colors[f]}18` : "transparent",
+                          color: active ? colors[f] : "#555",
+                          fontWeight: active ? 600 : 400,
+                          transition:"all 0.15s",
+                        }}>
                           {labels[f]} <span style={{opacity:0.7}}>({count})</span>
                         </button>
                       );
                     })}
-                  </div>
-                  {premarketRows.length === 0 ? (
-                    <div style={{color:"var(--dim)", fontSize:"0.7rem", padding:"8px 0"}}>
-                      Nessun segnale. Esegui scan dalla tab ANALISI.
-                    </div>
-                  ) : (() => {
-                    const filtered = premarketRows.filter(c =>
-                      scoreFilter === "all" ? true :
-                      scoreFilter === "high" ? (c.scorePct ?? 0) >= 65 :
-                      scoreFilter === "mid"  ? (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65 :
-                      (c.scorePct ?? 0) < 50
-                    );
-                    return (
-                    <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
-                      {filtered.length === 0 ? (
-                        <div style={{color:"var(--dim)", fontSize:"0.7rem", padding:"8px 0"}}>
-                          Nessun segnale in questa fascia.
-                        </div>
-                      ) : (
-                      <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
-                        <thead>
-                          <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
-                            <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
-                            <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
-                            <th style={{textAlign:"left", padding:"2px 4px"}} title="Tipo di struttura operativa. Passa il mouse sulla cella per i dettagli.">Strategia</th>
-                            <th style={{textAlign:"right", padding:"2px 4px"}} title="Punteggio composito 0–100 (4 pilastri: volatilità, liquidità, rischio/rendimento, regime). Soglia minima operativa: 50.">Score/100</th>
-                            <th style={{textAlign:"right", padding:"2px 4px"}} title="Spread bid-ask in % del mid. Soglia dura: ≤10%. Vuoto = dati non acquisiti (mercati chiusi?).">Spread%</th>
-                            <th style={{textAlign:"right", padding:"2px 4px"}} title="IV Rank in percentile. Soglia dura: ≥20. Vuoto = dati non acquisiti.">IVR%</th>
-                            <th style={{textAlign:"left", padding:"2px 4px"}}>Fonte</th>
-                            <th style={{padding:"2px 4px"}}></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filtered.map((c, i) => {
-                            const isSelected = selectedItemId != null && (c as any).item_id != null && selectedItemId === (c as any).item_id;
-                            return (
-                            <tr key={i} style={{borderBottom:"1px solid #222", background: isSelected ? "rgba(74,222,128,0.08)" : undefined}}>
-                              <td style={{padding:"2px 4px", color:"#666"}}>#{i + 1}</td>
-                              <td style={{padding:"2px 4px", fontWeight:600}}>{c.symbol}</td>
-                              <td style={{padding:"2px 4px", color:"#888"}} title={
-                                c.strategy === "BULL_PUT" ? "Bull Put Spread · vendi put strike basso + compri put strike alto · profitto se il sottostante resta sopra il break-even" :
-                                c.strategy === "IRON_CONDOR" ? "Iron Condor · bull put + bear call · profitto se il sottostante resta in un range definito" :
-                                c.strategy === "CALENDAR" ? "Calendar Spread · vendi opzione scadenza vicina + compri stessa scadenza lontana · profitto da decadimento temporale differenziale" :
-                                c.strategy === "WHEEL" ? "Wheel · ciclo put venduta → assegnazione → call venduta → incasso premi ripetuto" :
-                                c.strategy === "PMCC_CALENDAR" ? "Poor Man's Covered Call · LEAP come base, call mensile breve · replica covered call con minor capitale" :
-                                c.strategy === "HEDGE_ACTIVE" ? "Copertura attiva · protezione direzionale sul portafoglio" :
-                                c.strategy ?? ""
-                              }>{c.strategy}</td>
-                              <td style={{padding:"2px 4px", textAlign:"right"}}>
-                                {c.scorePct !== undefined ? (
-                                  <span className={c.scorePct >= 65 ? "sev-ok" : c.scorePct >= 50 ? "sev-warn" : "sev-error"}
-                                    title={`Punteggio: ${c.scorePct.toFixed(0)}/100. Soglia operativa minima: 50.`}>
-                                    {c.scorePct.toFixed(0)}<span style={{color:"var(--dim)", fontSize:"0.55rem"}}>/100</span>
-                                  </span>
-                                ) : "—"}
-                              </td>
-                              <td style={{padding:"2px 4px", textAlign:"right", color: c.spreadPct == null || c.spreadPct === 0 ? "var(--dim)" : "#888"}}>
-                                {c.spreadPct != null && c.spreadPct > 0 ? c.spreadPct.toFixed(1) : <span title="Dato non ancora acquisito — aggiorna lo scan">—</span>}
-                              </td>
-                              <td style={{padding:"2px 4px", textAlign:"right", color: c.ivRankPct == null || c.ivRankPct === 0 ? "var(--dim)" : "#888"}}>
-                                {c.ivRankPct != null && c.ivRankPct > 0 ? c.ivRankPct.toFixed(0) : <span title="Dato non ancora acquisito — aggiorna lo scan">—</span>}
-                              </td>
-                              <td style={{padding:"2px 4px", color:"#555", fontSize:"0.6rem"}}>{c.source ?? "—"}</td>
-                              <td style={{padding:"2px 2px"}}>
-                                {(c.spreadPct == null || c.spreadPct === 0 || c.ivRankPct == null || c.ivRankPct === 0) ? (
-                                  <span title="Dati incompleti — impossibile valutare il rischio. Aggiorna lo scan prima di eseguire." style={{fontSize:"0.6rem", color:"var(--amber)", padding:"1px 6px"}}>⚠ dati</span>
-                                ) : (
-                                  <button
-                                    className="btn btn-ghost"
-                                    style={{fontSize:"0.6rem", padding:"1px 6px", whiteSpace:"nowrap"}}
-                                    onClick={() => {
-                                      setSymbol(c.symbol ?? "");
-                                      setStrategy(c.strategy ?? "BULL_PUT");
-                                      setPayload(JSON.stringify({symbol: c.symbol, strategy: c.strategy, legs: []}, null, 2));
-                                      setSelectedItemId((c as any).item_id ?? null);
-                                      setOpExecOpen(true);
-                                    }}
-                                  >→ ESEGUI</button>
-                                )}
-                              </td>
-                            </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                    {/* date freschezza scan — spintonati a destra */}
+                    <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:3, flexWrap:"nowrap"}}>
+                      <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
+                      <input type="date" value={segnaliFrom} onChange={e => setSegnaliFrom(e.target.value)}
+                        style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                          border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                      <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>al</span>
+                      <input type="date" value={segnaliTo} onChange={e => setSegnaliTo(e.target.value)}
+                        style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                          border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                      {(segnaliFrom || segnaliTo) && (
+                        <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"0 4px"}}
+                          onClick={() => { setSegnaliFrom(""); setSegnaliTo(""); }}>✕</button>
                       )}
                     </div>
+                  </div>
+
+                  {/* ── Riga filtri 2 — strategia (lista fissa, sempre visibile) ── */}
+                  {(() => {
+                    const KNOWN = ["WHEEL","BULL_PUT","IRON_CONDOR","CALENDAR","PMCC_CALENDAR","HEDGE_ACTIVE"];
+                    const extra = Array.from(new Set(
+                      premarketRows.map(c => c.strategy).filter((s): s is string => !!s && !KNOWN.includes(s))
+                    )).sort();
+                    const strategies = ["tutte", ...KNOWN, ...extra];
+                    const countFor = (s: string) =>
+                      s === "tutte" ? premarketRows.length
+                        : premarketRows.filter(c => c.strategy === s).length;
+                    return (
+                      <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                          letterSpacing:"0.06em", marginRight:2, flexShrink:0}}>str</span>
+                        {strategies.map(s => {
+                          const active = segnaliStrategyFilter === s;
+                          const n = countFor(s);
+                          const hasData = s === "tutte" || n > 0;
+                          return (
+                            <button key={s} onClick={() => setSegnaliStrategyFilter(s)} style={{
+                              fontSize:"0.58rem", padding:"1px 6px", borderRadius:3,
+                              cursor: hasData ? "pointer" : "default",
+                              border:`1px solid ${active ? "#60a5fa" : hasData ? "#333" : "#1e1e1e"}`,
+                              background: active ? "#60a5fa18" : "transparent",
+                              color: active ? "#60a5fa" : hasData ? "#555" : "#2a2a2a",
+                              fontWeight: active ? 600 : 400,
+                              transition:"all 0.15s",
+                            }}>
+                              {s === "tutte" ? "TUTTE" : s}
+                              {s !== "tutte" && <span style={{opacity:0.5, marginLeft:2}}>({n})</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
                     );
                   })()}
-                  {/* nota in fondo alla tabella SEGNALI */}
+
+                  {/* ── Tabella segnali — sempre visibile ── */}
+                  {(() => {
+                    // freschezza: se date impostate, verifica che premarketScanAt sia nel range
+                    const scanDate = premarketScanAt?.slice(0, 10) ?? null;
+                    const scanOutOfRange = !!(
+                      (segnaliFrom && scanDate && scanDate < segnaliFrom) ||
+                      (segnaliTo   && scanDate && scanDate > segnaliTo)
+                    );
+                    // applica score + strategia
+                    const filtered = scanOutOfRange ? [] : premarketRows.filter(c => {
+                      const scoreOk =
+                        scoreFilter === "all"  ? true :
+                        scoreFilter === "high" ? (c.scorePct ?? 0) >= 65 :
+                        scoreFilter === "mid"  ? (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65 :
+                        (c.scorePct ?? 0) < 50;
+                      const stratOk = segnaliStrategyFilter === "tutte" || c.strategy === segnaliStrategyFilter;
+                      return scoreOk && stratOk;
+                    });
+                    // messaggio vuoto
+                    const emptyMsg = busy ? "Caricamento…"
+                      : scanOutOfRange ? `scan del ${scanDate ?? "?"} fuori dal periodo selezionato`
+                      : premarketRows.length === 0 ? "nessun segnale — esegui scan dalla tab ANALISI"
+                      : "nessun segnale per i filtri selezionati";
+                    return (
+                      <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
+                        <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                          <thead>
+                            <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}
+                                title="Struttura operativa — passa il mouse sulla riga per i dettagli">Str</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                                title="Score composito 0–100 (volatilità · liquidità · R/R · regime). Min operativo: 50">Score</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                                title="Spread bid-ask % del mid. Soglia dura ≤10%">Spr%</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                                title="IV Rank percentile. Soglia dura ≥20">IVR%</th>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>Fonte</th>
+                              <th style={{padding:"2px 4px"}}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filtered.length === 0 ? (
+                              <tr><td colSpan={8} style={{padding:"8px 4px", color:"#2a2a2a", fontSize:"0.7rem"}}>
+                                {emptyMsg}
+                              </td></tr>
+                            ) : (
+                              filtered.map((c, i) => {
+                                const isSelected = selectedItemId != null && (c as any).item_id != null
+                                  && selectedItemId === (c as any).item_id;
+                                const stratTip: Record<string, string> = {
+                                  BULL_PUT:      "Bull Put Spread · vendi put strike basso + compri put strike alto",
+                                  IRON_CONDOR:   "Iron Condor · bull put + bear call · profitto in range",
+                                  CALENDAR:      "Calendar Spread · decadimento temporale differenziale",
+                                  WHEEL:         "Wheel · put venduta → assegnazione → call venduta",
+                                  PMCC_CALENDAR: "Poor Man's Covered Call · LEAP + call mensile breve",
+                                  HEDGE_ACTIVE:  "Copertura attiva · protezione direzionale portafoglio",
+                                };
+                                return (
+                                  <tr key={i} style={{borderBottom:"1px solid #222",
+                                    background: isSelected ? "rgba(74,222,128,0.08)" : undefined}}>
+                                    <td style={{padding:"2px 4px", color:"#666"}}>#{i+1}</td>
+                                    <td style={{padding:"2px 4px", fontWeight:600}}>{c.symbol}</td>
+                                    <td style={{padding:"2px 4px", color:"#888"}}
+                                      title={stratTip[c.strategy ?? ""] ?? c.strategy ?? ""}>{c.strategy}</td>
+                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                      {c.scorePct !== undefined ? (
+                                        <span className={c.scorePct >= 65 ? "sev-ok" : c.scorePct >= 50 ? "sev-warn" : "sev-error"}
+                                          title={`${c.scorePct.toFixed(0)}/100 — min operativo 50`}>
+                                          {c.scorePct.toFixed(0)}<span style={{color:"var(--dim)", fontSize:"0.55rem"}}>/100</span>
+                                        </span>
+                                      ) : "—"}
+                                    </td>
+                                    <td style={{padding:"2px 4px", textAlign:"right",
+                                      color:c.spreadPct == null || c.spreadPct === 0 ? "var(--dim)" : "#888"}}>
+                                      {c.spreadPct != null && c.spreadPct > 0
+                                        ? c.spreadPct.toFixed(1)
+                                        : <span title="Dato non acquisito">—</span>}
+                                    </td>
+                                    <td style={{padding:"2px 4px", textAlign:"right",
+                                      color:c.ivRankPct == null || c.ivRankPct === 0 ? "var(--dim)" : "#888"}}>
+                                      {c.ivRankPct != null && c.ivRankPct > 0
+                                        ? c.ivRankPct.toFixed(0)
+                                        : <span title="Dato non acquisito">—</span>}
+                                    </td>
+                                    <td style={{padding:"2px 4px", color:"#555", fontSize:"0.6rem"}}>{c.source ?? "—"}</td>
+                                    <td style={{padding:"2px 2px"}}>
+                                      {(c.spreadPct == null || c.spreadPct === 0 || c.ivRankPct == null || c.ivRankPct === 0) ? (
+                                        <span title="Dati incompleti — aggiorna scan"
+                                          style={{fontSize:"0.6rem", color:"var(--amber)", padding:"1px 6px"}}>⚠</span>
+                                      ) : (
+                                        <button className="btn btn-ghost"
+                                          style={{fontSize:"0.6rem", padding:"1px 6px", whiteSpace:"nowrap"}}
+                                          onClick={() => {
+                                            setSymbol(c.symbol ?? "");
+                                            setStrategy(c.strategy ?? "BULL_PUT");
+                                            setPayload(JSON.stringify({symbol:c.symbol, strategy:c.strategy, legs:[]}, null, 2));
+                                            setSelectedItemId((c as any).item_id ?? null);
+                                            setOpExecOpen(true);
+                                          }}>→ ESEGUI</button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── nota piè tabella ── */}
                   <div style={{textAlign:"right", marginTop:6, fontSize:"0.58rem", color:"var(--dim)"}}
                     title="Spread% e IVR% vuoti = mercati chiusi o scan non ancora aggiornato.">
-                    ⚠ dati parziali = mercati chiusi o scan vecchio
+                    {premarketScanAt
+                      ? `scan: ${premarketScanAt.slice(0,10)} · Spr%/IVR% vuoti = mercati chiusi`
+                      : "⚠ scan non ancora eseguito"}
                   </div>
 
                 </div>
