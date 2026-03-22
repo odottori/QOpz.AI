@@ -50,7 +50,11 @@ def init_execution_schema() -> None:
     with _SCHEMA_LOCK:
         if _SCHEMA_READY and EXEC_DB_PATH.exists():
             return
-        con = _connect()
+        try:
+            con = _connect()
+        except Exception as exc:
+            logger.warning("init_execution_schema: cannot open DB (%s) — will retry on next call", exc)
+            return  # _SCHEMA_READY stays False → next caller retries
 
         con.execute(
             """
@@ -356,7 +360,10 @@ def init_execution_schema() -> None:
             """
         )
 
-        con.close()
+        try:
+            con.close()
+        except Exception:
+            pass
         _SCHEMA_READY = True
 
 

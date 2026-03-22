@@ -13,6 +13,8 @@ Follows storage.py conventions:
 """
 from __future__ import annotations
 
+import importlib
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
@@ -20,6 +22,8 @@ from typing import Optional
 
 from execution.storage import _connect, _prov, init_execution_schema, utc_now
 from strategy.wheel import WheelPosition, WheelState
+
+logger = logging.getLogger(__name__)
 
 
 # ── schema ───────────────────────────────────────────────────────────────────
@@ -173,16 +177,26 @@ def load_wheel_position(
 ) -> Optional[WheelPosition]:
     """
     Load a WheelPosition from DB by position_id.
-    Returns None if not found.
+    Returns None if not found or if DB is temporarily unavailable.
     """
-    init_wheel_schema()
-    con = _connect()
-    rows = con.execute(
-        "SELECT * FROM wheel_positions WHERE position_id = ? AND profile = ?",
-        (position_id, profile),
-    ).fetchall()
-    cols = [d[0] for d in con.description]
-    con.close()
+    global _WHEEL_SCHEMA_READY
+    try:
+        init_wheel_schema()
+    except Exception as exc:
+        logger.warning("wheel_storage: init failed in load_wheel_position (%s) — returning None", exc)
+        return None
+    try:
+        con = _connect()
+        rows = con.execute(
+            "SELECT * FROM wheel_positions WHERE position_id = ? AND profile = ?",
+            (position_id, profile),
+        ).fetchall()
+        cols = [d[0] for d in con.description]
+        con.close()
+    except Exception as exc:
+        logger.warning("wheel_storage: load_wheel_position query failed (%s) — returning None", exc)
+        _WHEEL_SCHEMA_READY = False
+        return None
 
     if not rows:
         return None
@@ -200,9 +214,17 @@ def list_wheel_positions(
     """
     Return list of (position_id, WheelPosition) matching filters.
     Excludes CLOSED positions by default unless state=WheelState.CLOSED is passed.
+    Returns empty list if DB is locked or schema not yet ready (graceful degradation).
     """
-    init_wheel_schema()
-    con = _connect()
+    global _WHEEL_SCHEMA_READY
+
+    # Ensure schema is ready; if a previous attempt failed (e.g. DB was locked),
+    # _WHEEL_SCHEMA_READY stays False and we retry here.
+    try:
+        init_wheel_schema()
+    except Exception as exc:
+        logger.warning("wheel_storage: init_wheel_schema failed (%s) — returning empty list", exc)
+        return []
 
     where = ["profile = ?"]
     params: list = [profile]
@@ -218,9 +240,17 @@ def list_wheel_positions(
         where.append("state != 'CLOSED'")
 
     sql = f"SELECT * FROM wheel_positions WHERE {' AND '.join(where)} ORDER BY updated_at DESC"
-    rows = con.execute(sql, params).fetchall()
-    cols = [d[0] for d in con.description]
-    con.close()
+    try:
+        con = _connect()
+        rows = con.execute(sql, params).fetchall()
+        cols = [d[0] for d in con.description]
+        con.close()
+    except Exception as exc:
+        # Table may not exist yet if schema init ran on a locked DB — reset flag so next
+        # call retries CREATE TABLE, and return empty for now.
+        logger.warning("wheel_storage: list_wheel_positions query failed (%s) — resetting schema flag", exc)
+        _WHEEL_SCHEMA_READY = False
+        return []
 
     result = []
     for row in rows:

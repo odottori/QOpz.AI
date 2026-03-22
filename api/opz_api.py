@@ -1102,39 +1102,44 @@ def opz_ai_chat(req: AiChatRequest) -> Dict[str, Any]:
     }
 def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
     n = max(1, min(int(limit), 20))
-    init_execution_schema()
-    con = _connect()
-
-    snapshots_rows = con.execute(
-        """
-        SELECT snapshot_id, created_at, asof_date, equity, note, profile, COALESCE(trigger, 'manual')
-        FROM paper_equity_snapshots
-        ORDER BY created_at DESC
-        LIMIT ?
-        """,
-        (n,),
-    ).fetchall()
-    trades_rows = con.execute(
-        """
-        SELECT trade_id, created_at, symbol, strategy, pnl, pnl_pct, slippage_ticks, violations, note, profile,
-               entry_ts_utc, exit_ts_utc, strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason,
-               COALESCE(trigger, 'manual')
-        FROM paper_trades
-        ORDER BY created_at DESC
-        LIMIT ?
-        """,
-        (n,),
-    ).fetchall()
-    opp_rows = con.execute(
-        """
-        SELECT created_at, batch_id, symbol, strategy, score, regime, scanner_name, source, decision, confidence, note, profile
-        FROM operator_opportunity_decisions
-        ORDER BY created_at DESC
-        LIMIT ?
-        """,
-        (n,),
-    ).fetchall()
-    con.close()
+    snapshots_rows: list = []
+    trades_rows: list = []
+    opp_rows: list = []
+    try:
+        init_execution_schema()
+        con = _connect()
+        snapshots_rows = con.execute(
+            """
+            SELECT snapshot_id, created_at, asof_date, equity, note, profile, COALESCE(trigger, 'manual')
+            FROM paper_equity_snapshots
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (n,),
+        ).fetchall()
+        trades_rows = con.execute(
+            """
+            SELECT trade_id, created_at, symbol, strategy, pnl, pnl_pct, slippage_ticks, violations, note, profile,
+                   entry_ts_utc, exit_ts_utc, strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason,
+                   COALESCE(trigger, 'manual')
+            FROM paper_trades
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (n,),
+        ).fetchall()
+        opp_rows = con.execute(
+            """
+            SELECT created_at, batch_id, symbol, strategy, score, regime, scanner_name, source, decision, confidence, note, profile
+            FROM operator_opportunity_decisions
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (n,),
+        ).fetchall()
+        con.close()
+    except Exception as exc:
+        logger.warning("opz_last_actions: DB query failed (%s) — returning empty lists", exc)
 
     previews_raw = _read_jsonl_tail(LOG_DIR / "operator_previews.jsonl", n)
     confirms_raw = _read_jsonl_tail(LOG_DIR / "operator_confirms.jsonl", n)
