@@ -3018,178 +3018,175 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* ── Posizioni IBKR ── */}
+                  {/* ── DUMP — tecnico/dev, collassato di default ── */}
                   <div style={{borderTop:"1px solid var(--border)", marginTop:12, paddingTop:8}}>
-                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
-                      <span className="lc-panel-title" style={{margin:0}}>
-                        POSIZIONI APERTE
-                        {ibkrAccount && <span className="sev-data" style={{fontWeight:400, marginLeft:6}}>({ibkrAccount.positions.length})</span>}
-                      </span>
-                      <div style={{display:"flex", gap:6, alignItems:"center"}}>
-                        {ibkrAccount && (
-                          <span style={{fontSize:"0.65rem", color: ibkrAccount.connected ? "var(--g1)" : "var(--muted)"}}>
-                            {ibkrAccount.connected ? "LIVE" : "OFFLINE"}
-                            {ibkrAccount.net_liquidation != null && ` · €${ibkrAccount.net_liquidation.toLocaleString("it-IT",{maximumFractionDigits:0})}`}
-                          </span>
-                        )}
-                        <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}}
-                          disabled={ibkrAccountLoading} onClick={() => void doFetchIbkrAccount()}>
-                          {ibkrAccountLoading ? "…" : "⟳"}
-                        </button>
+                    <div style={{border:"1px solid #2a2a2a", borderRadius:3, overflow:"hidden"}}>
+                      {/* Semaforino = marker visivo universale DUMP */}
+                      <div style={{display:"flex", alignItems:"center", gap:5, padding:"4px 8px",
+                        background:"#0d0d0d", cursor:"pointer",
+                        borderBottom: dumpOpen ? "1px solid #2a2a2a" : "none"}}
+                        onClick={() => setDumpOpen(o => !o)}>
+                        <span style={{width:7, height:7, borderRadius:"50%", background:"#ef4444", display:"inline-block"}}/>
+                        <span style={{width:7, height:7, borderRadius:"50%", background:"#eab308", display:"inline-block"}}/>
+                        <span style={{width:7, height:7, borderRadius:"50%", background:"#22c55e", display:"inline-block"}}/>
+                        <span style={{fontSize:"0.63rem", color:"#555", fontFamily:"monospace", marginLeft:4, letterSpacing:"0.05em"}}>DUMP</span>
+                        <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"#444"}}>{dumpOpen ? "▲" : "▼"}</span>
                       </div>
+                      {dumpOpen && (
+                        <div style={{padding:0}}>
+
+                          {/* ─── Sezione 1: execution_window.log ─── */}
+                          <div style={{borderBottom:"1px solid #1e1e1e"}}>
+                            <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
+                              onClick={() => setExecWindowOpen(o => !o)}>
+                              <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{execWindowOpen ? "▾" : "▸"}</span>
+                              <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>execution_window.log</span>
+                            </div>
+                            {execWindowOpen && (
+                              <div style={{padding:"6px 12px 10px"}}>
+                                <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE 🛑" : "off"}</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">go_nogo_gate</span><span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "PASS" : "FAIL"}</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">kelly_enabled</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "yes" : "no"}</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">sizing</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">candidati</span><span className="sev-data">{premarketShortlistCount}</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">exit_urgenti</span><span className={urgentExits.length > 0 ? "sev-warn" : "sev-ok"}>{urgentExits.length}</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">trades_chiusi</span><span className="sev-data">{sysStatus?.n_closed_trades ?? 0}</span></div>
+                                {goGate && !goGate.pass && goGate.reasons.length > 0 && (
+                                  <div className="lc-screen-section">
+                                    <div style={{color:"var(--amber)", fontSize:"0.6rem", marginBottom:4}}>motivi no-go:</div>
+                                    {goGate.reasons.map((r, i) => <div key={i} style={{fontSize:"0.6rem", color:"var(--dim)"}}>· {r}</div>)}
+                                  </div>
+                                )}
+                                <div style={{marginTop:8}}>
+                                  <button className="btn btn-ghost" style={{fontSize:"0.6rem"}} onClick={refreshAll} disabled={busy}>⟳ refresh</button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ─── Sezione 2: ESECUZIONE ORDINE ─── */}
+                          <div>
+                            <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
+                              onClick={() => setOpExecOpen(o => !o)}>
+                              <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{opExecOpen ? "▾" : "▸"}</span>
+                              <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>esecuzione_ordine</span>
+                              {!opExecOpen && symbol && (
+                                <span style={{fontSize:"0.6rem", color:"var(--muted)", marginLeft:4}}>{symbol} · {strategy}</span>
+                              )}
+                            </div>
+                            {opExecOpen && (
+                              <div style={{padding:"6px 12px 10px"}}>
+                                {!blk("order_preview").interactive && blk("order_preview").reason && (
+                                  <div className="notice error" style={{marginBottom:6, fontSize:"0.7rem"}}>
+                                    🛑 {blk("order_preview").reason}
+                                  </div>
+                                )}
+                                <div className="form-grid" style={{fontSize:"0.72rem"}}>
+                                  <label>Symbol</label>
+                                  <input value={symbol} onChange={e => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
+                                  <label>Strategia</label>
+                                  <select value={strategy} onChange={e => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive}
+                                    style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
+                                    <option value="BULL_PUT">BULL_PUT</option>
+                                    {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
+                                    {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
+                                    {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
+                                    {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
+                                    {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE"].includes(strategy) && <option value={strategy}>{strategy}</option>}
+                                  </select>
+                                  <label>Payload JSON</label>
+                                  <textarea rows={4} value={payload} onChange={e => setPayload(e.target.value)} disabled={!blk("order_preview").interactive}
+                                    style={{fontSize:"0.68rem", fontFamily:"monospace"}} />
+                                </div>
+                                {payloadJsonError && <div className="notice error" style={{fontSize:"0.7rem"}}>Payload JSON non valido.</div>}
+                                {previewDirty && <div className="notice error" style={{fontSize:"0.7rem"}}>Preview non allineata al payload.</div>}
+                                <div className="actions" style={{marginTop:6}}>
+                                  <button className="btn btn-primary" onClick={() => void doPreview()}
+                                    disabled={busy || payloadJsonError || !blk("order_preview").interactive}>
+                                    {busy ? "..." : "▶ PREVIEW"}
+                                  </button>
+                                  <select value={confirmDecision} onChange={e => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}
+                                    disabled={!blk("order_confirm").interactive}
+                                    style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
+                                    <option value="APPROVE">APPROVE</option>
+                                    <option value="REJECT">REJECT</option>
+                                  </select>
+                                  <button
+                                    className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
+                                    onClick={doConfirm}
+                                    disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
+                                    title={confirmArmed ? "Clicca ancora per inviare" : "Prima conferma"}
+                                  >{confirmArmed ? "⚠ CONFERMA?" : "CONFIRM"}</button>
+                                </div>
+                                {preview && <pre className="console" style={{fontSize:"0.62rem", marginTop:6}}>{JSON.stringify(preview, null, 2)}</pre>}
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+                      )}
                     </div>
-                    <div style={{fontSize:"0.6rem", color:"var(--dim)", marginBottom:6}} title="Queste posizioni provengono direttamente dal broker (IBKR). Includono sia posizioni aperte manualmente sia quelle generate da auto-paper. Il paper journal (tab METRICHE) tiene traccia delle sole operazioni generate dal sistema.">
-                      Dati live dal broker · include posizioni manuali e auto-paper · per tracciato sistema → tab METRICHE
+                  </div>
+                </div>
+
+                {/* ── POSIZIONI APERTE — colonna destra ── */}
+                <div className="lc-screen" style={{display:"flex", flexDirection:"column"}}>
+                  <div className="lc-screen-bar">
+                    <span className="lc-screen-title">POSIZIONI APERTE</span>
+                    {ibkrAccount && (
+                      <span style={{fontSize:"0.65rem", color: ibkrAccount.connected ? "var(--g1)" : "var(--muted)", marginLeft:8}}>
+                        {ibkrAccount.connected ? "LIVE" : "OFFLINE"}
+                        {ibkrAccount.net_liquidation != null && ` · €${ibkrAccount.net_liquidation.toLocaleString("it-IT",{maximumFractionDigits:0})}`}
+                      </span>
+                    )}
+                    {ibkrAccount && <span className="sev-data" style={{fontWeight:400, marginLeft:6, fontSize:"0.65rem"}}>({ibkrAccount.positions.length})</span>}
+                    <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px", marginLeft:"auto"}}
+                      disabled={ibkrAccountLoading} onClick={() => void doFetchIbkrAccount()}>
+                      {ibkrAccountLoading ? "…" : "⟳"}
+                    </button>
+                  </div>
+                  <div className="lc-screen-body" style={{flex:1, overflowY:"auto", padding:"8px 10px"}}>
+                    <div style={{fontSize:"0.58rem", color:"var(--dim)", marginBottom:8}}
+                      title="Dati live dal broker. Include posizioni manuali e auto-paper. Per tracciato sistema → tab METRICHE.">
+                      Dati live broker · manuale + auto-paper · tracciato → METRICHE
                     </div>
                     {!ibkrAccount && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessun dato disponibile.</div>}
                     {ibkrAccount && ibkrAccount.positions.length === 0 && (
                       <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessuna posizione aperta.</div>
                     )}
                     {ibkrAccount && ibkrAccount.positions.length > 0 && (
-                      <div style={{overflowX:"auto", maxHeight:160, overflowY:"auto"}}>
-                        <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
-                          <thead>
-                            <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>Scadenza</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}>Strike</th>
-                              <th style={{textAlign:"center", padding:"2px 4px"}} title="P = Put · C = Call">P/C</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}} title="Qty negativo = posizione corta (venduta). Qty positivo = posizione lunga (comprata).">Qty</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}} title="Profitto/perdita non realizzato sulla posizione aperta.">uPnL</th>
+                      <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                        <thead>
+                          <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                            <th style={{textAlign:"left", padding:"3px 4px"}}>Sym</th>
+                            <th style={{textAlign:"left", padding:"3px 4px"}}>Scad.</th>
+                            <th style={{textAlign:"right", padding:"3px 4px"}}>Strike</th>
+                            <th style={{textAlign:"center", padding:"3px 4px"}} title="P = Put · C = Call">P/C</th>
+                            <th style={{textAlign:"right", padding:"3px 4px"}} title="Qty negativo = posizione corta (venduta).">Qty</th>
+                            <th style={{textAlign:"right", padding:"3px 4px"}} title="Profitto/perdita non realizzato.">uPnL</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ibkrAccount.positions.map((pos, i) => (
+                            <tr key={i} style={{borderBottom:"1px solid #1a1a1a"}}>
+                              <td style={{padding:"3px 4px", fontWeight:600}}>{pos.symbol}</td>
+                              <td style={{padding:"3px 4px", color:"#888", fontSize:"0.62rem"}}>{pos.expiry ?? "—"}</td>
+                              <td style={{padding:"3px 4px", textAlign:"right"}}>{pos.strike != null && pos.strike !== 0 ? pos.strike : "—"}</td>
+                              <td style={{padding:"3px 4px", textAlign:"center", color: pos.right === "C" ? "#60a5fa" : "#fb923c"}}>{pos.right ?? "—"}</td>
+                              <td style={{padding:"3px 4px", textAlign:"right", color:(pos.quantity??0)<0?"#f87171":"#4ade80"}}
+                                title={(pos.quantity??0) < 0 ? "Posizione corta" : "Posizione lunga"}>
+                                {pos.quantity}
+                              </td>
+                              <td style={{padding:"3px 4px", textAlign:"right", color:(pos.unrealized_pnl??0)>=0?"#4ade80":"#f87171"}}>
+                                {pos.unrealized_pnl != null ? `${pos.unrealized_pnl>=0?"+":""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {ibkrAccount.positions.map((pos, i) => (
-                              <tr key={i} style={{borderBottom:"1px solid #222"}}>
-                                <td style={{padding:"2px 4px"}}>{pos.symbol}</td>
-                                <td style={{padding:"2px 4px", color:"#888"}}>{pos.expiry ?? "—"}</td>
-                                <td style={{padding:"2px 4px", textAlign:"right"}}>{pos.strike != null && pos.strike !== 0 ? pos.strike : "—"}</td>
-                                <td style={{padding:"2px 4px", textAlign:"center", color: pos.right === "C" ? "#60a5fa" : "#fb923c"}}>{pos.right ?? "—"}</td>
-                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.quantity??0)<0?"#f87171":"#4ade80"}}
-                                  title={(pos.quantity??0) < 0 ? "Posizione corta (venduta)" : "Posizione lunga (comprata)"}>
-                                  {pos.quantity}
-                                </td>
-                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.unrealized_pnl??0)>=0?"#4ade80":"#f87171"}}>
-                                  {pos.unrealized_pnl != null ? `${pos.unrealized_pnl>=0?"+":""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
                     )}
                   </div>
-                </div>
-
-                {/* ══════════════════════════════════════════════════════
-                    DUMP — contenuto tecnico/dev · collassato di default
-                    Il semaforino (🔴🟡🟢) è il marker visivo universale
-                    di questo pattern: contenuto tecnico, non operativo.
-                    ══════════════════════════════════════════════════════ */}
-                <div className="lc-screen" style={{marginTop:8}}>
-                  {/* Header DUMP — toggle top-level */}
-                  <div className="lc-screen-bar" style={{cursor:"pointer"}} onClick={() => setDumpOpen(o => !o)}>
-                    <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
-                    <span className="lc-screen-title">DUMP</span>
-                    <span style={{marginLeft:"auto", fontSize:"0.6rem", color:"var(--dim)", paddingRight:4}}>
-                      {dumpOpen ? "▲ chiudi" : "▼ espandi"}
-                    </span>
-                  </div>
-
-                  {dumpOpen && (
-                    <div className="lc-screen-body" style={{padding:0}}>
-
-                      {/* ─── Sezione 1: execution_window.log ─── */}
-                      <div style={{borderBottom:"1px solid var(--border)"}}>
-                        <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
-                          onClick={() => setExecWindowOpen(o => !o)}>
-                          <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{execWindowOpen ? "▾" : "▸"}</span>
-                          <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>execution_window.log</span>
-                        </div>
-                        {execWindowOpen && (
-                          <div style={{padding:"6px 12px 10px"}}>
-                            <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
-                            <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE 🛑" : "off"}</span></div>
-                            <div className="lc-screen-row"><span className="lc-dim">go_nogo_gate</span><span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "PASS" : "FAIL"}</span></div>
-                            <div className="lc-screen-row"><span className="lc-dim">kelly_enabled</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "yes" : "no"}</span></div>
-                            <div className="lc-screen-row"><span className="lc-dim">sizing</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span></div>
-                            <div className="lc-screen-row"><span className="lc-dim">candidati</span><span className="sev-data">{premarketShortlistCount}</span></div>
-                            <div className="lc-screen-row"><span className="lc-dim">exit_urgenti</span><span className={urgentExits.length > 0 ? "sev-warn" : "sev-ok"}>{urgentExits.length}</span></div>
-                            <div className="lc-screen-row"><span className="lc-dim">trades_chiusi</span><span className="sev-data">{sysStatus?.n_closed_trades ?? 0}</span></div>
-                            {goGate && !goGate.pass && goGate.reasons.length > 0 && (
-                              <div className="lc-screen-section">
-                                <div style={{color:"var(--amber)", fontSize:"0.6rem", marginBottom:4}}>motivi no-go:</div>
-                                {goGate.reasons.map((r, i) => <div key={i} style={{fontSize:"0.6rem", color:"var(--dim)"}}>· {r}</div>)}
-                              </div>
-                            )}
-                            <div style={{marginTop:8}}>
-                              <button className="btn btn-ghost" style={{fontSize:"0.6rem"}} onClick={refreshAll} disabled={busy}>⟳ refresh</button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ─── Sezione 2: ESECUZIONE ORDINE ─── */}
-                      <div>
-                        <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
-                          onClick={() => setOpExecOpen(o => !o)}>
-                          <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{opExecOpen ? "▾" : "▸"}</span>
-                          <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>esecuzione_ordine</span>
-                          {!opExecOpen && symbol && (
-                            <span style={{fontSize:"0.6rem", color:"var(--muted)", marginLeft:4}}>{symbol} · {strategy}</span>
-                          )}
-                        </div>
-                        {opExecOpen && (
-                          <div style={{padding:"6px 12px 10px"}}>
-                            {!blk("order_preview").interactive && blk("order_preview").reason && (
-                              <div className="notice error" style={{marginBottom:6, fontSize:"0.7rem"}}>
-                                🛑 {blk("order_preview").reason}
-                              </div>
-                            )}
-                            <div className="form-grid" style={{fontSize:"0.72rem"}}>
-                              <label>Symbol</label>
-                              <input value={symbol} onChange={e => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
-                              <label>Strategia</label>
-                              <select value={strategy} onChange={e => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive}
-                                style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
-                                <option value="BULL_PUT">BULL_PUT</option>
-                                {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
-                                {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
-                                {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
-                                {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
-                                {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE"].includes(strategy) && <option value={strategy}>{strategy}</option>}
-                              </select>
-                              <label>Payload JSON</label>
-                              <textarea rows={4} value={payload} onChange={e => setPayload(e.target.value)} disabled={!blk("order_preview").interactive}
-                                style={{fontSize:"0.68rem", fontFamily:"monospace"}} />
-                            </div>
-                            {payloadJsonError && <div className="notice error" style={{fontSize:"0.7rem"}}>Payload JSON non valido.</div>}
-                            {previewDirty && <div className="notice error" style={{fontSize:"0.7rem"}}>Preview non allineata al payload.</div>}
-                            <div className="actions" style={{marginTop:6}}>
-                              <button className="btn btn-primary" onClick={() => void doPreview()}
-                                disabled={busy || payloadJsonError || !blk("order_preview").interactive}>
-                                {busy ? "..." : "▶ PREVIEW"}
-                              </button>
-                              <select value={confirmDecision} onChange={e => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}
-                                disabled={!blk("order_confirm").interactive}
-                                style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
-                                <option value="APPROVE">APPROVE</option>
-                                <option value="REJECT">REJECT</option>
-                              </select>
-                              <button
-                                className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
-                                onClick={doConfirm}
-                                disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
-                                title={confirmArmed ? "Clicca ancora per inviare" : "Prima conferma"}
-                              >{confirmArmed ? "⚠ CONFERMA?" : "CONFIRM"}</button>
-                            </div>
-                            {preview && <pre className="console" style={{fontSize:"0.62rem", marginTop:6}}>{JSON.stringify(preview, null, 2)}</pre>}
-                          </div>
-                        )}
-                      </div>
-
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
