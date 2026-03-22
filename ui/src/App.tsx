@@ -2975,14 +2975,16 @@ export default function App() {
                       {/* Pin icon — top-right */}
                       {!compact && (
                         <span onClick={e => kpiPin(id, e)}
-                          title={pinned ? "Rimuovi dalla colonna destra" : "Fissa nella colonna destra"}
+                          title={pinned ? "Rimuovi da Posizioni ▶" : "Fissa in Posizioni ▶"}
                           style={{
                             position:"absolute", top:4, right:6,
-                            fontSize:"0.6rem", cursor:"pointer",
-                            color: pinned ? accent : "#333",
+                            fontSize:"0.65rem", cursor:"pointer",
+                            color: pinned ? accent : "#555",
                             userSelect:"none",
                             transition:"color 0.15s",
-                          }}>
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = pinned ? "#fff" : accent; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = pinned ? accent : "#555"; }}>
                           {pinned ? "◆" : "◇"}
                         </span>
                       )}
@@ -3028,6 +3030,13 @@ export default function App() {
                     detail:<><div>NORMAL → sizing 100%, tutte le strategie</div><div>CAUTION → sizing 50%, solo spread stretti</div><div>SHOCK → sizing 0%, nessun nuovo trade</div></>,
                   },
                   {
+                    id:"finestra", label:"Finestra operativa",
+                    value:"10:00–11:30",
+                    sub:"evita 09:30–09:45", subTooltip:"Fascia oraria ottimale per esecuzione (EST). Evitare i primi 15 min per spread più ampi.",
+                    accent:"#a78bfa",
+                    detail:<><div>Fascia ottimale: 10:00–11:30 EST</div><div>Evitare: 09:30–09:45 (apertura)</div><div>Seconda finestra: 14:00–15:00 EST</div></>,
+                  },
+                  {
                     id:"exits", label:"Exit urgenti",
                     value: urgentExits.length,
                     sub: urgentExits.length > 0 ? "attenzione richiesta" : "nessuna azione",
@@ -3043,13 +3052,6 @@ export default function App() {
                     sub:"paper journal", subTooltip:"Operazioni chiuse nel journal paper trading. Soglia Kelly: 50 trade.",
                     accent:"#60a5fa",
                     detail:<><div>Kelly gate: {(sysStatus?.n_closed_trades ?? 0) >= 50 ? "✓ sbloccato" : `✗ mancano ${50 - (sysStatus?.n_closed_trades ?? 0)} trade`}</div><div style={{marginTop:4}}>Per dettagli → tab METRICHE</div></>,
-                  },
-                  {
-                    id:"finestra", label:"Finestra operativa",
-                    value:"10:00–11:30",
-                    sub:"evita 09:30–09:45", subTooltip:"Fascia oraria ottimale per esecuzione (EST). Evitare i primi 15 min per spread più ampi.",
-                    accent:"#a78bfa",
-                    detail:<><div>Fascia ottimale: 10:00–11:30 EST</div><div>Evitare: 09:30–09:45 (apertura)</div><div>Seconda finestra: 14:00–15:00 EST</div></>,
                   },
                 ];
                 // KPI bar: 2-column grid aligned with lc-body (1fr 1fr, gap:12)
@@ -3129,9 +3131,9 @@ export default function App() {
                     const filterBtnStyle = (active: boolean, color: string, hasData = true) => ({
                       fontSize:"0.6rem" as const, padding:"2px 7px", borderRadius:3,
                       cursor: hasData ? "pointer" as const : "default" as const,
-                      border:`1px solid ${active ? color : hasData ? "#333" : "#1e1e1e"}`,
-                      background: active ? `${color}18` : "transparent",
-                      color: active ? color : hasData ? "#555" : "#2a2a2a",
+                      border:`1px solid ${active ? color : hasData ? "#3d3d3d" : "#252525"}`,
+                      background: active ? `${color}22` : "transparent",
+                      color: active ? color : hasData ? "#888" : "#3a3a3a",
                       fontWeight: active ? 600 : 400,
                       transition:"all 0.15s",
                     });
@@ -3310,10 +3312,6 @@ export default function App() {
                     };
                     return (
                       <>
-                      <div style={{display:"flex", justifyContent:"flex-end", marginBottom:2}}>
-                        <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 5px"}}
-                          onClick={csvSegnali} title="Scarica CSV dei segnali filtrati">⬇ CSV</button>
-                      </div>
                       <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
                         <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                           <thead>
@@ -3422,17 +3420,19 @@ export default function App() {
                           </tbody>
                         </table>
                       </div>
+                      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6}}>
+                        <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 5px"}}
+                          onClick={csvSegnali} title="Scarica CSV dei segnali filtrati">⬇ CSV</button>
+                        <span style={{fontSize:"0.58rem", color:"var(--dim)"}}
+                          title="Spread% e IVR% vuoti = mercati chiusi o scan non ancora aggiornato.">
+                          {premarketScanAt
+                            ? `scan: ${premarketScanAt.slice(0,10)} · Spr%/IVR% vuoti = mercati chiusi`
+                            : "⚠ scan non ancora eseguito"}
+                        </span>
+                      </div>
                       </>
                     );
                   })()}
-
-                  {/* ── nota piè tabella ── */}
-                  <div style={{textAlign:"right", marginTop:6, fontSize:"0.58rem", color:"var(--dim)"}}
-                    title="Spread% e IVR% vuoti = mercati chiusi o scan non ancora aggiornato.">
-                    {premarketScanAt
-                      ? `scan: ${premarketScanAt.slice(0,10)} · Spr%/IVR% vuoti = mercati chiusi`
-                      : "⚠ scan non ancora eseguito"}
-                  </div>
 
                 </div>
 
@@ -3520,10 +3520,10 @@ export default function App() {
                       const mc = (label: string, val: string, col: string, tip?: string) => (
                         <div key={label} title={tip} style={{
                           flex:"1 1 0", minWidth:46, background:"var(--p2)",
-                          border:"1px solid #1a1a1a", borderRadius:3, padding:"3px 5px", textAlign:"center",
+                          border:`1px solid ${col}28`, borderRadius:3, padding:"4px 6px", textAlign:"center",
                         }}>
-                          <div style={{fontSize:"0.46rem", color:"#3a3a3a", textTransform:"uppercase", letterSpacing:"0.05em"}}>{label}</div>
-                          <div style={{fontSize:"0.7rem", fontWeight:700, color:col, lineHeight:1.25}}>{val}</div>
+                          <div style={{fontSize:"0.48rem", color:"#666", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:1}}>{label}</div>
+                          <div style={{fontSize:"0.76rem", fontWeight:700, color:col, lineHeight:1.2}}>{val}</div>
                         </div>
                       );
                       return (
@@ -3572,9 +3572,9 @@ export default function App() {
                     const fbs = (active: boolean, color: string, hasData = true) => ({
                       fontSize:"0.6rem" as const, padding:"2px 7px", borderRadius:3,
                       cursor: hasData ? "pointer" as const : "default" as const,
-                      border:`1px solid ${active ? color : hasData ? "#333" : "#1e1e1e"}`,
-                      background: active ? `${color}18` : "transparent",
-                      color: active ? color : hasData ? "#555" : "#2a2a2a",
+                      border:`1px solid ${active ? color : hasData ? "#3d3d3d" : "#252525"}`,
+                      background: active ? `${color}22` : "transparent",
+                      color: active ? color : hasData ? "#888" : "#3a3a3a",
                       fontWeight: active ? 600 : 400,
                       transition:"all 0.15s",
                     });
@@ -3697,23 +3697,6 @@ export default function App() {
                           </div>
                         )}
                         {/* tabella sempre visibile — header fissa, messaggio inline nel tbody */}
-                        <div style={{display:"flex", justifyContent:"flex-end", marginBottom:2}}>
-                          <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 5px"}}
-                            title="Scarica CSV dei trade filtrati"
-                            onClick={() => {
-                              const cols = ["#","Simbolo","Strategia","PnL","PnL%","Data"];
-                              const body = filtered.map((t, i) => [
-                                i+1, t.symbol??""  , t.strategy??"",
-                                (t.pnl??0).toFixed(2), (t.pnl_pct??0).toFixed(2),
-                                (posOutcomeFilter==="aperti" ? t.entry_ts_utc : t.exit_ts_utc)?.slice(0,10)??"",
-                              ].join(","));
-                              const blob = new Blob([[cols.join(","), ...body].join("\n")], {type:"text/csv"});
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement("a"); a.href=url;
-                              a.download=`posizioni_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-                              URL.revokeObjectURL(url);
-                            }}>⬇ CSV</button>
-                        </div>
                         <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
                           <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                             <thead>
@@ -3766,15 +3749,30 @@ export default function App() {
                             </tbody>
                           </table>
                         </div>
+                        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6}}>
+                          <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 5px"}}
+                            title="Scarica CSV dei trade filtrati"
+                            onClick={() => {
+                              const cols = ["#","Simbolo","Strategia","PnL","PnL%","Data"];
+                              const body = filtered.map((t, i) => [
+                                i+1, t.symbol??"", t.strategy??"",
+                                (t.pnl??0).toFixed(2), (t.pnl_pct??0).toFixed(2),
+                                (t.exit_ts_utc ?? t.entry_ts_utc)?.slice(0,10)??"",
+                              ].join(","));
+                              const blob = new Blob([[cols.join(","), ...body].join("\n")], {type:"text/csv"});
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a"); a.href=url;
+                              a.download=`posizioni_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+                              URL.revokeObjectURL(url);
+                            }}>⬇ CSV</button>
+                          <span style={{fontSize:"0.58rem", color:"var(--dim)"}}
+                            title="Storico trades da paper journal (DuckDB). Cassa e posizioni aperte da broker IBKR.">
+                            source: paper journal · DuckDB
+                          </span>
+                        </div>
                       </div>
                     );
                   })()}
-
-                  {/* nota piè di tabella */}
-                  <div style={{textAlign:"right", marginTop:6, fontSize:"0.58rem", color:"var(--dim)"}}
-                    title="Storico trades da paper journal (DuckDB). Cassa e posizioni aperte da broker IBKR.">
-                    source: paper journal · DuckDB
-                  </div>
                 </div>{/* fine colonna destra */}
               </div>{/* fine lc-body */}
 
