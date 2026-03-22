@@ -3248,6 +3248,13 @@ export default function App() {
                     const nNew  = lc.filter(s => s.state === "NEW").length;
                     const nConf = lc.filter(s => s.state === "CONFIRMED").length;
                     const nDead = lc.filter(s => s.state === "DEAD").length;
+                    const avgSpr = total > 0
+                      ? premarketRows.reduce((s, c) => s + (c.spreadPct ?? 0), 0) / total
+                      : null;
+                    const avgIvr = total > 0
+                      ? premarketRows.reduce((s, c) => s + (c.ivRankPct ?? 0), 0) / total
+                      : null;
+                    const nSyms = new Set(premarketRows.map(r => r.symbol)).size;
                     const mc = (label: string, val: string, col: string, tip?: string) => (
                       <div key={label} title={tip} style={{
                         flex:"1 1 0", minWidth:44, height:44, background:"var(--p2)",
@@ -3259,13 +3266,15 @@ export default function App() {
                       </div>
                     );
                     return (
-                      <div style={{display:"flex", gap:4, marginBottom:8}}>
-                        {mc("totali", total > 0 ? String(total) : "—", "#888", "Segnali nell'ultimo scan")}
-                        {mc("score medio", avgScore != null ? `${avgScore.toFixed(0)}%` : "—", avgScore != null && avgScore >= 65 ? "#4ade80" : avgScore != null && avgScore >= 50 ? "#fbbf24" : "#f87171", "Score medio dei segnali filtrati")}
-                        {mc("NEW", nNew > 0 ? String(nNew) : "—", "#4ade80", "Segnali nuovi (solo nell'ultimo scan)")}
-                        {mc("CONF.", nConf > 0 ? String(nConf) : "—", "#60a5fa", "Segnali confermati (≥2 scan consecutivi)")}
-                        {mc("DEAD", nDead > 0 ? String(nDead) : "—", "#f87171", "Segnali scomparsi dall'ultimo scan")}
-                        {[0,1,2].map(i => <div key={`ph${i}`} style={{flex:"1 1 0", minWidth:44, height:44, border:"1px dashed #252525", borderRadius:3}} />)}
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("totali",     total > 0 ? String(total) : "—",                                       "#888",    "Segnali candidati nell'ultimo scan")}
+                        {mc("score med",  avgScore != null ? `${avgScore.toFixed(0)}%` : "—",                    avgScore != null && avgScore >= 65 ? "#4ade80" : avgScore != null && avgScore >= 50 ? "#fbbf24" : "#f87171", "Score composito medio")}
+                        {mc("NEW",        nNew  > 0 ? String(nNew)  : "—",                                       "#4ade80", "Segnali nuovi (solo nell'ultimo scan)")}
+                        {mc("CONF.",      nConf > 0 ? String(nConf) : "—",                                       "#60a5fa", "Segnali confermati (≥2 scan consecutivi)")}
+                        {mc("DEAD",       nDead > 0 ? String(nDead) : "—",                                       "#f87171", "Segnali scomparsi dall'ultimo scan")}
+                        {mc("spr% med",   avgSpr != null ? `${avgSpr.toFixed(1)}%` : "—",                        avgSpr != null && avgSpr <= 3 ? "#4ade80" : avgSpr != null && avgSpr <= 6 ? "#fbbf24" : "#f87171", "Spread bid-ask medio degli scan — soglia hard ≤10%")}
+                        {mc("IVR% med",   avgIvr != null ? `${avgIvr.toFixed(0)}` : "—",                         avgIvr != null && avgIvr >= 40 ? "#4ade80" : avgIvr != null && avgIvr >= 20 ? "#fbbf24" : "#888",    "IV Rank medio — soglia hard ≥20")}
+                        {mc("simboli",    total > 0 ? String(nSyms) : "—",                                       "#888",    "Simboli distinti nell'ultimo scan")}
                       </div>
                     );
                   })()}
@@ -3610,10 +3619,13 @@ export default function App() {
                   {/* ── Metrics strip ── */}
                   {(() => {
                     const chiusi = storicoTrades.filter(t => !!t.exit_ts_utc);
+                    const nAperti = storicoTrades.filter(t => !t.exit_ts_utc).length;
                     const nPos = chiusi.filter(t => (t.pnl ?? 0) >= 0).length;
                     const maxWin  = chiusi.length ? Math.max(...chiusi.map(t => t.pnl ?? 0)) : null;
                     const maxLoss = chiusi.length ? Math.min(...chiusi.map(t => t.pnl ?? 0)) : null;
                     const winPct  = chiusi.length > 0 ? nPos / chiusi.length * 100 : null;
+                    const sumPnlAll = chiusi.reduce((s, t) => s + (t.pnl ?? 0), 0);
+                    const avgPnl  = chiusi.length > 0 ? sumPnlAll / chiusi.length : null;
                     const roi     = storicoSummary?.roi_pct ?? null;
                     const dd      = storicoSummary?.max_drawdown_pct ?? null;
                     const cassa   = ibkrAccount?.net_liquidation ?? null;
@@ -3631,14 +3643,15 @@ export default function App() {
                       </div>
                     );
                     return (
-                      <div style={{display:"flex", gap:4, marginBottom:8}}>
-                        {mc("cassa", cassa != null ? `€${cassa.toLocaleString("it-IT",{maximumFractionDigits:0})}` : "—", "#888", brokerStatus ?? "Patrimonio netto broker")}
-                        {mc("ROI", roi != null ? `${roi>=0?"+":""}${Number(roi).toFixed(1)}%` : "—", (roi??0)>=0?"#4ade80":"#f87171", "Rendimento totale journal")}
-                        {mc("▼ maxDown", dd != null ? `${Number(dd).toFixed(1)}%` : "—", "#f87171", "Drawdown massimo dal picco")}
-                        {mc("▲ maxWin", maxWin != null ? `+${maxWin.toFixed(0)}` : "—", "#4ade80", "Trade migliore (€)")}
-                        {mc("▼ maxLoss", maxLoss != null ? `${maxLoss.toFixed(0)}` : "—", "#f87171", "Trade peggiore (€)")}
-                        {mc("win%", winPct != null ? `${winPct.toFixed(0)}%` : "—", winPct != null && winPct>=50?"#4ade80":"#f87171", "Percentuale trade chiusi positivi")}
-                        {[0,1].map(i => <div key={`ph${i}`} style={{flex:"1 1 0", minWidth:44, height:44, border:"1px dashed #252525", borderRadius:3}} />)}
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("cassa",    cassa != null ? `€${cassa.toLocaleString("it-IT",{maximumFractionDigits:0})}` : "—", "#888",    brokerStatus ?? "Patrimonio netto broker")}
+                        {mc("ROI",      roi != null ? `${roi>=0?"+":""}${Number(roi).toFixed(1)}%` : "—",                    (roi??0)>=0?"#4ade80":"#f87171", "Rendimento totale journal")}
+                        {mc("▼ maxDown",dd != null ? `${Number(dd).toFixed(1)}%` : "—",                                      "#f87171", "Drawdown massimo dal picco")}
+                        {mc("▲ maxWin", maxWin  != null ? `+${maxWin.toFixed(0)}`  : "—",                                    "#4ade80", "Trade migliore singolo (€)")}
+                        {mc("▼ maxLoss",maxLoss != null ? `${maxLoss.toFixed(0)}`  : "—",                                    "#f87171", "Trade peggiore singolo (€)")}
+                        {mc("win%",     winPct  != null ? `${winPct.toFixed(0)}%`  : "—",                                    winPct != null && winPct>=50?"#4ade80":"#f87171", "Percentuale trade chiusi positivi")}
+                        {mc("aperti",   String(nAperti),                                                                      nAperti > 0 ? "#fbbf24" : "#888", "Posizioni aperte correnti nel journal")}
+                        {mc("PnL med",  avgPnl != null ? `${avgPnl>=0?"+":""}${avgPnl.toFixed(0)}` : "—",                    avgPnl != null && avgPnl>=0?"#4ade80":"#f87171", "PnL medio per trade chiuso (€)")}
                       </div>
                     );
                   })()}
