@@ -2613,6 +2613,8 @@ def opz_system_status() -> SystemStatusOut:
 
 
 def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
+    from execution.storage import record_ingestion_run as _rec_ingest
+
     profile = _clean_text(req.profile, "profile")
     safe_settings_path = _resolve_safe_path(
         req.settings_path,
@@ -2631,35 +2633,59 @@ def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
     if req.symbols:
         symbols_csv = ",".join([str(x).strip().upper() for x in req.symbols if str(x).strip()])
 
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    def _ingest_stage(feed: str, fn: Any, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Run a pipeline stage, record result in ingestion_runs, return run dict."""
+        t0 = datetime.now(timezone.utc)
+        result = fn(*args, **kwargs)
+        t1 = datetime.now(timezone.utc)
+        dur = int((t1 - t0).total_seconds() * 1000)
+        payload = result.get("payload", {}) if isinstance(result, dict) else {}
+        rec_in  = int(payload.get("n_fetched", payload.get("n_records", payload.get("n_rows", 0))) or 0)
+        rec_out = int(payload.get("n_stored", payload.get("n_valid", rec_in)) or rec_in)
+        syms    = int(payload.get("n_symbols", payload.get("symbols_count", 0)) or 0)
+        status  = "ok" if (isinstance(result, dict) and result.get("ok")) else "error"
+        try:
+            _rec_ingest(
+                feed=feed, profile=profile, run_date=today,
+                started_at=t0.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                finished_at=t1.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                duration_ms=dur, status=status,
+                records_in=rec_in, records_out=rec_out, symbols_count=syms,
+                details=payload if payload else None,
+            )
+        except Exception as _exc:
+            logger.warning("ingestion_runs write failed for feed=%s: %s", feed, _exc)
+        return result
+
     fetch_args: list[str] = ["--profile", profile, "--limit", str(int(req.fetch_limit))]
     if symbols_csv:
         fetch_args.extend(["--symbols", symbols_csv])
     if safe_settings_path:
         fetch_args.extend(["--settings-path", safe_settings_path])
 
-    fetch_run = _run_script_json("scripts/ibkr_demo_fetch_inbox.py", fetch_args)
+    fetch_run = _ingest_stage("ibkr_demo",
+        _run_script_json, "scripts/ibkr_demo_fetch_inbox.py", fetch_args)
     if not fetch_run["ok"]:
         raise HTTPException(status_code=502, detail={"stage": "fetch", "returncode": fetch_run["returncode"], "stderr": fetch_run["stderr"] or fetch_run["stdout"]})
 
-    capture_run = _run_script_json(
-        "scripts/capture_pages.py",
-        ["--source", "ibkr_demo", "--freshness-minutes", "30", "--retention-days", "30", "--max-store-mb", "2048"],
-    )
+    capture_run = _ingest_stage("ibkr_capture",
+        _run_script_json, "scripts/capture_pages.py",
+        ["--source", "ibkr_demo", "--freshness-minutes", "30", "--retention-days", "30", "--max-store-mb", "2048"])
     if not capture_run["ok"]:
         raise HTTPException(status_code=502, detail={"stage": "capture", "returncode": capture_run["returncode"], "stderr": capture_run["stderr"] or capture_run["stdout"]})
 
-    extract_run = _run_script_json(
-        "scripts/extract_with_ollama.py",
-        ["--backend", backend, "--model", "qwen2.5", "--max-retries", "2", "--limit", "500"],
-    )
+    extract_run = _ingest_stage("ibkr_extract",
+        _run_script_json, "scripts/extract_with_ollama.py",
+        ["--backend", backend, "--model", "qwen2.5", "--max-retries", "2", "--limit", "500"])
     if not extract_run["ok"]:
         raise HTTPException(status_code=502, detail={"stage": "extract", "returncode": extract_run["returncode"], "stderr": extract_run["stderr"] or extract_run["stdout"]})
 
     dataset_name = f"ibkr_demo_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-    dataset_run = _run_script_json(
-        "scripts/build_test_dataset.py",
-        ["--dataset-name", dataset_name, "--model", "qwen2.5", "--prompt-version", "v1", "--limit", "50000"],
-    )
+    dataset_run = _ingest_stage("ibkr_dataset",
+        _run_script_json, "scripts/build_test_dataset.py",
+        ["--dataset-name", dataset_name, "--model", "qwen2.5", "--prompt-version", "v1", "--limit", "50000"])
     if not dataset_run["ok"]:
         raise HTTPException(status_code=502, detail={"stage": "dataset", "returncode": dataset_run["returncode"], "stderr": dataset_run["stderr"] or dataset_run["stdout"]})
 

@@ -366,6 +366,32 @@ def init_execution_schema() -> None:
         except Exception as _exc:
             logger.debug("ALTER TABLE skip: %s", _exc)
 
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ingestion_runs (
+                run_id        VARCHAR PRIMARY KEY,
+                profile       VARCHAR,
+                feed          VARCHAR,
+                run_date      VARCHAR,
+                started_at    VARCHAR,
+                finished_at   VARCHAR,
+                duration_ms   INTEGER,
+                status        VARCHAR,
+                records_in    INTEGER,
+                records_out   INTEGER,
+                quality_pct   DOUBLE,
+                symbols_count INTEGER,
+                error_msg     VARCHAR,
+                details_json  VARCHAR,
+                source_system VARCHAR,
+                source_mode   VARCHAR,
+                source_quality VARCHAR,
+                asof_ts       VARCHAR,
+                received_ts   VARCHAR
+            )
+            """
+        )
+
         try:
             con.close()
         except Exception:
@@ -602,4 +628,91 @@ def get_order_state(client_order_id: str) -> str | None:
 
 def order_exists(client_order_id: str) -> bool:
     return get_order_state(client_order_id) is not None
+
+
+def record_ingestion_run(
+    *,
+    feed: str,
+    profile: str,
+    run_date: str,
+    started_at: str,
+    finished_at: str,
+    duration_ms: int,
+    status: str,
+    records_in: int = 0,
+    records_out: int = 0,
+    symbols_count: int = 0,
+    error_msg: str | None = None,
+    details: dict[str, Any] | None = None,
+) -> None:
+    """Record one ingestion run per feed.
+
+    feed    — 'yfinance' | 'fred' | 'orats' | 'ibkr_demo' | 'ibwr' | any label
+    status  — 'ok' | 'error' | 'partial'
+    """
+    import json as _json
+
+    init_execution_schema()
+    con = _connect()
+    now = utc_now()
+    prov = _prov(profile, now)
+    quality = round(records_out / records_in * 100, 1) if records_in > 0 else None
+    try:
+        con.execute(
+            """
+            INSERT INTO ingestion_runs (
+                run_id, profile, feed, run_date, started_at, finished_at,
+                duration_ms, status, records_in, records_out, quality_pct,
+                symbols_count, error_msg, details_json,
+                source_system, source_mode, source_quality, asof_ts, received_ts
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()), profile, feed, run_date, started_at, finished_at,
+                duration_ms, status, records_in, records_out, quality,
+                symbols_count, error_msg,
+                None if details is None else _json.dumps(details, ensure_ascii=False),
+                *prov,
+            ),
+        )
+        if hasattr(con, "commit"):
+            con.commit()
+    except Exception as exc:
+        logger.warning("record_ingestion_run: failed to write (%s)", exc)
+    finally:
+        con.close()
+
+
+def list_ingestion_runs(
+    *,
+    profile: str,
+    days_back: int = 30,
+    feed: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return ingestion_runs rows ordered by started_at DESC."""
+    init_execution_schema()
+    con = _connect()
+    try:
+        where = "profile = ? AND CAST(run_date AS DATE) >= CURRENT_DATE - INTERVAL (?) DAY"
+        params: list[Any] = [profile, days_back]
+        if feed:
+            where += " AND feed = ?"
+            params.append(feed)
+        rows = con.execute(
+            f"""
+            SELECT run_id, feed, run_date, started_at, finished_at,
+                   duration_ms, status, records_in, records_out, quality_pct,
+                   symbols_count, error_msg
+            FROM ingestion_runs
+            WHERE {where}
+            ORDER BY started_at DESC
+            """,
+            params,
+        ).fetchall()
+        cols = ["run_id", "feed", "run_date", "started_at", "finished_at",
+                "duration_ms", "status", "records_in", "records_out", "quality_pct",
+                "symbols_count", "error_msg"]
+        return [dict(zip(cols, r)) for r in rows]
+    finally:
+        con.close()
 
