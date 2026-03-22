@@ -2937,7 +2937,7 @@ export default function App() {
                       style={{
                         background:"var(--p2)", border:`1px solid ${open ? accent + "55" : pinned && !compact ? accent + "33" : "var(--border)"}`,
                         borderRadius:4, padding: compact ? "6px 8px" : "7px 10px",
-                        minWidth: compact ? 0 : 100, maxWidth: compact ? "none" : 250, flex:"1 1 auto",
+                        width:"100%", boxSizing:"border-box",
                         cursor: detail && !compact ? "pointer" : "default",
                         transition:"border-color 0.15s",
                         position:"relative",
@@ -3022,9 +3022,31 @@ export default function App() {
                     detail:<><div>Fascia ottimale: 10:00–11:30 EST</div><div>Evitare: 09:30–09:45 (apertura)</div><div>Seconda finestra: 14:00–15:00 EST</div></>,
                   },
                 ];
+                // KPI bar: 2-column grid aligned with lc-body (1fr 1fr, gap:12)
+                // Each column = inner grid of 3 slots; empty slots = faded placeholder
+                const SLOTS = 3, GROUPS = 2, PER_ROW = SLOTS * GROUPS;
+                const nRows = Math.max(1, Math.ceil(kpiDefs.length / PER_ROW));
+                const kpiGroups: React.ReactNode[] = [];
+                for (let row = 0; row < nRows; row++) {
+                  for (let g = 0; g < GROUPS; g++) {
+                    const base = row * PER_ROW + g * SLOTS;
+                    kpiGroups.push(
+                      <div key={`g${row}-${g}`} style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:6}}>
+                        {Array.from({length: SLOTS}).map((_, s) => {
+                          const k = kpiDefs[base + s];
+                          if (k) return kpiCard(k.id, k.label, k.value, k.sub, k.subTooltip, k.accent, k.detail);
+                          return <div key={`ph${base+s}`} style={{
+                            background:"var(--p2)", border:"1px dashed #1c1c1c",
+                            borderRadius:4, minHeight:52, opacity:0.15,
+                          }} />;
+                        })}
+                      </div>
+                    );
+                  }
+                }
                 return (
-                  <div style={{display:"flex", gap:6, padding:"8px 12px 6px", flexWrap:"wrap", borderBottom:"1px solid var(--border)"}}>
-                    {kpiDefs.map(k => kpiCard(k.id, k.label, k.value, k.sub, k.subTooltip, k.accent, k.detail))}
+                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, padding:"8px 0 6px", borderBottom:"1px solid var(--border)"}}>
+                    {kpiGroups}
                   </div>
                 );
               })()}
@@ -3084,10 +3106,6 @@ export default function App() {
                         </button>
                       );
                     })}
-                    <span style={{fontSize:"0.58rem", color:"var(--dim)", marginLeft:4}}
-                      title="Spread% e IVR% vuoti = mercati chiusi o scan non ancora aggiornato.">
-                      ⚠ dati parziali = mercati chiusi o scan vecchio
-                    </span>
                   </div>
                   {premarketRows.length === 0 ? (
                     <div style={{color:"var(--dim)", fontSize:"0.7rem", padding:"8px 0"}}>
@@ -3177,6 +3195,11 @@ export default function App() {
                     </div>
                     );
                   })()}
+                  {/* nota in fondo alla tabella SEGNALI */}
+                  <div style={{textAlign:"right", marginTop:6, fontSize:"0.58rem", color:"var(--dim)"}}
+                    title="Spread% e IVR% vuoti = mercati chiusi o scan non ancora aggiornato.">
+                    ⚠ dati parziali = mercati chiusi o scan vecchio
+                  </div>
 
                 </div>
 
@@ -3261,10 +3284,6 @@ export default function App() {
                   {/* ── TAB LIVE ── */}
                   {posTab === "live" && (
                     <div className="lc-screen-body" style={{flex:1, overflowY:"auto", padding:"8px 10px"}}>
-                      <div style={{fontSize:"0.58rem", color:"var(--dim)", marginBottom:8}}
-                        title="Dati live dal broker. Include posizioni manuali e auto-paper. Per tracciato sistema → tab METRICHE.">
-                        Dati live broker · manuale + auto-paper · tracciato → METRICHE
-                      </div>
                       {!ibkrAccount && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessun dato disponibile.</div>}
                       {ibkrAccount && ibkrAccount.positions.length === 0 && (
                         <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessuna posizione aperta.</div>
@@ -3302,6 +3321,11 @@ export default function App() {
                           </tbody>
                         </table>
                       )}
+                      {/* nota in fondo alla tabella LIVE */}
+                      <div style={{textAlign:"right", marginTop:6, fontSize:"0.58rem", color:"var(--dim)"}}
+                        title="Dati live dal broker. Include posizioni manuali e auto-paper. Per tracciato sistema → tab METRICHE.">
+                        live broker · manuale + auto-paper · tracciato → METRICHE
+                      </div>
                     </div>
                   )}
 
