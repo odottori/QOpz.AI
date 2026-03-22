@@ -9,6 +9,7 @@ import secrets
 import shlex
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from contextlib import asynccontextmanager, contextmanager
@@ -107,6 +108,7 @@ from api.state import (
     TTS_FALLBACK_PID_PATH,
     TTS_FALLBACK_STATE_PATH,
     TUTORIAL_TEXT2SPEECH_PATH,
+    _JSONL_LOCK,
     _SESSION_STATE,
     _SESSION_TASK,
     _TTS_FALLBACK_PID_MEM,
@@ -216,44 +218,63 @@ async def _run_session_subprocess(session_type: str, cfg: dict[str, Any]) -> dic
 async def _scheduler_loop(cfg: dict[str, Any]) -> None:
     """Loop infinito che dorme fino alla prossima sessione e la esegue."""
     from zoneinfo import ZoneInfo
-    tz = ZoneInfo(cfg.get("timezone", "America/New_York"))
-    morning_t = _parse_session_time(cfg.get("morning_time", "09:00"), cfg.get("timezone", "America/New_York"))
-    eod_t     = _parse_session_time(cfg.get("eod_time", "16:30"),    cfg.get("timezone", "America/New_York"))
+    try:
+        morning_t = _parse_session_time(cfg.get("morning_time", "09:00"), cfg.get("timezone", "America/New_York"))
+        eod_t     = _parse_session_time(cfg.get("eod_time", "16:30"),    cfg.get("timezone", "America/New_York"))
+    except Exception as exc:
+        logger.critical("SESSION_SCHEDULER cannot parse times — scheduler disabled: %s", exc)
+        _SESSION_STATE["enabled"] = False
+        return
 
     logger.info("SESSION_SCHEDULER started | morning=%s eod=%s tz=%s",
                 cfg.get("morning_time"), cfg.get("eod_time"), cfg.get("timezone"))
 
     while True:
-        now = datetime.now(timezone.utc)
-        next_dt, session_type = _next_session_dt(now, morning_t, eod_t, cfg.get("timezone", "America/New_York"))
-
-        # Aggiorna stato
-        _SESSION_STATE[f"next_{session_type}"] = next_dt.isoformat()
-        sleep_sec = max(1.0, (next_dt.astimezone(timezone.utc) - now).total_seconds())
-        logger.info("SESSION_SCHEDULER sleeping %.0fs until %s (%s)",
-                    sleep_sec, next_dt.isoformat(), session_type)
-
         try:
-            await asyncio.sleep(sleep_sec)
+            now = datetime.now(timezone.utc)
+            next_dt, session_type = _next_session_dt(now, morning_t, eod_t, cfg.get("timezone", "America/New_York"))
+
+            # Aggiorna stato
+            _SESSION_STATE[f"next_{session_type}"] = next_dt.isoformat()
+            sleep_sec = max(1.0, (next_dt.astimezone(timezone.utc) - now).total_seconds())
+            logger.info("SESSION_SCHEDULER sleeping %.0fs until %s (%s)",
+                        sleep_sec, next_dt.isoformat(), session_type)
+
+            try:
+                await asyncio.sleep(sleep_sec)
+            except asyncio.CancelledError:
+                logger.info("SESSION_SCHEDULER cancelled")
+                return
+
+            # Esegui sessione
+            _SESSION_STATE["running"] = True
+            logger.info("SESSION_SCHEDULER launching %s session", session_type)
+            try:
+                result = await _run_session_subprocess(session_type, cfg)
+                _SESSION_STATE[f"last_{session_type}"] = datetime.now(timezone.utc).isoformat()
+                _SESSION_STATE["last_result"] = result
+                ok_str = "OK" if result.get("ok") else "WARN"
+                logger.info("SESSION_%s %s errors=%s", session_type.upper(), ok_str,
+                            len(result.get("errors", [])))
+            except Exception as exc:
+                logger.exception("SESSION_%s FAILED: %s", session_type.upper(), exc)
+                _SESSION_STATE["last_result"] = {"ok": False, "reason": str(exc)}
+            finally:
+                _SESSION_STATE["running"] = False
+
         except asyncio.CancelledError:
-            logger.info("SESSION_SCHEDULER cancelled")
+            logger.info("SESSION_SCHEDULER cancelled (outer loop)")
             return
-
-        # Esegui sessione
-        _SESSION_STATE["running"] = True
-        logger.info("SESSION_SCHEDULER launching %s session", session_type)
-        try:
-            result = await _run_session_subprocess(session_type, cfg)
-            _SESSION_STATE[f"last_{session_type}"] = datetime.now(timezone.utc).isoformat()
-            _SESSION_STATE["last_result"] = result
-            ok_str = "OK" if result.get("ok") else "WARN"
-            logger.info("SESSION_%s %s errors=%s", session_type.upper(), ok_str,
-                        len(result.get("errors", [])))
         except Exception as exc:
-            logger.exception("SESSION_%s FAILED: %s", session_type.upper(), exc)
-            _SESSION_STATE["last_result"] = {"ok": False, "reason": str(exc)}
-        finally:
+            # Errore imprevisto nel loop infrastrutturale — logga e riprova dopo 60s
+            logger.critical("SESSION_SCHEDULER loop error (will retry in 60s): %s", exc, exc_info=True)
             _SESSION_STATE["running"] = False
+            _SESSION_STATE["last_result"] = {"ok": False, "reason": f"SCHEDULER_LOOP_ERROR: {exc}"}
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                logger.info("SESSION_SCHEDULER cancelled during error recovery")
+                return
 
 
 @asynccontextmanager
@@ -270,6 +291,15 @@ async def _app_lifespan(_app: FastAPI):
     _SESSION_STATE["enabled"] = bool(cfg.get("enabled", False))
     if _SESSION_STATE["enabled"]:
         _SESSION_TASK = asyncio.create_task(_scheduler_loop(cfg))
+        # Callback per rilevare crash inattesi del task
+        def _scheduler_done_cb(task: asyncio.Task) -> None:
+            if task.cancelled():
+                logger.info("SESSION_SCHEDULER task cancelled (normal shutdown)")
+            elif task.exception():
+                logger.critical("SESSION_SCHEDULER task died unexpectedly: %s", task.exception(), exc_info=task.exception())
+                _SESSION_STATE["enabled"] = False
+                _SESSION_STATE["last_result"] = {"ok": False, "reason": f"SCHEDULER_DIED: {task.exception()}"}
+        _SESSION_TASK.add_done_callback(_scheduler_done_cb)
         logger.info("SESSION_SCHEDULER task created (morning=%s, eod=%s)",
                     cfg.get("morning_time"), cfg.get("eod_time"))
     else:
@@ -388,7 +418,7 @@ def _load_state() -> Dict[str, Any]:
 
 def _run_release_status_md() -> str:
     cmd = [sys.executable, str(ROOT / "tools" / "release_status.py"), "--format", "md"]
-    r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace")
+    r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     if r.returncode != 0:
         return f"ERROR running release_status: rc={r.returncode}\n{r.stdout}\n{r.stderr}"
     return r.stdout
@@ -396,14 +426,20 @@ def _run_release_status_md() -> str:
 
 def _run_script_json(script_rel: str, args: list[str]) -> dict[str, Any]:
     cmd = [sys.executable, str(ROOT / script_rel), *args, "--format", "json"]
-    r = subprocess.run(
-        cmd,
-        cwd=str(ROOT),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+    try:
+        r = subprocess.run(
+            cmd,
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "timeout", "returncode": -1, "stdout": "", "stderr": "timeout after 60s", "duration_ms": 60000}
+    except FileNotFoundError as exc:
+        return {"ok": False, "error": str(exc), "returncode": -1, "stdout": "", "stderr": str(exc), "duration_ms": 0}
     stdout = (r.stdout or "").strip()
     stderr = (r.stderr or "").strip()
 
@@ -1411,12 +1447,18 @@ def opz_delete_trade(trade_id: str) -> Dict[str, Any]:
     tid = trade_id.strip()
     if not tid:
         raise HTTPException(status_code=400, detail="trade_id required")
-    init_execution_schema()
-    con = _connect()
-    con.execute("DELETE FROM paper_trades WHERE trade_id = ?", (tid,))
-    if hasattr(con, "commit"):
-        con.commit()
-    con.close()
+    try:
+        init_execution_schema()
+        con = _connect()
+        try:
+            con.execute("DELETE FROM paper_trades WHERE trade_id = ?", (tid,))
+            if hasattr(con, "commit"):
+                con.commit()
+        finally:
+            con.close()
+    except Exception as exc:
+        logger.warning("opz_delete_trade failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"DB non disponibile: {exc}") from exc
     return {"ok": True, "deleted": tid}
 
 
@@ -1424,12 +1466,18 @@ def opz_delete_snapshot(snapshot_id: str) -> Dict[str, Any]:
     sid = snapshot_id.strip()
     if not sid:
         raise HTTPException(status_code=400, detail="snapshot_id required")
-    init_execution_schema()
-    con = _connect()
-    con.execute("DELETE FROM paper_equity_snapshots WHERE snapshot_id = ?", (sid,))
-    if hasattr(con, "commit"):
-        con.commit()
-    con.close()
+    try:
+        init_execution_schema()
+        con = _connect()
+        try:
+            con.execute("DELETE FROM paper_equity_snapshots WHERE snapshot_id = ?", (sid,))
+            if hasattr(con, "commit"):
+                con.commit()
+        finally:
+            con.close()
+    except Exception as exc:
+        logger.warning("opz_delete_snapshot failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"DB non disponibile: {exc}") from exc
     return {"ok": True, "deleted": sid}
 
 
@@ -1445,8 +1493,12 @@ def execution_preview(req: PreviewRequest) -> PreviewResponse:
         "ts_unix": int(time.time()),
         "note": "PREVIEW ONLY. Requires explicit operator confirmation (confirm endpoint).",
     }
-    with (LOG_DIR / "operator_previews.jsonl").open("a", encoding="utf-8") as _fh:
-        _fh.write(json.dumps({"token": token, "preview": preview}, ensure_ascii=False) + "\n")
+    try:
+        with _JSONL_LOCK:
+            with (LOG_DIR / "operator_previews.jsonl").open("a", encoding="utf-8") as _fh:
+                _fh.write(json.dumps({"token": token, "preview": preview}, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        logger.warning("execution_preview: cannot write JSONL log (%s)", exc)
     return PreviewResponse(confirm_token=token, preview=preview)
 
 
@@ -1477,8 +1529,12 @@ def execution_confirm(req: ConfirmRequest) -> Dict[str, Any]:
         "ts_unix": int(time.time()),
         "note": "HUMAN CONFIRMED. No broker submit performed in F6-T1 skeleton.",
     }
-    with (LOG_DIR / "operator_confirms.jsonl").open("a", encoding="utf-8") as _fh:
-        _fh.write(json.dumps(event, ensure_ascii=False) + "\n")
+    try:
+        with _JSONL_LOCK:
+            with (LOG_DIR / "operator_confirms.jsonl").open("a", encoding="utf-8") as _fh:
+                _fh.write(json.dumps(event, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        logger.warning("execution_confirm: cannot write JSONL log (%s)", exc)
     return {"ok": True, "event": event}
 
 
@@ -1604,20 +1660,29 @@ def execution_kill_switch(req: KillSwitchRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="action must be 'activate' or 'deactivate'")
 
     ks_path = ROOT / "ops" / "kill_switch.trigger"
-    ks_path.parent.mkdir(parents=True, exist_ok=True)
     ts_now = datetime.now(timezone.utc).isoformat()
 
     if req.action == "activate":
-        ks_path.write_text(
-            json.dumps({"activated_at": ts_now, "source": "operator_ui"}, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        try:
+            ks_path.parent.mkdir(parents=True, exist_ok=True)
+            ks_path.write_text(
+                json.dumps({"activated_at": ts_now, "source": "operator_ui"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            logger.warning("kill_switch write failed: %s", exc)
+            raise HTTPException(status_code=503, detail=f"Kill switch non disponibile: {exc}") from exc
         logger.warning("KILL SWITCH ATTIVATO via API — %s", ts_now)
         return {"ok": True, "kill_switch_active": True, "action": "activate", "ts_utc": ts_now}
     else:
         removed = ks_path.exists()
         if removed:
-            ks_path.unlink()
+            try:
+                ks_path.unlink()
+            except FileNotFoundError:
+                pass  # già rimosso
+            except Exception as exc:
+                logger.warning("kill_switch unlink failed: %s", exc)
         logger.warning("Kill switch disattivato via API — %s", ts_now)
         return {"ok": True, "kill_switch_active": False, "action": "deactivate", "ts_utc": ts_now, "was_active": removed}
 
@@ -1631,7 +1696,6 @@ def execution_observer_switch(req: ObserverSwitchRequest) -> Dict[str, Any]:
     """
     action = _normalize_observer_action(req.action)
     ks_path = ROOT / "ops" / "kill_switch.trigger"
-    ks_path.parent.mkdir(parents=True, exist_ok=True)
     ts_now = datetime.now(timezone.utc).isoformat()
     ibkr_connected, ibkr_detail = _ibkr_connected_for_observer()
 
@@ -1641,27 +1705,42 @@ def execution_observer_switch(req: ObserverSwitchRequest) -> Dict[str, Any]:
     observer_state = "OFF"
 
     if action == "off":
-        ks_path.write_text(
-            json.dumps({"activated_at": ts_now, "source": req.source or "observer_api", "observer": "OFF"}, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        try:
+            ks_path.parent.mkdir(parents=True, exist_ok=True)
+            ks_path.write_text(
+                json.dumps({"activated_at": ts_now, "source": req.source or "observer_api", "observer": "OFF"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            logger.warning("observer_switch write failed: %s", exc)
+            raise HTTPException(status_code=503, detail=f"Kill switch non disponibile: {exc}") from exc
         applied_action = "activate"
         observer_state = "OFF"
         reason = "MANUAL_OFF"
     else:
         if not ibkr_connected:
             if not ks_path.exists():
-                ks_path.write_text(
-                    json.dumps({"activated_at": ts_now, "source": req.source or "observer_api", "observer": "OFF"}, ensure_ascii=False),
-                    encoding="utf-8",
-                )
+                try:
+                    ks_path.parent.mkdir(parents=True, exist_ok=True)
+                    ks_path.write_text(
+                        json.dumps({"activated_at": ts_now, "source": req.source or "observer_api", "observer": "OFF"}, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                except Exception as exc:
+                    logger.warning("observer_switch write failed: %s", exc)
+                    raise HTTPException(status_code=503, detail=f"Kill switch non disponibile: {exc}") from exc
             applied_action = "blocked"
             observer_state = "OFF"
             reason = "IBKR_DISCONNECTED"
             result_ok = False
         else:
             if ks_path.exists():
-                ks_path.unlink()
+                try:
+                    ks_path.unlink()
+                except FileNotFoundError:
+                    pass  # già rimosso
+                except Exception as exc:
+                    logger.warning("observer_switch unlink failed: %s", exc)
             applied_action = "deactivate"
             observer_state = "ON"
             reason = "READY"
@@ -1702,14 +1781,18 @@ def ibwr_service_switch(req: IbwrServiceRequest) -> Dict[str, Any]:
     )
 
     ks_path = ROOT / "ops" / "kill_switch.trigger"
-    ks_path.parent.mkdir(parents=True, exist_ok=True)
     ks_forced = False
     if action == "off":
         ts_now = datetime.now(timezone.utc).isoformat()
-        ks_path.write_text(
-            json.dumps({"activated_at": ts_now, "source": req.source or "ibwr_service", "ibwr": "OFF"}, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        try:
+            ks_path.parent.mkdir(parents=True, exist_ok=True)
+            ks_path.write_text(
+                json.dumps({"activated_at": ts_now, "source": req.source or "ibwr_service", "ibwr": "OFF"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            logger.warning("ibwr_service_switch write failed: %s", exc)
+            raise HTTPException(status_code=503, detail=f"Kill switch non disponibile: {exc}") from exc
         ks_forced = True
 
     service_state = str(result.get("service_state", "OFF"))
@@ -1793,32 +1876,34 @@ def opz_opportunity_decision(req: OpportunityDecisionRequest) -> Dict[str, Any]:
 
     init_execution_schema()
     con = _connect()
-    con.execute(
-        """
-        INSERT INTO operator_opportunity_decisions
-        (decision_id, profile, batch_id, symbol, strategy, score, regime, scanner_name, source, decision, confidence, note, created_at, source_system, source_mode, source_quality, asof_ts, received_ts)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            decision_id,
-            profile,
-            req.batch_id,
-            symbol,
-            strategy,
-            score,
-            regime,
-            scanner_name,
-            source,
-            req.decision,
-            int(req.confidence),
-            note,
-            ts_s,
-            *prov,
-        ),
-    )
-    if hasattr(con, "commit"):
-        con.commit()
-    con.close()
+    try:
+        con.execute(
+            """
+            INSERT INTO operator_opportunity_decisions
+            (decision_id, profile, batch_id, symbol, strategy, score, regime, scanner_name, source, decision, confidence, note, created_at, source_system, source_mode, source_quality, asof_ts, received_ts)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                decision_id,
+                profile,
+                req.batch_id,
+                symbol,
+                strategy,
+                score,
+                regime,
+                scanner_name,
+                source,
+                req.decision,
+                int(req.confidence),
+                note,
+                ts_s,
+                *prov,
+            ),
+        )
+        if hasattr(con, "commit"):
+            con.commit()
+    finally:
+        con.close()
     return {
         "ok": True,
         "decision": {
@@ -3264,26 +3349,37 @@ def opz_session_log(req: SessionLogRequest) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
     prov = _prov(req.profile, now)
     errors_json = json.dumps(req.errors or [], ensure_ascii=False)
+    steps_json = json.dumps(req.steps or {}, ensure_ascii=False, default=str)
     equity_val = float(req.equity) if req.equity is not None and math.isfinite(req.equity) else None
     try:
         con.execute(
             """
             INSERT INTO session_logs (
                 log_id, profile, session_date, session_type, regime,
-                equity, n_symbols, errors_json, trigger,
+                equity, n_symbols, errors_json, steps_json, trigger,
                 started_at, finished_at,
                 source_system, source_mode, source_quality, asof_ts, received_ts
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 log_id, req.profile, req.session_date, req.session_type,
-                req.regime, equity_val, req.n_symbols, errors_json, req.trigger,
+                req.regime, equity_val, req.n_symbols, errors_json, steps_json, req.trigger,
                 req.started_at, req.finished_at,
                 *prov,
             ),
         )
         if hasattr(con, "commit"):
             con.commit()
+        # Retention: elimina sessioni più vecchie di 30 giorni (best-effort)
+        try:
+            con.execute(
+                "DELETE FROM session_logs WHERE profile = ? AND session_date < ?",
+                (req.profile, (datetime.now(timezone.utc).date() - timedelta(days=30)).isoformat()),
+            )
+            if hasattr(con, "commit"):
+                con.commit()
+        except Exception as _ret_exc:
+            logger.debug("session_logs retention cleanup skip: %s", _ret_exc)
     finally:
         con.close()
     return {"ok": True, "log_id": log_id}
@@ -3303,7 +3399,7 @@ def opz_session_logs(
             rows = con.execute(
                 """
                 SELECT log_id, session_date, session_type, regime, equity, n_symbols,
-                       errors_json, trigger, started_at, finished_at
+                       errors_json, trigger, started_at, finished_at, steps_json
                 FROM session_logs
                 WHERE profile = ? AND session_type = ?
                 ORDER BY session_date DESC, finished_at DESC
@@ -3315,7 +3411,7 @@ def opz_session_logs(
             rows = con.execute(
                 """
                 SELECT log_id, session_date, session_type, regime, equity, n_symbols,
-                       errors_json, trigger, started_at, finished_at
+                       errors_json, trigger, started_at, finished_at, steps_json
                 FROM session_logs
                 WHERE profile = ?
                 ORDER BY session_date DESC, finished_at DESC
@@ -3338,6 +3434,7 @@ def opz_session_logs(
             "trigger": str(r[7]) if r[7] else "auto",
             "started_at": str(r[8]) if r[8] else None,
             "finished_at": str(r[9]) if r[9] else None,
+            "steps": json.loads(r[10]) if r[10] else {},
         }
         for r in rows
     ]

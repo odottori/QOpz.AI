@@ -852,6 +852,15 @@ export default function App() {
     next_morning: string | null; next_eod: string | null;
   } | null>(null);
 
+  type SessionLogEntry = {
+    log_id: string; session_date: string; session_type: string;
+    regime: string | null; equity: number | null; n_symbols: number | null;
+    errors: string[]; steps: Record<string, unknown>;
+    trigger: string; started_at: string | null; finished_at: string | null;
+  };
+  const [sessionLogs, setSessionLogs] = useState<SessionLogEntry[]>([]);
+  const [sessionLogOpen, setSessionLogOpen] = useState(false);
+
   const parsedPayload = useMemo(() => {
     try {
       const parsed = JSON.parse(payload);
@@ -1466,6 +1475,13 @@ export default function App() {
     } catch { /* non critico */ }
   }
 
+  async function doFetchSessionLogs() {
+    try {
+      const r = await apiJson<{ logs: SessionLogEntry[] }>(`${API_BASE}/opz/session/logs?profile=${ACTIVE_PROFILE}&limit=60`);
+      setSessionLogs(r.logs ?? []);
+    } catch { /* non critico */ }
+  }
+
   async function doFetchControlStatus() {
     try {
       const r = await apiJson<ControlStatusResponse>(`${API_BASE}/opz/control/status`);
@@ -1926,6 +1942,7 @@ export default function App() {
     void doFetchExitCandidates();
     void doFetchActivityStream();
     void doFetchSessionStatus();
+    void doFetchSessionLogs();
     void doFetchControlStatus();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2275,20 +2292,94 @@ export default function App() {
                     <div className="left-kpi-row"><span>Aggiornato</span><b className="sev-meta">{paperSummary?.as_of_date ?? "-"}</b></div>
                   </div>
                 )}
-                <div className="left-subhead left-subhead-inline" style={{marginTop:4}}>
-                  <span className="sev-meta" style={{fontSize:"0.6rem"}}>SESSIONI AUTO</span>
-                  <span className={sessionStatus?.enabled ? "sev-ok" : "sev-neutral"} style={{fontSize:"0.6rem"}}>
-                    {sessionStatus?.enabled ? "ON" : "OFF"}
+                {/* ── SESSIONI AUTO ── */}
+                <div className="left-subhead left-subhead-inline"
+                  onClick={() => setSessionLogOpen(v => !v)} role="button" tabIndex={0} style={{cursor:"pointer", marginTop:4}}>
+                  <span className="sev-meta" style={{fontSize:"0.6rem"}}>
+                    <span style={{marginRight:4}}>{sessionLogOpen ? "▾" : "▸"}</span>SESSIONI AUTO
+                  </span>
+                  <span style={{display:"flex", gap:4, alignItems:"center"}}>
+                    <span className={sessionStatus?.enabled ? "sev-ok" : "sev-neutral"} style={{fontSize:"0.6rem"}}>
+                      {sessionStatus?.enabled ? "ON" : "OFF"}
+                    </span>
+                    {sessionLogs.some(l => l.errors.length > 0) && <span className="sev-error" style={{fontSize:"0.58rem"}}>ERR</span>}
                   </span>
                 </div>
                 <div className="left-subbody">
                   <div className="left-kpi-row"><span>Prossima</span><b className="sev-meta" style={{fontSize:"0.6rem"}}>
                     {sessionStatus?.next_morning ? sessionStatus.next_morning.slice(0,16).replace("T"," ") : "—"}
                   </b></div>
-                  <div className="left-kpi-row"><span>Ultima morning</span><b className="sev-meta" style={{fontSize:"0.6rem"}}>
-                    {sessionStatus?.last_morning ? sessionStatus.last_morning.slice(0,16).replace("T"," ") : "mai"}
-                  </b></div>
                 </div>
+                {sessionLogOpen && (() => {
+                  // Raggruppa per data (max 30 giorni)
+                  const byDay: Record<string, SessionLogEntry[]> = {};
+                  sessionLogs.forEach(l => {
+                    const d = l.session_date ?? l.started_at?.slice(0,10) ?? "?";
+                    if (!byDay[d]) byDay[d] = [];
+                    byDay[d].push(l);
+                  });
+                  const days = Object.keys(byDay).sort().reverse().slice(0, 30);
+                  if (days.length === 0) return (
+                    <div style={{fontSize:"0.6rem", color:"var(--dim)", padding:"4px 6px"}}>Nessuna sessione registrata</div>
+                  );
+                  return (
+                    <div style={{maxHeight:320, overflowY:"auto"}}>
+                      {days.map(day => {
+                        const sessions = byDay[day];
+                        const allErrors = sessions.flatMap(s => s.errors ?? []);
+                        const morning = sessions.find(s => s.session_type === "morning");
+                        const eod = sessions.find(s => s.session_type === "eod");
+                        return (
+                          <div key={day} style={{borderTop:"1px solid var(--border)", paddingTop:4, marginTop:4}}>
+                            {/* Header giorno */}
+                            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3}}>
+                              <span style={{fontSize:"0.62rem", fontWeight:600, color:"var(--text)"}}>{day}</span>
+                              {allErrors.length > 0
+                                ? <span className="sev-error" style={{fontSize:"0.55rem"}}>{allErrors.length} err</span>
+                                : <span className="sev-ok" style={{fontSize:"0.55rem"}}>✓</span>}
+                            </div>
+                            {/* Blocco PROCESSI */}
+                            <div style={{fontSize:"0.58rem", color:"var(--dim)", marginBottom:2, textTransform:"uppercase", letterSpacing:"0.03em"}}>Processi</div>
+                            {[morning, eod].map((sess, si) => sess && (
+                              <div key={si} style={{marginBottom:4, paddingLeft:6, borderLeft:"2px solid var(--border)"}}>
+                                <div style={{fontSize:"0.6rem", color:"var(--dim)", marginBottom:2}}>
+                                  {sess.session_type.toUpperCase()} · {sess.started_at?.slice(11,16) ?? "?"} → {sess.finished_at?.slice(11,16) ?? "?"}
+                                  {sess.regime && <span style={{marginLeft:4}} className={sess.regime==="NORMAL"?"sev-ok":sess.regime==="CAUTION"?"sev-warn":"sev-error"}>{sess.regime}</span>}
+                                </div>
+                                {Object.entries(sess.steps ?? {}).map(([stepName, stepData]) => {
+                                  const sd = stepData as Record<string, unknown>;
+                                  const ok = sd.ok !== false;
+                                  return (
+                                    <div key={stepName} style={{display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:"0.58rem", padding:"1px 0"}}>
+                                      <span style={{color: ok ? "var(--text)" : "var(--error)"}}>{ok ? "✓" : "✗"} {stepName}</span>
+                                      <span style={{color:"var(--dim)"}}>
+                                        {sd.candidates != null ? `${sd.candidates} cand` :
+                                         sd.universe_size != null ? `${sd.universe_size} sym` :
+                                         sd.count != null ? String(sd.count) :
+                                         sd.regime != null ? String(sd.regime) : ""}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                            {/* Blocco ERRORI */}
+                            {allErrors.length > 0 && (
+                              <>
+                                <div style={{fontSize:"0.58rem", color:"var(--error)", marginTop:3, marginBottom:2, textTransform:"uppercase", letterSpacing:"0.03em"}}>Errori</div>
+                                <div style={{paddingLeft:6, borderLeft:"2px solid var(--error)"}}>
+                                  {allErrors.map((e, ei) => (
+                                    <div key={ei} style={{fontSize:"0.57rem", color:"var(--error)", padding:"1px 0", wordBreak:"break-word"}}>· {e}</div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </>
             )}
           </div>

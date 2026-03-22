@@ -309,3 +309,4 @@ class SessionLogRequest(BaseModel):
     trigger: str = Field(default="auto", pattern="^(auto|manual)$")
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
+    steps: Optional[dict] = None  # dettagli di ogni step della sessione

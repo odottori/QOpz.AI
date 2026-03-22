@@ -348,6 +348,7 @@ def init_execution_schema() -> None:
                 equity        DOUBLE,
                 n_symbols     INTEGER,
                 errors_json   VARCHAR,
+                steps_json    VARCHAR,
                 trigger       VARCHAR DEFAULT 'auto',
                 started_at    VARCHAR,
                 finished_at   VARCHAR,
@@ -359,6 +360,11 @@ def init_execution_schema() -> None:
             )
             """
         )
+
+        try:
+            con.execute("ALTER TABLE session_logs ADD COLUMN IF NOT EXISTS steps_json VARCHAR")
+        except Exception as _exc:
+            logger.debug("ALTER TABLE skip: %s", _exc)
 
         try:
             con.close()

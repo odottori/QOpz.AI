@@ -19,6 +19,7 @@ TTS_FALLBACK_STATE_PATH = LOG_DIR / "tts_fallback_state.txt"
 _TTS_FALLBACK_PID_MEM: Optional[int] = None
 _TTS_FALLBACK_STATE_MEM: str = ""
 _TTS_LOCK = threading.Lock()
+_JSONL_LOCK = threading.Lock()  # serializza scritture su operator_previews/confirms.jsonl
 
 _SESSION_STATE: dict[str, Any] = {
     "last_morning": None,

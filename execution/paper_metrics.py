@@ -13,6 +13,8 @@ from typing import Any, Callable, Dict, Optional
 from scripts.metrics import annualized_sharpe, max_drawdown
 from .storage import _connect, _prov, init_execution_schema
 
+logger = logging.getLogger(__name__)
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -64,28 +66,36 @@ def record_equity_snapshot(
     note: str = "",
     trigger: str = "manual",
 ) -> str:
-    init_execution_schema()
-    con = _connect()
-    sid = str(uuid.uuid4())
-    backend = type(con).__module__.split(".")[0]
-    created = _utc_now_iso()
-    prov = _prov(profile, created)
-    if backend == "duckdb":
-        con.execute(
-            "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, trigger, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (sid, profile, asof_date.isoformat(), float(equity), note, trigger, created, *prov),
-        )
-        con.close()
-        return sid
+    try:
+        init_execution_schema()
+        con = _connect()
+        sid = str(uuid.uuid4())
+        backend = type(con).__module__.split(".")[0]
+        created = _utc_now_iso()
+        prov = _prov(profile, created)
+        if backend == "duckdb":
+            try:
+                con.execute(
+                    "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, trigger, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (sid, profile, asof_date.isoformat(), float(equity), note, trigger, created, *prov),
+                )
+            finally:
+                con.close()
+            return sid
 
-    con.execute(
-        "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, trigger, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (sid, profile, asof_date.isoformat(), float(equity), note, trigger, created, *prov),
-    )
-    if hasattr(con, "commit"):
-        con.commit()
-    con.close()
-    return sid
+        try:
+            con.execute(
+                "INSERT INTO paper_equity_snapshots (snapshot_id, profile, asof_date, equity, note, trigger, created_at, source_system, source_mode, source_quality, asof_ts, received_ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (sid, profile, asof_date.isoformat(), float(equity), note, trigger, created, *prov),
+            )
+            if hasattr(con, "commit"):
+                con.commit()
+        finally:
+            con.close()
+        return sid
+    except Exception as exc:
+        logger.warning("record_equity_snapshot failed: %s", exc)
+        return ""
 
 
 def record_trade(

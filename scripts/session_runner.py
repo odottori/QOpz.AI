@@ -300,6 +300,18 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
     if scan_regime not in {"NORMAL", "CAUTION", "SHOCK"}:
         scan_regime = "NORMAL"
 
+    # Recupera account size per scan_full
+    account_size = 10000.0  # default
+    ok_acct, acct_data = _get(api_base, "/opz/ibkr/account")
+    if ok_acct:
+        raw_nav = acct_data.get("net_liquidation")
+        try:
+            nav = float(raw_nav)
+            if nav > 0:
+                account_size = nav
+        except (TypeError, ValueError):
+            pass
+
     ok, data = _post_json(api_base, "/opz/universe/scan", {
         "profile": profile,
         "source": "auto",
@@ -314,7 +326,27 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
     if not ok:
         errors.append(f"universe_scan: {data.get('error')}")
 
-    # ── Step 6: Briefing ──────────────────────────────────────────────────────
+    # ── Step 6: Scan full (scoring + chain IBKR) ──────────────────────────────
+    scan_symbols = symbols[:6]  # max 6 simboli
+    ok, data = _post_json(api_base, "/opz/opportunity/scan_full", {
+        "profile": profile,
+        "regime": scan_regime,
+        "symbols": scan_symbols,
+        "top_n": 5,
+        "account_size": account_size,
+        "use_cache": False,
+    })
+    steps["scan_full"] = {
+        "ok": ok,
+        "candidates": data.get("candidates_count", len(data.get("candidates", []))) if ok else 0,
+        "batch_id": data.get("batch_id") if ok else None,
+        "suspension_reason": data.get("suspension_reason") if ok else None,
+        "error": data.get("error") if not ok else None,
+    }
+    if not ok:
+        errors.append(f"scan_full: {data.get('error')}")
+
+    # ── Step 7: Briefing ──────────────────────────────────────────────────────
     ok, data = _post(api_base, "/opz/briefing/generate", {"no_telegram": "true"})
     steps["briefing"] = {
         "ok": ok,
@@ -337,6 +369,7 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
         "trigger": "auto",
         "started_at": started_at,
         "finished_at": finished_at,
+        "steps": steps,
     })
 
     return {
@@ -363,6 +396,9 @@ def run_eod(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE) ->
     started_at = datetime.now(timezone.utc).isoformat()
     steps: dict[str, Any] = {}
     errors: list[str] = []
+
+    # Recupera simboli universe per scan_full EOD
+    eod_symbols = _get_universe_symbols(api_base)
 
     # ── Step 1: Paper summary ─────────────────────────────────────────────────
     ok, data = _get(api_base, "/opz/paper/summary", {"profile": profile, "window_days": 60})
@@ -432,6 +468,24 @@ def run_eod(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE) ->
     else:
         steps["equity_snapshot"] = {"ok": False, "reason": "IBKR non connesso o NAV non disponibile"}
 
+    # ── Step 6: Scan full EOD (best-effort — mercato potenzialmente chiuso) ───
+    ok, data = _post_json(api_base, "/opz/opportunity/scan_full", {
+        "profile": profile,
+        "regime": str(steps.get("regime_eod", {}).get("regime") or "NORMAL").strip().upper(),
+        "symbols": eod_symbols[:6],
+        "top_n": 5,
+        "account_size": float(equity_val) if equity_val and equity_val > 0 else 10000.0,
+        "use_cache": True,  # usa cache se disponibile
+    })
+    steps["scan_full"] = {
+        "ok": ok,
+        "candidates": data.get("candidates_count", len(data.get("candidates", []))) if ok else 0,
+        "batch_id": data.get("batch_id") if ok else None,
+        "note": "best-effort EOD — mercato potenzialmente chiuso",
+        "error": data.get("error") if not ok else None,
+    }
+    # Non aggiunge a errors — è best-effort
+
     finished_at = datetime.now(timezone.utc).isoformat()
 
     # ── Persistenza: session log in DuckDB ────────────────────────────────────
@@ -445,6 +499,7 @@ def run_eod(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE) ->
         "trigger": "auto",
         "started_at": started_at,
         "finished_at": finished_at,
+        "steps": steps,
     })
 
     return {
