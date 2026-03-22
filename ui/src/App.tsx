@@ -3496,9 +3496,6 @@ export default function App() {
                               <span style={{color:"#444"}}>/</span>
                               <span style={{color:"#fbbf24"}} title="Trades ancora aperti nel journal">{ape}</span>
                               <span style={{color:"#555"}}>)</span>
-                              {live > 0 && (
-                                <span style={{color:"#555"}} title="Posizioni aperte sul broker"> · live({live})</span>
-                              )}
                             </span>
                           );
                         })()}
@@ -3519,11 +3516,12 @@ export default function App() {
                         : null;
                       const mc = (label: string, val: string, col: string, tip?: string) => (
                         <div key={label} title={tip} style={{
-                          flex:"1 1 0", minWidth:46, background:"var(--p2)",
-                          border:`1px solid ${col}28`, borderRadius:3, padding:"4px 6px", textAlign:"center",
+                          flex:"1 1 0", minWidth:44, height:44, background:"var(--p2)",
+                          border:`1px solid ${col}28`, borderRadius:3,
+                          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2,
                         }}>
-                          <div style={{fontSize:"0.48rem", color:"#666", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:1}}>{label}</div>
-                          <div style={{fontSize:"0.76rem", fontWeight:700, color:col, lineHeight:1.2}}>{val}</div>
+                          <div style={{fontSize:"0.46rem", color:"#666", textTransform:"uppercase", letterSpacing:"0.05em", lineHeight:1}}>{label}</div>
+                          <div style={{fontSize:"0.76rem", fontWeight:700, color:col, lineHeight:1}}>{val}</div>
                         </div>
                       );
                       return (
