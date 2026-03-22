@@ -320,9 +320,9 @@ def compute_paper_summary(
             pos = sum(p for p in pnls if p > 0)
             neg = sum(p for p in pnls if p < 0)
             if neg < 0:
-                pf = float(pos / abs(neg)) if abs(neg) > 1e-18 else float("inf")
+                pf = float(pos / abs(neg)) if abs(neg) > 1e-18 else 99.0  # cap: JSON non serializza inf
             else:
-                pf = float("inf") if pos > 0 else 0.0
+                pf = 99.0 if pos > 0 else 0.0  # tutti i trade profittevoli → cap a 99
 
         avg_slip: Optional[float] = None
         if slippages:
@@ -370,14 +370,14 @@ def compute_paper_summary(
 
     if wr is None:
         f6_ok = False
-        reasons_f6.append("missing trade journal (win_rate/profit_factor/slippage)")
+        reasons_f6.append("win_rate mancante (nessun trade chiuso)")
     elif wr < 0.55:
         f6_ok = False
         reasons_f6.append(f"win_rate {wr:.3%} < 55%")
 
     if pf is None:
         f6_ok = False
-        reasons_f6.append("missing trade journal (win_rate/profit_factor/slippage)")
+        reasons_f6.append("profit_factor mancante (nessun trade chiuso)")
     elif pf < 1.3:
         f6_ok = False
         reasons_f6.append(f"profit_factor {pf:.3f} < 1.3")
@@ -396,7 +396,7 @@ def compute_paper_summary(
 
     if avg_slip is None:
         f6_ok = False
-        reasons_f6.append("missing trade journal (win_rate/profit_factor/slippage)")
+        reasons_f6.append("avg_slippage mancante (nessun trade chiuso)")
     elif avg_slip > 3.0:
         f6_ok = False
         reasons_f6.append(f"avg_slippage_ticks {avg_slip:.2f} > 3.0")

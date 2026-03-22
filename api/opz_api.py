@@ -3057,6 +3057,7 @@ def opz_tier(profile: str = "dev", regime: str = "NORMAL") -> Dict[str, Any]:
 # ── Briefing audio ────────────────────────────────────────────────────────────
 
 _AUDIO_DIR = ROOT / "data" / "audio"
+_AUDIO_DIR.mkdir(parents=True, exist_ok=True)  # crea al boot se non esiste
 _BRIEFING_LATEST = _AUDIO_DIR / "briefing_latest.mp3"
 
 
