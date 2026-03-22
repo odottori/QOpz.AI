@@ -3365,28 +3365,49 @@ export default function App() {
                     );
                   })()}
 
-                  {/* ── Riga filtri 2 — strategia (dinamica dai dati) ── */}
+                  {/* ── Riga filtri 2 — strategia (lista fissa, sempre visibile) ── */}
                   {(() => {
-                    const strategies = ["tutte", ...Array.from(new Set(
-                      storicoTrades.map(t => t.strategy).filter(Boolean)
-                    )).sort() as string[]];
-                    if (strategies.length <= 1) return null;
+                    // Strategie note del sistema — sempre mostrate, indipendentemente dai dati
+                    const KNOWN: string[] = ["WHEEL","BULL_PUT","IRON_CONDOR","CALENDAR","PMCC_CALENDAR","HEDGE_ACTIVE"];
+                    // Aggiunge eventuali strategie presenti nei dati ma non nella lista fissa
+                    const extra = Array.from(new Set(
+                      storicoTrades.map(t => t.strategy).filter((s): s is string => !!s && !KNOWN.includes(s))
+                    )).sort();
+                    const strategies = ["tutte", ...KNOWN, ...extra];
+                    // Conta per strategia sui dati filtrati per data (non per strategia stessa)
+                    const byDate = storicoTrades.filter(t => {
+                      if (posOutcomeFilter === "aperti") return !t.exit_ts_utc;
+                      const d = t.exit_ts_utc?.slice(0,10);
+                      return d != null
+                        && (!storicoFrom || d >= storicoFrom)
+                        && (!storicoTo   || d <= storicoTo)
+                        && (posOutcomeFilter === "tutti"    || true)
+                        && (posOutcomeFilter === "positivi" ? (t.pnl ?? 0) >= 0 : true)
+                        && (posOutcomeFilter === "negativi" ? (t.pnl ?? 0) <  0 : true);
+                    });
+                    const countFor = (s: string) =>
+                      s === "tutte" ? byDate.length : byDate.filter(t => t.strategy === s).length;
                     return (
                       <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap"}}>
                         <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
-                          letterSpacing:"0.06em", marginRight:2}}>str</span>
+                          letterSpacing:"0.06em", marginRight:2, flexShrink:0}}>str</span>
                         {strategies.map(s => {
                           const active = posStrategyFilter === s;
+                          const n = countFor(s);
+                          // strategie senza dati = "spente" (dimmer, non cliccabili)
+                          const hasData = s === "tutte" || n > 0;
                           return (
                             <button key={s} onClick={() => setPosStrategyFilter(s)} style={{
-                              fontSize:"0.58rem", padding:"1px 6px", borderRadius:3, cursor:"pointer",
-                              border:`1px solid ${active ? "#60a5fa" : "#333"}`,
+                              fontSize:"0.58rem", padding:"1px 6px", borderRadius:3,
+                              cursor: hasData ? "pointer" : "default",
+                              border:`1px solid ${active ? "#60a5fa" : hasData ? "#333" : "#1e1e1e"}`,
                               background: active ? "#60a5fa18" : "transparent",
-                              color: active ? "#60a5fa" : "#555",
+                              color: active ? "#60a5fa" : hasData ? "#555" : "#2a2a2a",
                               fontWeight: active ? 600 : 400,
                               transition:"all 0.15s",
                             }}>
                               {s === "tutte" ? "TUTTE" : s}
+                              {s !== "tutte" && <span style={{opacity:0.5, marginLeft:2}}>({n})</span>}
                             </button>
                           );
                         })}
@@ -3442,37 +3463,38 @@ export default function App() {
                             {pill("▼ worst", fmtPnl(maxLoss), "#f87171", "Trade peggiore")}
                           </div>
                         )}
-                        {storicoLoading && (
-                          <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Caricamento…</div>
-                        )}
-                        {!storicoLoading && filtered.length === 0 && (
-                          <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>
-                            {storicoTrades.length === 0
-                              ? "Nessun trade nel journal."
-                              : "Nessun trade per i filtri selezionati."}
-                          </div>
-                        )}
-                        {filtered.length > 0 && (
-                          <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
-                            <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
-                              <thead>
-                                <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
-                                  <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
-                                  <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
-                                  <th style={{textAlign:"left", padding:"2px 4px"}}>Str</th>
-                                  <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL realizzato">PnL</th>
-                                  <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL %">%</th>
-                                  <th style={{textAlign:"left", padding:"2px 4px"}}>
-                                    {posOutcomeFilter === "aperti" ? "Entrata" : "Uscita"}
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {filtered.map((t, i) => {
+                        {/* tabella sempre visibile — header fissa, messaggio inline nel tbody */}
+                        <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
+                          <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                            <thead>
+                              <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                                <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
+                                <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
+                                <th style={{textAlign:"left", padding:"2px 4px"}}>Str</th>
+                                <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL realizzato">PnL</th>
+                                <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL %">%</th>
+                                <th style={{textAlign:"left", padding:"2px 4px"}}>
+                                  {posOutcomeFilter === "aperti" ? "Entrata" : "Uscita"}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {storicoLoading ? (
+                                <tr><td colSpan={6} style={{padding:"8px 4px", color:"var(--dim)", fontSize:"0.7rem"}}>
+                                  Caricamento…
+                                </td></tr>
+                              ) : filtered.length === 0 ? (
+                                <tr><td colSpan={6} style={{padding:"8px 4px", color:"#2a2a2a", fontSize:"0.7rem"}}>
+                                  {storicoTrades.length === 0
+                                    ? "nessun trade nel journal — premi ⟳ per caricare"
+                                    : "nessun trade per i filtri selezionati"}
+                                </td></tr>
+                              ) : (
+                                filtered.map((t, i) => {
                                   const pnl    = t.pnl ?? null;
                                   const pnlPct = t.pnl_pct ?? null;
                                   const pnlCol = pnl == null ? "#666" : pnl >= 0 ? "#4ade80" : "#f87171";
-                                  const dateCol = posOutcomeFilter === "aperti"
+                                  const dateVal = posOutcomeFilter === "aperti"
                                     ? (t.entry_ts_utc?.slice(0,10) ?? "—")
                                     : (t.exit_ts_utc?.slice(0,10)  ?? "—");
                                   return (
@@ -3486,14 +3508,14 @@ export default function App() {
                                       <td style={{padding:"2px 4px", textAlign:"right", color:pnlCol, fontSize:"0.62rem"}}>
                                         {pnlPct != null ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%` : "—"}
                                       </td>
-                                      <td style={{padding:"2px 4px", color:"#555", fontSize:"0.62rem"}}>{dateCol}</td>
+                                      <td style={{padding:"2px 4px", color:"#555", fontSize:"0.62rem"}}>{dateVal}</td>
                                     </tr>
                                   );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     );
                   })()}
