@@ -25,6 +25,7 @@ def submit(order, client_order_id: str, *, run_id: str = "UNKNOWN", profile: str
             side=order.side,
             quantity=order.quantity,
             state="DEDUPLICATED",
+            outcome=ExecutionOutcome.DEDUPLICATED.value,
         )
         record_event(
             client_order_id=client_order_id,

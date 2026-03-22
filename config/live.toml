@@ -46,3 +46,15 @@ required_env = []
 # active_mode  = currently selected operating mode (must be <= capital_tier)
 capital_tier = "SMALL"
 active_mode  = "SMALL"
+
+[sessions]
+# Sessioni automatiche morning + EOD — DISABILITATE in live fino a Kelly gate soddisfatto
+enabled          = false
+morning_time     = "09:00"           # orario locale EST (America/New_York)
+eod_time         = "16:30"           # orario locale EST
+timezone         = "America/New_York"
+duration_max_min = 10                # timeout massimo per sessione (minuti)
+skip_weekends    = true
+skip_holidays    = true              # calendario NYSE
+profile          = "live"
+api_base         = "http://localhost:8765"

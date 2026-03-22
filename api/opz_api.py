@@ -3450,6 +3450,7 @@ def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
     """Return last N activity events (order_events + regime transitions) for the activity feed."""
     from execution.storage import _connect
     events: list[Dict[str, Any]] = []
+    con = None
     try:
         con = _connect()
         # Order events
@@ -3489,7 +3490,14 @@ def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
             })
     except Exception as exc:
         logger.warning("activity_stream order_events: %s", exc)
+    finally:
+        if con is not None:
+            try:
+                con.close()
+            except Exception:
+                pass
 
+    con2 = None
     try:
         con2 = _connect()
         sess_rows = con2.execute(
@@ -3518,6 +3526,12 @@ def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
             })
     except Exception as exc:
         logger.warning("activity_stream session_logs: %s", exc)
+    finally:
+        if con2 is not None:
+            try:
+                con2.close()
+            except Exception:
+                pass
 
     # Sort all events by ts desc, take top n
     events.sort(key=lambda e: e["ts"], reverse=True)

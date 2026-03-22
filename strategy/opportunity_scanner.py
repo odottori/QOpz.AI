@@ -213,10 +213,19 @@ def _load_cache(symbol: str) -> tuple[list[OptionContract], float] | tuple[None,
         for c in raw_contracts:
             try:
                 contracts.append(OptionContract(**c))
-            except Exception:
+            except Exception as _e:
+                logger.warning("_load_cache: skipping malformed contract %s: %s", c, _e)
                 continue
+        # Discard cache if too many contracts were malformed (>20% corrupted)
+        if raw_contracts and len(contracts) < len(raw_contracts) * 0.8:
+            logger.warning(
+                "_load_cache: %d/%d contracts malformed for %s — discarding cache",
+                len(raw_contracts) - len(contracts), len(raw_contracts), symbol,
+            )
+            return None, None
         return contracts, round(age_hours, 2)
-    except Exception:
+    except Exception as _e:
+        logger.warning("_load_cache: failed to load cache for %s: %s", symbol, _e)
         return None, None
 
 
@@ -254,8 +263,8 @@ def apply_hard_filters(
     kept: list[OptionContract] = []
 
     for c in contracts:
-        # IV missing / non-positive
-        if c.iv <= 0.0 or math.isnan(c.iv):
+        # IV missing / non-positive / non-finite
+        if not (c.iv > 0.0 and math.isfinite(c.iv)):
             stats.iv_missing += 1
             continue
         # DTE out of range (HARD bounds take priority over preferred params)

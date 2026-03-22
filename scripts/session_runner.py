@@ -154,9 +154,13 @@ def _next_session_dt(
             candidates.append((eod_dt, "eod"))
 
     if not candidates:
-        # fallback: domani mattina
-        tomorrow = today + timedelta(days=1)
-        return _make_dt(tomorrow, morning_time), "morning"
+        # fallback: prossimo giorno di trading (salta weekend/festivi)
+        for fallback_offset in range(1, 9):
+            fallback_day = today + timedelta(days=fallback_offset)
+            if is_trading_day(fallback_day):
+                return _make_dt(fallback_day, morning_time), "morning"
+        # ultima risorsa: domani (non dovrebbe mai accadere)
+        return _make_dt(today + timedelta(days=1), morning_time), "morning"
 
     candidates.sort(key=lambda x: x[0])
     return candidates[0]

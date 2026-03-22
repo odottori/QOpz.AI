@@ -24,9 +24,9 @@ seed = 42           # RNG seed for reproducibility
 mode = "synthetic"  # DATA_MODE watermark: synthetic surface calibrated data
 
 [broker]
-# TWS/IBG paper account — port 7496 = paper, 7497 = live (see IBKR Gateway settings)
+# TWS/IBG account ports: 7496 = paper trading, 7497 = live trading (see IBKR Gateway settings)
 host      = "127.0.0.1"
-port      = 7496        # TWS live socket (7496=live, 7497=paper)
+port      = 7496        # TWS paper socket (7496=paper, 7497=live)
 client_id = 12          # must be unique per connected client (change if conflict)
 
 [ops]

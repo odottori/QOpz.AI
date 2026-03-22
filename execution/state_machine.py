@@ -29,6 +29,10 @@ _ALLOWED = {
     ("ACKED", "REJECTED"),
     ("ACKED", "CANCELLED"),
     ("ACKED", "FILLED"),
+
+    ("DEDUPLICATED", "FILLED"),
+    ("DEDUPLICATED", "REJECTED"),
+    ("DEDUPLICATED", "CANCELLED"),
 }
 
 _STATES = {"NEW", "SUBMITTED", "ACKED", "DEDUPLICATED", "REJECTED", "CANCELLED", "FILLED"}
@@ -39,7 +43,9 @@ def is_allowed(prev: str, nxt: str) -> bool:
 
 
 def normalize_state(state: str) -> str:
-    s = (state or "").upper()
+    if state is None:
+        raise ValueError("normalize_state called with None — caller must handle missing state explicitly")
+    s = state.upper()
     if s not in _STATES:
         raise ValueError(f"Unknown state: {state!r}")
     return s

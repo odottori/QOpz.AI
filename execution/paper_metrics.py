@@ -226,7 +226,8 @@ def compute_paper_summary(
                 cur = equities[i]
                 if prev and prev > 0:
                     daily_returns.append((cur / prev) - 1.0)
-            sharpe_a = float(annualized_sharpe(daily_returns, periods_per_year=252))
+            if len(daily_returns) >= 2:
+                sharpe_a = float(annualized_sharpe(daily_returns, periods_per_year=252))
             mdd = float(max_drawdown(equities))
 
         trows = con.execute(
@@ -319,10 +320,12 @@ def compute_paper_summary(
             wr = float(sum(1 for p in pnls if p > 0) / len(pnls))
             pos = sum(p for p in pnls if p > 0)
             neg = sum(p for p in pnls if p < 0)
-            if neg < 0:
+            if neg != 0.0:  # losing trades exist
                 pf = float(pos / abs(neg)) if abs(neg) > 1e-18 else 99.0  # cap: JSON non serializza inf
+            elif pos > 0:
+                pf = 99.0  # tutti i trade profittevoli → cap a 99
             else:
-                pf = 99.0 if pos > 0 else 0.0  # tutti i trade profittevoli → cap a 99
+                pf = 0.0   # nessun trade o tutti a zero
 
         avg_slip: Optional[float] = None
         if slippages:
@@ -486,8 +489,10 @@ def _history_table_exists(con: Any, table_name: str) -> bool:
             (table_name,),
         ).fetchone()
         return bool(row and int(row[0]) > 0)
-    except (AttributeError, RuntimeError, TypeError, ValueError):
-        return True
+    except (AttributeError, RuntimeError, TypeError, ValueError) as e:
+        import logging as _log
+        _log.getLogger(__name__).warning("_history_table_exists query failed for %s: %s", table_name, e)
+        return False  # assume table does NOT exist; caller will handle
 
 
 def _history_to_day_key(value: Any) -> Optional[str]:

@@ -124,50 +124,61 @@ def save_wheel_position(
     ts = now.isoformat().replace("+00:00", "Z")
 
     con = _connect()
+    try:
+        con.execute("BEGIN")
+        # Upsert wheel_positions (INSERT OR REPLACE semantics via DELETE+INSERT)
+        con.execute("DELETE FROM wheel_positions WHERE position_id = ?", (position_id,))
+        con.execute(
+            """
+            INSERT INTO wheel_positions (
+                position_id, run_id, profile, symbol, state,
+                csp_strike, csp_expiry, csp_premium_received,
+                shares, cost_basis,
+                cc_strike, cc_expiry, cc_premium_received,
+                total_premium_collected, cycle_count,
+                created_at, updated_at,
+                source_system, source_mode, source_quality, asof_ts, received_ts
+            ) VALUES (?,?,?,?,?, ?,?,?, ?,?, ?,?,?, ?,?, ?,?, ?,?,?,?,?)
+            """,
+            (
+                position_id, run_id, profile, pos.symbol, pos.state.value,
+                pos.csp_strike, pos.csp_expiry, pos.csp_premium_received,
+                pos.shares, pos.cost_basis,
+                pos.cc_strike, pos.cc_expiry, pos.cc_premium_received,
+                pos.total_premium_collected, pos.cycle_count,
+                ts, ts,
+                *prov,
+            ),
+        )
 
-    # Upsert wheel_positions (INSERT OR REPLACE semantics via DELETE+INSERT)
-    con.execute("DELETE FROM wheel_positions WHERE position_id = ?", (position_id,))
-    con.execute(
-        """
-        INSERT INTO wheel_positions (
-            position_id, run_id, profile, symbol, state,
-            csp_strike, csp_expiry, csp_premium_received,
-            shares, cost_basis,
-            cc_strike, cc_expiry, cc_premium_received,
-            total_premium_collected, cycle_count,
-            created_at, updated_at,
-            source_system, source_mode, source_quality, asof_ts, received_ts
-        ) VALUES (?,?,?,?,?, ?,?,?, ?,?, ?,?,?, ?,?, ?,?, ?,?,?,?,?)
-        """,
-        (
-            position_id, run_id, profile, pos.symbol, pos.state.value,
-            pos.csp_strike, pos.csp_expiry, pos.csp_premium_received,
-            pos.shares, pos.cost_basis,
-            pos.cc_strike, pos.cc_expiry, pos.cc_premium_received,
-            pos.total_premium_collected, pos.cycle_count,
-            ts, ts,
-            *prov,
-        ),
-    )
-
-    # Append event row
-    con.execute(
-        """
-        INSERT INTO wheel_position_events (
-            event_id, position_id, run_id, profile, symbol,
-            prev_state, new_state, event_type, ts_utc, details_json,
-            source_system, source_mode, source_quality, asof_ts, received_ts
-        ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?)
-        """,
-        (
-            str(uuid.uuid4()), position_id, run_id, profile, pos.symbol,
-            prev_state.value if prev_state else None,
-            pos.state.value, event_type, ts, details,
-            *prov,
-        ),
-    )
-
-    con.close()
+        # Append event row
+        con.execute(
+            """
+            INSERT INTO wheel_position_events (
+                event_id, position_id, run_id, profile, symbol,
+                prev_state, new_state, event_type, ts_utc, details_json,
+                source_system, source_mode, source_quality, asof_ts, received_ts
+            ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?)
+            """,
+            (
+                str(uuid.uuid4()), position_id, run_id, profile, pos.symbol,
+                prev_state.value if prev_state else None,
+                pos.state.value, event_type, ts, details,
+                *prov,
+            ),
+        )
+        con.execute("COMMIT")
+    except Exception:
+        try:
+            con.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
 
 
 def load_wheel_position(

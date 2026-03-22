@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Optional, Protocol, Dict, Any
 
 from execution.ack import AckResult, AckStatus
+from execution.outcome import ExecutionOutcome
 
 
 class BrokerUnavailableError(RuntimeError):
@@ -103,7 +104,7 @@ class PaperLiveAdapterBase:
                 quantity=qty,
                 state="REJECTED",
                 limit_price=limit_price,
-                outcome="REJECTED_BROKER_UNAVAILABLE",
+                outcome=ExecutionOutcome.REJECTED_BROKER_UNAVAILABLE.value,
             )
             record_event(
                 client_order_id=client_order_id,

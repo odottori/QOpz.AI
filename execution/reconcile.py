@@ -119,7 +119,7 @@ def reconcile(run_id: Optional[str] = None, report_path: Optional[str] = None) -
                 FROM orders
                 WHERE run_id = ?
                   AND (
-                    (state='REJECTED' AND outcome <> 'REJECTED') OR
+                    (state='REJECTED' AND outcome NOT IN ('REJECTED','REJECTED_BROKER_UNAVAILABLE')) OR
                     (state='FILLED' AND outcome <> 'FILLED') OR
                     (state='CANCELLED' AND outcome NOT IN ('CANCELLED','ABANDONED','TIMEOUT'))
                   )
@@ -139,7 +139,7 @@ def reconcile(run_id: Optional[str] = None, report_path: Optional[str] = None) -
                 SELECT client_order_id, state, outcome
                 FROM orders
                 WHERE (
-                  (state='REJECTED' AND outcome <> 'REJECTED') OR
+                  (state='REJECTED' AND outcome NOT IN ('REJECTED','REJECTED_BROKER_UNAVAILABLE')) OR
                   (state='FILLED' AND outcome <> 'FILLED') OR
                   (state='CANCELLED' AND outcome NOT IN ('CANCELLED','ABANDONED','TIMEOUT'))
                 )

@@ -819,6 +819,7 @@ export default function App() {
   const [fetchErrors, setFetchErrors] = useState<Set<string>>(new Set());
   const [aiDrawerOpen, setAiDrawerOpen] = useState<boolean>(false);
   const [opExecOpen, setOpExecOpen] = useState<boolean>(false);
+  const [execWindowOpen, setExecWindowOpen] = useState<boolean>(false);  // collassato di default
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [leftKellyOpen, setLeftKellyOpen] = useState<boolean>(false);
   const [leftPhaseOpen, setLeftPhaseOpen] = useState<boolean>(false);
@@ -2899,6 +2900,11 @@ export default function App() {
                     </span>
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}} onClick={refreshAll} disabled={busy}>⟳</button>
                   </div>
+                  {/* Legenda score e dati incompleti */}
+                  <div style={{fontSize:"0.6rem", color:"var(--dim)", marginBottom:6, display:"flex", gap:12, flexWrap:"wrap"}}>
+                    <span>Score su 100 · <span style={{color:"#4ade80"}}>≥65 ottimo</span> · <span style={{color:"#fbbf24"}}>50–64 borderline</span> · <span style={{color:"#f87171"}}>&lt;50 basso</span></span>
+                    <span title="Spread% e IVR% vuoti = dati di mercato non ancora acquisiti. Il segnale è preliminare.">⚠ celle vuote = dati incompleti · esecuzione non consigliata</span>
+                  </div>
                   {premarketRows.length === 0 ? (
                     <div style={{color:"var(--dim)", fontSize:"0.7rem", padding:"8px 0"}}>
                       Nessun segnale. Esegui scan dalla tab ANALISI.
@@ -2910,10 +2916,10 @@ export default function App() {
                           <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
                             <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
                             <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
-                            <th style={{textAlign:"left", padding:"2px 4px"}}>Strategia</th>
-                            <th style={{textAlign:"right", padding:"2px 4px"}}>Score</th>
-                            <th style={{textAlign:"right", padding:"2px 4px"}}>Spread%</th>
-                            <th style={{textAlign:"right", padding:"2px 4px"}}>IVR%</th>
+                            <th style={{textAlign:"left", padding:"2px 4px"}} title="Tipo di struttura operativa. Passa il mouse sulla cella per i dettagli.">Strategia</th>
+                            <th style={{textAlign:"right", padding:"2px 4px"}} title="Punteggio composito 0–100 (4 pilastri: volatilità, liquidità, rischio/rendimento, regime). Soglia minima operativa: 50.">Score/100</th>
+                            <th style={{textAlign:"right", padding:"2px 4px"}} title="Spread bid-ask in % del mid. Soglia dura: ≤10%. Vuoto = dato non acquisito.">Spread%</th>
+                            <th style={{textAlign:"right", padding:"2px 4px"}} title="IV Rank in percentile. Soglia dura: ≥20. Vuoto = dato non acquisito.">IVR%</th>
                             <th style={{textAlign:"left", padding:"2px 4px"}}>Fonte</th>
                             <th style={{padding:"2px 4px"}}></th>
                           </tr>
@@ -2925,33 +2931,46 @@ export default function App() {
                             <tr key={i} style={{borderBottom:"1px solid #222", background: isSelected ? "rgba(74,222,128,0.08)" : undefined}}>
                               <td style={{padding:"2px 4px", color:"#666"}}>#{i + 1}</td>
                               <td style={{padding:"2px 4px", fontWeight:600}}>{c.symbol}</td>
-                              <td style={{padding:"2px 4px", color:"#888"}}>{c.strategy}</td>
+                              <td style={{padding:"2px 4px", color:"#888"}} title={
+                                c.strategy === "BULL_PUT" ? "Bull Put Spread · vendi put strike basso + compri put strike alto · profitto se il sottostante resta sopra il break-even" :
+                                c.strategy === "IRON_CONDOR" ? "Iron Condor · bull put + bear call · profitto se il sottostante resta in un range definito" :
+                                c.strategy === "CALENDAR" ? "Calendar Spread · vendi opzione scadenza vicina + compri stessa scadenza lontana · profitto da decadimento temporale differenziale" :
+                                c.strategy === "WHEEL" ? "Wheel · ciclo put venduta → assegnazione → call venduta → incasso premi ripetuto" :
+                                c.strategy === "PMCC_CALENDAR" ? "Poor Man's Covered Call · LEAP come base, call mensile breve · replica covered call con minor capitale" :
+                                c.strategy === "HEDGE_ACTIVE" ? "Copertura attiva · protezione direzionale sul portafoglio" :
+                                c.strategy ?? ""
+                              }>{c.strategy}</td>
                               <td style={{padding:"2px 4px", textAlign:"right"}}>
                                 {c.scorePct !== undefined ? (
-                                  <span className={c.scorePct >= 65 ? "sev-ok" : c.scorePct >= 50 ? "sev-warn" : "sev-error"}>
-                                    {c.scorePct.toFixed(0)}
+                                  <span className={c.scorePct >= 65 ? "sev-ok" : c.scorePct >= 50 ? "sev-warn" : "sev-error"}
+                                    title={`Punteggio: ${c.scorePct.toFixed(0)}/100. Soglia operativa minima: 50.`}>
+                                    {c.scorePct.toFixed(0)}<span style={{color:"var(--dim)", fontSize:"0.55rem"}}>/100</span>
                                   </span>
                                 ) : "—"}
                               </td>
-                              <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
-                                {c.spreadPct != null ? c.spreadPct.toFixed(1) : "—"}
+                              <td style={{padding:"2px 4px", textAlign:"right", color: c.spreadPct == null || c.spreadPct === 0 ? "var(--dim)" : "#888"}}>
+                                {c.spreadPct != null && c.spreadPct > 0 ? c.spreadPct.toFixed(1) : <span title="Dato non ancora acquisito — aggiorna lo scan">—</span>}
                               </td>
-                              <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
-                                {c.ivRankPct != null ? c.ivRankPct.toFixed(0) : "—"}
+                              <td style={{padding:"2px 4px", textAlign:"right", color: c.ivRankPct == null || c.ivRankPct === 0 ? "var(--dim)" : "#888"}}>
+                                {c.ivRankPct != null && c.ivRankPct > 0 ? c.ivRankPct.toFixed(0) : <span title="Dato non ancora acquisito — aggiorna lo scan">—</span>}
                               </td>
                               <td style={{padding:"2px 4px", color:"#555", fontSize:"0.6rem"}}>{c.source ?? "—"}</td>
                               <td style={{padding:"2px 2px"}}>
-                                <button
-                                  className="btn btn-ghost"
-                                  style={{fontSize:"0.6rem", padding:"1px 6px", whiteSpace:"nowrap"}}
-                                  onClick={() => {
-                                    setSymbol(c.symbol ?? "");
-                                    setStrategy(c.strategy ?? "BULL_PUT");
-                                    setPayload(JSON.stringify({symbol: c.symbol, strategy: c.strategy, legs: []}, null, 2));
-                                    setSelectedItemId((c as any).item_id ?? null);
-                                    setOpExecOpen(true);
-                                  }}
-                                >→ ESEGUI</button>
+                                {(c.spreadPct == null || c.spreadPct === 0 || c.ivRankPct == null || c.ivRankPct === 0) ? (
+                                  <span title="Dati incompleti — impossibile valutare il rischio. Aggiorna lo scan prima di eseguire." style={{fontSize:"0.6rem", color:"var(--amber)", padding:"1px 6px"}}>⚠ dati</span>
+                                ) : (
+                                  <button
+                                    className="btn btn-ghost"
+                                    style={{fontSize:"0.6rem", padding:"1px 6px", whiteSpace:"nowrap"}}
+                                    onClick={() => {
+                                      setSymbol(c.symbol ?? "");
+                                      setStrategy(c.strategy ?? "BULL_PUT");
+                                      setPayload(JSON.stringify({symbol: c.symbol, strategy: c.strategy, legs: []}, null, 2));
+                                      setSelectedItemId((c as any).item_id ?? null);
+                                      setOpExecOpen(true);
+                                    }}
+                                  >→ ESEGUI</button>
+                                )}
                               </td>
                             </tr>
                             );
@@ -3058,7 +3077,7 @@ export default function App() {
 
                   {/* ── Posizioni IBKR ── */}
                   <div style={{borderTop:"1px solid var(--border)", marginTop:12, paddingTop:8}}>
-                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
                       <span className="lc-panel-title" style={{margin:0}}>
                         POSIZIONI APERTE
                         {ibkrAccount && <span className="sev-data" style={{fontWeight:400, marginLeft:6}}>({ibkrAccount.positions.length})</span>}
@@ -3076,21 +3095,24 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    {!ibkrAccount && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessun dato — clicca ⟳.</div>}
+                    <div style={{fontSize:"0.6rem", color:"var(--dim)", marginBottom:6}} title="Queste posizioni provengono direttamente dal broker (IBKR). Includono sia posizioni aperte manualmente sia quelle generate da auto-paper. Il paper journal (tab METRICHE) tiene traccia delle sole operazioni generate dal sistema.">
+                      Dati live dal broker · include posizioni manuali e auto-paper · per tracciato sistema → tab METRICHE
+                    </div>
+                    {!ibkrAccount && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessun dato disponibile.</div>}
                     {ibkrAccount && ibkrAccount.positions.length === 0 && (
                       <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessuna posizione aperta.</div>
                     )}
                     {ibkrAccount && ibkrAccount.positions.length > 0 && (
-                      <div style={{overflowX:"auto", maxHeight:130, overflowY:"auto"}}>
+                      <div style={{overflowX:"auto", maxHeight:160, overflowY:"auto"}}>
                         <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                           <thead>
                             <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
                               <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>Exp</th>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>Scadenza</th>
                               <th style={{textAlign:"right", padding:"2px 4px"}}>Strike</th>
-                              <th style={{textAlign:"center", padding:"2px 4px"}}>P/C</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}>Qty</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}>uPnL</th>
+                              <th style={{textAlign:"center", padding:"2px 4px"}} title="P = Put · C = Call">P/C</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}} title="Qty negativo = posizione corta (venduta). Qty positivo = posizione lunga (comprata).">Qty</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}} title="Profitto/perdita non realizzato sulla posizione aperta.">uPnL</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -3098,9 +3120,12 @@ export default function App() {
                               <tr key={i} style={{borderBottom:"1px solid #222"}}>
                                 <td style={{padding:"2px 4px"}}>{pos.symbol}</td>
                                 <td style={{padding:"2px 4px", color:"#888"}}>{pos.expiry ?? "—"}</td>
-                                <td style={{padding:"2px 4px", textAlign:"right"}}>{pos.strike ?? "—"}</td>
+                                <td style={{padding:"2px 4px", textAlign:"right"}}>{pos.strike != null && pos.strike !== 0 ? pos.strike : "—"}</td>
                                 <td style={{padding:"2px 4px", textAlign:"center", color: pos.right === "C" ? "#60a5fa" : "#fb923c"}}>{pos.right ?? "—"}</td>
-                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.quantity??0)<0?"#f87171":"#4ade80"}}>{pos.quantity}</td>
+                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.quantity??0)<0?"#f87171":"#4ade80"}}
+                                  title={(pos.quantity??0) < 0 ? "Posizione corta (venduta)" : "Posizione lunga (comprata)"}>
+                                  {pos.quantity}
+                                </td>
                                 <td style={{padding:"2px 4px", textAlign:"right", color:(pos.unrealized_pnl??0)>=0?"#4ade80":"#f87171"}}>
                                   {pos.unrealized_pnl != null ? `${pos.unrealized_pnl>=0?"+":""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
                                 </td>
@@ -3113,30 +3138,34 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="lc-screen">
-                  <div className="lc-screen-bar">
+                {/* ── Execution window — dettaglio tecnico, collassato di default ── */}
+                <div className="lc-screen" style={{marginTop:8}}>
+                  <div className="lc-screen-bar" style={{cursor:"pointer"}} onClick={() => setExecWindowOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
                     <span className="lc-screen-title">execution_window.log</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.6rem", color:"var(--dim)", paddingRight:4}}>{execWindowOpen ? "▲ chiudi" : "▼ espandi"}</span>
                   </div>
-                  <div className="lc-screen-body">
-                    <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE 🛑" : "off"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">go_nogo_gate</span><span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "PASS" : "FAIL"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">kelly_enabled</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "yes" : "no"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">sizing</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">candidati</span><span className="sev-data">{premarketShortlistCount}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">exit_urgenti</span><span className={urgentExits.length > 0 ? "sev-warn" : "sev-ok"}>{urgentExits.length}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">trades_chiusi</span><span className="sev-data">{sysStatus?.n_closed_trades ?? 0}</span></div>
-                    {goGate && !goGate.pass && goGate.reasons.length > 0 && (
-                      <div className="lc-screen-section">
-                        <div style={{color:"var(--amber)", fontSize:"0.6rem", marginBottom:4}}>motivi no-go:</div>
-                        {goGate.reasons.map((r, i) => <div key={i} style={{fontSize:"0.6rem", color:"var(--dim)"}}>· {r}</div>)}
+                  {execWindowOpen && (
+                    <div className="lc-screen-body">
+                      <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
+                      <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE 🛑" : "off"}</span></div>
+                      <div className="lc-screen-row"><span className="lc-dim">go_nogo_gate</span><span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "PASS" : "FAIL"}</span></div>
+                      <div className="lc-screen-row"><span className="lc-dim">kelly_enabled</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "yes" : "no"}</span></div>
+                      <div className="lc-screen-row"><span className="lc-dim">sizing</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span></div>
+                      <div className="lc-screen-row"><span className="lc-dim">candidati</span><span className="sev-data">{premarketShortlistCount}</span></div>
+                      <div className="lc-screen-row"><span className="lc-dim">exit_urgenti</span><span className={urgentExits.length > 0 ? "sev-warn" : "sev-ok"}>{urgentExits.length}</span></div>
+                      <div className="lc-screen-row"><span className="lc-dim">trades_chiusi</span><span className="sev-data">{sysStatus?.n_closed_trades ?? 0}</span></div>
+                      {goGate && !goGate.pass && goGate.reasons.length > 0 && (
+                        <div className="lc-screen-section">
+                          <div style={{color:"var(--amber)", fontSize:"0.6rem", marginBottom:4}}>motivi no-go:</div>
+                          {goGate.reasons.map((r, i) => <div key={i} style={{fontSize:"0.6rem", color:"var(--dim)"}}>· {r}</div>)}
+                        </div>
+                      )}
+                      <div className="lc-action-bar">
+                        <button className="btn btn-ghost" onClick={refreshAll} disabled={busy}>⟳ refresh</button>
                       </div>
-                    )}
-                    <div className="lc-action-bar">
-                      <button className="btn btn-ghost" onClick={refreshAll} disabled={busy}>⟳ refresh</button>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
