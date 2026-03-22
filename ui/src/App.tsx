@@ -823,6 +823,7 @@ export default function App() {
   const [dumpOpen, setDumpOpen] = useState<boolean>(false);              // DUMP block collassato di default
   const [scoreFilter, setScoreFilter] = useState<"all"|"high"|"mid"|"low">("all"); // filtro segnali per soglia score
   const [kpiExpanded, setKpiExpanded] = useState<string|null>(null); // blocco KPI espanso nel tab TRADING
+  const [pinnedKpis, setPinnedKpis] = useState<string[]>([]);        // KPI bloccati nella colonna destra
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [leftKellyOpen, setLeftKellyOpen] = useState<boolean>(false);
   const [leftPhaseOpen, setLeftPhaseOpen] = useState<boolean>(false);
@@ -2893,9 +2894,13 @@ export default function App() {
                   Go/No-Go: {goGate?.pass ? "✓ GO" : "✗ NO-GO"} · Kill switch: {sysStatus?.kill_switch_active ? "🛑 ON" : "off"}
                 </span>
               </div>
-              {/* ══ KPI BAR — blocchi operativi, cliccabili ══ */}
+              {/* ══ KPI BAR — blocchi operativi, cliccabili + pinnabili ══ */}
               {(() => {
                 const kpiToggle = (id: string) => setKpiExpanded(v => v === id ? null : id);
+                const kpiPin = (id: string, e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  setPinnedKpis(v => v.includes(id) ? v.filter(x => x !== id) : [...v, id]);
+                };
                 const kpiCard = (
                   id: string,
                   label: string,
@@ -2904,20 +2909,47 @@ export default function App() {
                   subTooltip: string,
                   accent: string,
                   detail: React.ReactNode | null,
+                  compact?: boolean,   // versione compatta per colonna destra
                 ) => {
-                  const open = kpiExpanded === id;
+                  const open = !compact && kpiExpanded === id;
+                  const pinned = pinnedKpis.includes(id);
                   return (
-                    <div key={id} onClick={() => detail && kpiToggle(id)}
+                    <div key={id} onClick={() => !compact && detail && kpiToggle(id)}
                       style={{
-                        background:"var(--p2)", border:`1px solid ${open ? accent + "55" : "var(--border)"}`,
-                        borderRadius:4, padding:"7px 10px", minWidth:100, flex:"1 1 auto",
-                        cursor: detail ? "pointer" : "default",
+                        background:"var(--p2)", border:`1px solid ${open ? accent + "55" : pinned && !compact ? accent + "33" : "var(--border)"}`,
+                        borderRadius:4, padding: compact ? "6px 8px" : "7px 10px",
+                        minWidth: compact ? 0 : 100, maxWidth: compact ? "none" : 250, flex:"1 1 auto",
+                        cursor: detail && !compact ? "pointer" : "default",
                         transition:"border-color 0.15s",
                         position:"relative",
                       }}>
-                      <div style={{fontSize:"0.58rem", color:"#555", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2}}>{label}</div>
-                      <div style={{fontSize:"1rem", fontWeight:700, color: accent, lineHeight:1.1, marginBottom:2}}>{value}</div>
-                      <div style={{fontSize:"0.58rem", color:"#555"}} title={subTooltip}>{sub}{detail ? <span style={{marginLeft:4, color:"#333"}}>{open ? "▲" : "▼"}</span> : null}</div>
+                      {/* Pin icon — top-right */}
+                      {!compact && (
+                        <span onClick={e => kpiPin(id, e)}
+                          title={pinned ? "Rimuovi dalla colonna destra" : "Fissa nella colonna destra"}
+                          style={{
+                            position:"absolute", top:4, right:6,
+                            fontSize:"0.6rem", cursor:"pointer",
+                            color: pinned ? accent : "#333",
+                            userSelect:"none",
+                            transition:"color 0.15s",
+                          }}>
+                          {pinned ? "◆" : "◇"}
+                        </span>
+                      )}
+                      {compact && (
+                        <span onClick={e => kpiPin(id, e)}
+                          title="Rimuovi dalla colonna destra"
+                          style={{float:"right", fontSize:"0.6rem", cursor:"pointer", color:"#444", userSelect:"none"}}>
+                          ✕
+                        </span>
+                      )}
+                      <div style={{fontSize: compact ? "0.55rem" : "0.58rem", color:"#555", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2}}>{label}</div>
+                      <div style={{fontSize: compact ? "0.85rem" : "1rem", fontWeight:700, color: accent, lineHeight:1.1, marginBottom:2}}>{value}</div>
+                      <div style={{fontSize:"0.58rem", color:"#555"}} title={subTooltip}>
+                        {sub}
+                        {!compact && detail ? <span style={{marginLeft:4, color:"#333"}}>{open ? "▲" : "▼"}</span> : null}
+                      </div>
                       {open && detail && (
                         <div onClick={e => e.stopPropagation()}
                           style={{marginTop:8, paddingTop:8, borderTop:"1px solid #222", fontSize:"0.65rem", color:"var(--dim)"}}>
@@ -2927,51 +2959,53 @@ export default function App() {
                     </div>
                   );
                 };
+                // Definizioni KPI — usate sia nella barra che nella colonna destra (pinned)
+                const kpiDefs: Array<{id:string, label:string, value:React.ReactNode, sub:string, subTooltip:string, accent:string, detail:React.ReactNode|null}> = [
+                  {
+                    id:"gate", label:"Gate Go/No-Go",
+                    value: goGate?.pass ? "GO ✓" : "NO-GO",
+                    sub:"accesso mercato", subTooltip:"Autorizzazione sistema ad operare. FAIL blocca nuovi ordini.",
+                    accent: goGate?.pass ? "#4ade80" : "#f87171",
+                    detail: goGate && !goGate.pass && goGate.reasons.length > 0
+                      ? <>{goGate.reasons.map((r,i) => <div key={i}>· {r}</div>)}</>
+                      : goGate?.pass ? <div style={{color:"#4ade80"}}>Tutti i controlli superati</div> : null,
+                  },
+                  {
+                    id:"regime", label:"Regime · Sizing",
+                    value: premarketRegime ?? "—",
+                    sub: premarketRegime === "NORMAL" ? "sizing 100%" : premarketRegime === "CAUTION" ? "sizing 50%" : premarketRegime === "SHOCK" ? "sizing 0%" : "—",
+                    subTooltip:"Stato di mercato rilevato dal classificatore HMM. CAUTION dimezza il sizing. SHOCK blocca tutto.",
+                    accent: premarketRegime === "NORMAL" ? "#4ade80" : premarketRegime === "CAUTION" ? "#fbbf24" : "#f87171",
+                    detail:<><div>NORMAL → sizing 100%, tutte le strategie</div><div>CAUTION → sizing 50%, solo spread stretti</div><div>SHOCK → sizing 0%, nessun nuovo trade</div></>,
+                  },
+                  {
+                    id:"exits", label:"Exit urgenti",
+                    value: urgentExits.length,
+                    sub: urgentExits.length > 0 ? "attenzione richiesta" : "nessuna azione",
+                    subTooltip:"Posizioni che superano la soglia di score di uscita (≥5). Richiedono revisione immediata.",
+                    accent: urgentExits.length > 0 ? "#fbbf24" : "#4ade80",
+                    detail: urgentExits.length > 0
+                      ? <>{urgentExits.map((c,i) => <div key={i}>{c.symbol} {c.right ?? ""} {c.strike ?? ""} — score {c.exit_score}</div>)}</>
+                      : null,
+                  },
+                  {
+                    id:"trades", label:"Trades chiusi",
+                    value: sysStatus?.n_closed_trades ?? 0,
+                    sub:"paper journal", subTooltip:"Operazioni chiuse nel journal paper trading. Soglia Kelly: 50 trade.",
+                    accent:"#60a5fa",
+                    detail:<><div>Kelly gate: {(sysStatus?.n_closed_trades ?? 0) >= 50 ? "✓ sbloccato" : `✗ mancano ${50 - (sysStatus?.n_closed_trades ?? 0)} trade`}</div><div style={{marginTop:4}}>Per dettagli → tab METRICHE</div></>,
+                  },
+                  {
+                    id:"finestra", label:"Finestra operativa",
+                    value:"10:00–11:30",
+                    sub:"evita 09:30–09:45", subTooltip:"Fascia oraria ottimale per esecuzione (EST). Evitare i primi 15 min per spread più ampi.",
+                    accent:"#a78bfa",
+                    detail:<><div>Fascia ottimale: 10:00–11:30 EST</div><div>Evitare: 09:30–09:45 (apertura)</div><div>Seconda finestra: 14:00–15:00 EST</div></>,
+                  },
+                ];
                 return (
                   <div style={{display:"flex", gap:6, padding:"8px 12px 6px", flexWrap:"wrap", borderBottom:"1px solid var(--border)"}}>
-                    {kpiCard(
-                      "gate", "Gate Go/No-Go",
-                      goGate?.pass ? "GO ✓" : "NO-GO",
-                      "accesso mercato", "Autorizzazione sistema ad operare. FAIL blocca nuovi ordini.",
-                      goGate?.pass ? "#4ade80" : "#f87171",
-                      goGate && !goGate.pass && goGate.reasons.length > 0
-                        ? <>{goGate.reasons.map((r,i) => <div key={i}>· {r}</div>)}</>
-                        : goGate?.pass ? <div style={{color:"#4ade80"}}>Tutti i controlli superati</div> : null,
-                    )}
-                    {kpiCard(
-                      "regime", "Regime · Sizing",
-                      premarketRegime ?? "—",
-                      premarketRegime === "NORMAL" ? "sizing 100%" : premarketRegime === "CAUTION" ? "sizing 50%" : premarketRegime === "SHOCK" ? "sizing 0%" : "—",
-                      "Stato di mercato rilevato dal classificatore HMM. CAUTION dimezza il sizing. SHOCK blocca tutto.",
-                      premarketRegime === "NORMAL" ? "#4ade80" : premarketRegime === "CAUTION" ? "#fbbf24" : "#f87171",
-                      <><div>NORMAL → sizing 100%, tutte le strategie</div><div>CAUTION → sizing 50%, solo spread stretti</div><div>SHOCK → sizing 0%, nessun nuovo trade</div></>,
-                    )}
-                    {kpiCard(
-                      "exits", "Exit urgenti",
-                      urgentExits.length,
-                      urgentExits.length > 0 ? "attenzione richiesta" : "nessuna azione",
-                      "Posizioni che superano la soglia di score di uscita (≥5). Richiedono revisione immediata.",
-                      urgentExits.length > 0 ? "#fbbf24" : "#4ade80",
-                      urgentExits.length > 0
-                        ? <>{urgentExits.map((c,i) => <div key={i}>{c.symbol} {c.right ?? ""} {c.strike ?? ""} — score {c.exit_score}</div>)}</>
-                        : null,
-                    )}
-                    {kpiCard(
-                      "trades", "Trades chiusi",
-                      sysStatus?.n_closed_trades ?? 0,
-                      "paper journal",
-                      "Numero di operazioni chiuse nel journal di paper trading. Soglia Kelly: 50 trade.",
-                      "#60a5fa",
-                      <><div>Kelly gate: {(sysStatus?.n_closed_trades ?? 0) >= 50 ? "✓ sbloccato" : `✗ servono ancora ${50 - (sysStatus?.n_closed_trades ?? 0)} trade`}</div><div style={{marginTop:4}}>Per dettagli → tab METRICHE</div></>,
-                    )}
-                    {kpiCard(
-                      "finestra", "Finestra operativa",
-                      "10:00–11:30",
-                      "evita 09:30–09:45",
-                      "Fascia oraria ottimale per l'esecuzione (EST). Evitare i primi 15 min di apertura per spread più ampi.",
-                      "#a78bfa",
-                      <><div>Fascia ottimale: 10:00–11:30 EST</div><div>Evitare: 09:30–09:45 (apertura)</div><div>Seconda finestra: 14:00–15:00 EST</div></>,
-                    )}
+                    {kpiDefs.map(k => kpiCard(k.id, k.label, k.value, k.sub, k.subTooltip, k.accent, k.detail))}
                   </div>
                 );
               })()}
@@ -3125,120 +3159,50 @@ export default function App() {
                     );
                   })()}
 
-                  {/* ── DUMP — tecnico/dev, collassato di default ── */}
-                  <div style={{borderTop:"1px solid var(--border)", marginTop:12, paddingTop:8}}>
-                    <div style={{border:"1px solid #2a2a2a", borderRadius:3, overflow:"hidden"}}>
-                      {/* Semaforino = marker visivo universale DUMP */}
-                      <div style={{display:"flex", alignItems:"center", gap:5, padding:"4px 8px",
-                        background:"#0d0d0d", cursor:"pointer",
-                        borderBottom: dumpOpen ? "1px solid #2a2a2a" : "none"}}
-                        onClick={() => setDumpOpen(o => !o)}>
-                        <span style={{width:7, height:7, borderRadius:"50%", background:"#ef4444", display:"inline-block"}}/>
-                        <span style={{width:7, height:7, borderRadius:"50%", background:"#eab308", display:"inline-block"}}/>
-                        <span style={{width:7, height:7, borderRadius:"50%", background:"#22c55e", display:"inline-block"}}/>
-                        <span style={{fontSize:"0.63rem", color:"#555", fontFamily:"monospace", marginLeft:4, letterSpacing:"0.05em"}}>DUMP</span>
-                        <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"#444"}}>{dumpOpen ? "▲" : "▼"}</span>
-                      </div>
-                      {dumpOpen && (
-                        <div style={{padding:0}}>
-
-                          {/* ─── Sezione 1: execution_window.log ─── */}
-                          <div style={{borderBottom:"1px solid #1e1e1e"}}>
-                            <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
-                              onClick={() => setExecWindowOpen(o => !o)}>
-                              <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{execWindowOpen ? "▾" : "▸"}</span>
-                              <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>execution_window.log</span>
-                            </div>
-                            {execWindowOpen && (
-                              <div style={{padding:"6px 12px 10px"}}>
-                                <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE 🛑" : "off"}</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">go_nogo_gate</span><span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "PASS" : "FAIL"}</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">kelly_enabled</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "yes" : "no"}</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">sizing</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">candidati</span><span className="sev-data">{premarketShortlistCount}</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">exit_urgenti</span><span className={urgentExits.length > 0 ? "sev-warn" : "sev-ok"}>{urgentExits.length}</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">trades_chiusi</span><span className="sev-data">{sysStatus?.n_closed_trades ?? 0}</span></div>
-                                {goGate && !goGate.pass && goGate.reasons.length > 0 && (
-                                  <div className="lc-screen-section">
-                                    <div style={{color:"var(--amber)", fontSize:"0.6rem", marginBottom:4}}>motivi no-go:</div>
-                                    {goGate.reasons.map((r, i) => <div key={i} style={{fontSize:"0.6rem", color:"var(--dim)"}}>· {r}</div>)}
-                                  </div>
-                                )}
-                                <div style={{marginTop:8}}>
-                                  <button className="btn btn-ghost" style={{fontSize:"0.6rem"}} onClick={refreshAll} disabled={busy}>⟳ refresh</button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* ─── Sezione 2: ESECUZIONE ORDINE ─── */}
-                          <div>
-                            <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
-                              onClick={() => setOpExecOpen(o => !o)}>
-                              <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{opExecOpen ? "▾" : "▸"}</span>
-                              <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>esecuzione_ordine</span>
-                              {!opExecOpen && symbol && (
-                                <span style={{fontSize:"0.6rem", color:"var(--muted)", marginLeft:4}}>{symbol} · {strategy}</span>
-                              )}
-                            </div>
-                            {opExecOpen && (
-                              <div style={{padding:"6px 12px 10px"}}>
-                                {!blk("order_preview").interactive && blk("order_preview").reason && (
-                                  <div className="notice error" style={{marginBottom:6, fontSize:"0.7rem"}}>
-                                    🛑 {blk("order_preview").reason}
-                                  </div>
-                                )}
-                                <div className="form-grid" style={{fontSize:"0.72rem"}}>
-                                  <label>Symbol</label>
-                                  <input value={symbol} onChange={e => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
-                                  <label>Strategia</label>
-                                  <select value={strategy} onChange={e => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive}
-                                    style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
-                                    <option value="BULL_PUT">BULL_PUT</option>
-                                    {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
-                                    {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
-                                    {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
-                                    {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
-                                    {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE"].includes(strategy) && <option value={strategy}>{strategy}</option>}
-                                  </select>
-                                  <label>Payload JSON</label>
-                                  <textarea rows={4} value={payload} onChange={e => setPayload(e.target.value)} disabled={!blk("order_preview").interactive}
-                                    style={{fontSize:"0.68rem", fontFamily:"monospace"}} />
-                                </div>
-                                {payloadJsonError && <div className="notice error" style={{fontSize:"0.7rem"}}>Payload JSON non valido.</div>}
-                                {previewDirty && <div className="notice error" style={{fontSize:"0.7rem"}}>Preview non allineata al payload.</div>}
-                                <div className="actions" style={{marginTop:6}}>
-                                  <button className="btn btn-primary" onClick={() => void doPreview()}
-                                    disabled={busy || payloadJsonError || !blk("order_preview").interactive}>
-                                    {busy ? "..." : "▶ PREVIEW"}
-                                  </button>
-                                  <select value={confirmDecision} onChange={e => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}
-                                    disabled={!blk("order_confirm").interactive}
-                                    style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
-                                    <option value="APPROVE">APPROVE</option>
-                                    <option value="REJECT">REJECT</option>
-                                  </select>
-                                  <button
-                                    className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
-                                    onClick={doConfirm}
-                                    disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
-                                    title={confirmArmed ? "Clicca ancora per inviare" : "Prima conferma"}
-                                  >{confirmArmed ? "⚠ CONFERMA?" : "CONFIRM"}</button>
-                                </div>
-                                {preview && <pre className="console" style={{fontSize:"0.62rem", marginTop:6}}>{JSON.stringify(preview, null, 2)}</pre>}
-                              </div>
-                            )}
-                          </div>
-
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
 
-                {/* ── POSIZIONI APERTE — colonna destra ── */}
-                <div className="lc-screen" style={{display:"flex", flexDirection:"column"}}>
+                {/* ── Colonna destra: blocchi pinnati + POSIZIONI APERTE ── */}
+                <div style={{display:"flex", flexDirection:"column", gap:0}} className="lc-screen">
+                {/* Blocchi KPI pinnati — in cima alla colonna destra */}
+                {pinnedKpis.length > 0 && (() => {
+                  // Dati KPI inline (senza accesso all'IIFE della barra)
+                  const pinnedData: Record<string, {label:string, value:React.ReactNode, sub:string, accent:string}> = {
+                    gate:     { label:"Gate Go/No-Go", value: goGate?.pass ? "GO ✓" : "NO-GO",   sub:"accesso mercato",  accent: goGate?.pass ? "#4ade80" : "#f87171" },
+                    regime:   { label:"Regime · Sizing", value: premarketRegime ?? "—",          sub: premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : premarketRegime === "SHOCK" ? "0%" : "—",  accent: premarketRegime === "NORMAL" ? "#4ade80" : premarketRegime === "CAUTION" ? "#fbbf24" : "#f87171" },
+                    exits:    { label:"Exit urgenti",  value: urgentExits.length,                sub: urgentExits.length > 0 ? "⚠ attenzione" : "ok",  accent: urgentExits.length > 0 ? "#fbbf24" : "#4ade80" },
+                    trades:   { label:"Trades chiusi", value: sysStatus?.n_closed_trades ?? 0,  sub:"paper journal",    accent:"#60a5fa" },
+                    finestra: { label:"Finestra",      value:"10:00–11:30",                      sub:"evita 09:30–09:45", accent:"#a78bfa" },
+                  };
+                  return (
+                    <div style={{display:"flex", flexDirection:"column", gap:4, padding:"8px 10px", borderBottom:"1px solid var(--border)"}}>
+                      {pinnedKpis.map(id => {
+                        const d = pinnedData[id];
+                        if (!d) return null;
+                        return (
+                          <div key={id} style={{
+                            background:"var(--p2)", border:`1px solid ${d.accent}22`,
+                            borderRadius:3, padding:"5px 8px", display:"flex", alignItems:"center", gap:8,
+                          }}>
+                            <div style={{flex:1, minWidth:0}}>
+                              <div style={{fontSize:"0.55rem", color:"#555", textTransform:"uppercase", letterSpacing:"0.05em"}}>{d.label}</div>
+                              <div style={{fontSize:"0.9rem", fontWeight:700, color:d.accent, lineHeight:1.1}}>{d.value}</div>
+                              <div style={{fontSize:"0.55rem", color:"#444"}}>{d.sub}</div>
+                            </div>
+                            <span onClick={() => setPinnedKpis(v => v.filter(x => x !== id))}
+                              title="Rimuovi dalla colonna destra"
+                              style={{fontSize:"0.65rem", color:"#333", cursor:"pointer", padding:"2px 4px", userSelect:"none"}}
+                              onMouseEnter={e => (e.currentTarget.style.color = "#888")}
+                              onMouseLeave={e => (e.currentTarget.style.color = "#333")}>
+                              ✕
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                {/* POSIZIONI APERTE */}
+                <div style={{flex:1, display:"flex", flexDirection:"column"}}>
                   <div className="lc-screen-bar">
                     <span className="lc-screen-title">POSIZIONI APERTE</span>
                     {ibkrAccount && (
@@ -3294,6 +3258,118 @@ export default function App() {
                       </table>
                     )}
                   </div>
+                </div>{/* fine flex:1 POSIZIONI APERTE */}
+                </div>{/* fine lc-screen colonna destra */}
+              </div>{/* fine lc-body */}
+
+              {/* ── DUMP — tecnico/dev, collassato di default ── */}
+              <div style={{borderTop:"1px solid var(--border)"}}>
+                <div style={{border:"1px solid #2a2a2a", borderRadius:3, overflow:"hidden"}}>
+                  {/* Semaforino = marker visivo universale DUMP */}
+                  <div style={{display:"flex", alignItems:"center", gap:5, padding:"4px 8px",
+                    background:"#0d0d0d", cursor:"pointer",
+                    borderBottom: dumpOpen ? "1px solid #2a2a2a" : "none"}}
+                    onClick={() => setDumpOpen(o => !o)}>
+                    <span style={{width:7, height:7, borderRadius:"50%", background:"#ef4444", display:"inline-block"}}/>
+                    <span style={{width:7, height:7, borderRadius:"50%", background:"#eab308", display:"inline-block"}}/>
+                    <span style={{width:7, height:7, borderRadius:"50%", background:"#22c55e", display:"inline-block"}}/>
+                    <span style={{fontSize:"0.63rem", color:"#555", fontFamily:"monospace", marginLeft:4, letterSpacing:"0.05em"}}>DUMP</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"#444"}}>{dumpOpen ? "▲" : "▼"}</span>
+                  </div>
+                  {dumpOpen && (
+                    <div style={{padding:0}}>
+
+                      {/* ─── Sezione 1: execution_window.log ─── */}
+                      <div style={{borderBottom:"1px solid #1e1e1e"}}>
+                        <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
+                          onClick={() => setExecWindowOpen(o => !o)}>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{execWindowOpen ? "▾" : "▸"}</span>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>execution_window.log</span>
+                        </div>
+                        {execWindowOpen && (
+                          <div style={{padding:"6px 12px 10px"}}>
+                            <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE 🛑" : "off"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">go_nogo_gate</span><span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "PASS" : "FAIL"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">kelly_enabled</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "yes" : "no"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">sizing</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">candidati</span><span className="sev-data">{premarketShortlistCount}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">exit_urgenti</span><span className={urgentExits.length > 0 ? "sev-warn" : "sev-ok"}>{urgentExits.length}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">trades_chiusi</span><span className="sev-data">{sysStatus?.n_closed_trades ?? 0}</span></div>
+                            {goGate && !goGate.pass && goGate.reasons.length > 0 && (
+                              <div className="lc-screen-section">
+                                <div style={{color:"var(--amber)", fontSize:"0.6rem", marginBottom:4}}>motivi no-go:</div>
+                                {goGate.reasons.map((r, i) => <div key={i} style={{fontSize:"0.6rem", color:"var(--dim)"}}>· {r}</div>)}
+                              </div>
+                            )}
+                            <div style={{marginTop:8}}>
+                              <button className="btn btn-ghost" style={{fontSize:"0.6rem"}} onClick={refreshAll} disabled={busy}>⟳ refresh</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ─── Sezione 2: ESECUZIONE ORDINE ─── */}
+                      <div>
+                        <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
+                          onClick={() => setOpExecOpen(o => !o)}>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{opExecOpen ? "▾" : "▸"}</span>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>esecuzione_ordine</span>
+                          {!opExecOpen && symbol && (
+                            <span style={{fontSize:"0.6rem", color:"var(--muted)", marginLeft:4}}>{symbol} · {strategy}</span>
+                          )}
+                        </div>
+                        {opExecOpen && (
+                          <div style={{padding:"6px 12px 10px"}}>
+                            {!blk("order_preview").interactive && blk("order_preview").reason && (
+                              <div className="notice error" style={{marginBottom:6, fontSize:"0.7rem"}}>
+                                🛑 {blk("order_preview").reason}
+                              </div>
+                            )}
+                            <div className="form-grid" style={{fontSize:"0.72rem"}}>
+                              <label>Symbol</label>
+                              <input value={symbol} onChange={e => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
+                              <label>Strategia</label>
+                              <select value={strategy} onChange={e => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive}
+                                style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
+                                <option value="BULL_PUT">BULL_PUT</option>
+                                {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
+                                {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
+                                {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
+                                {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
+                                {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE"].includes(strategy) && <option value={strategy}>{strategy}</option>}
+                              </select>
+                              <label>Payload JSON</label>
+                              <textarea rows={4} value={payload} onChange={e => setPayload(e.target.value)} disabled={!blk("order_preview").interactive}
+                                style={{fontSize:"0.68rem", fontFamily:"monospace"}} />
+                            </div>
+                            {payloadJsonError && <div className="notice error" style={{fontSize:"0.7rem"}}>Payload JSON non valido.</div>}
+                            {previewDirty && <div className="notice error" style={{fontSize:"0.7rem"}}>Preview non allineata al payload.</div>}
+                            <div className="actions" style={{marginTop:6}}>
+                              <button className="btn btn-primary" onClick={() => void doPreview()}
+                                disabled={busy || payloadJsonError || !blk("order_preview").interactive}>
+                                {busy ? "..." : "▶ PREVIEW"}
+                              </button>
+                              <select value={confirmDecision} onChange={e => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}
+                                disabled={!blk("order_confirm").interactive}
+                                style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
+                                <option value="APPROVE">APPROVE</option>
+                                <option value="REJECT">REJECT</option>
+                              </select>
+                              <button
+                                className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
+                                onClick={doConfirm}
+                                disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
+                                title={confirmArmed ? "Clicca ancora per inviare" : "Prima conferma"}
+                              >{confirmArmed ? "⚠ CONFERMA?" : "CONFIRM"}</button>
+                            </div>
+                            {preview && <pre className="console" style={{fontSize:"0.62rem", marginTop:6}}>{JSON.stringify(preview, null, 2)}</pre>}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
