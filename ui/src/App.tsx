@@ -790,13 +790,13 @@ export default function App() {
   const [ibkrChecking, setIbkrChecking] = useState<boolean>(false);
   const [ibkrAccount, setIbkrAccount] = useState<IbkrAccountResponse | null>(null);
   const [ibkrAccountLoading, setIbkrAccountLoading] = useState<boolean>(false);
-  const [posTab, setPosTab] = useState<"live"|"storico">("live");
   const [storicoTrades, setStoricoTrades] = useState<any[]>([]);
   const [storicoSummary, setStoricoSummary] = useState<any>(null);
   const [storicoLoading, setStoricoLoading] = useState(false);
   const [storicoFrom, setStoricoFrom] = useState<string>("");
   const [storicoTo, setStoricoTo] = useState<string>("");
   const [posOutcomeFilter, setPosOutcomeFilter] = useState<"tutti"|"positivi"|"negativi"|"aperti">("tutti");
+  const [posStrategyFilter, setPosStrategyFilter] = useState<string>("tutte");
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
@@ -3249,30 +3249,27 @@ export default function App() {
                     <div style={{display:"flex", flexDirection:"column", gap:2, minWidth:0}}>
                       <span className="lc-panel-title" style={{margin:0}}>
                         POSIZIONI
-                        {/* contatori (tot/pos/neg/aperti) sempre visibili */}
+                        {/* contatori assoluti — INDIPENDENTI dai filtri */}
                         {(() => {
-                          const byDate = storicoTrades.filter(t => {
-                            const d = t.exit_ts_utc?.slice(0,10);
-                            return d && (!storicoFrom || d >= storicoFrom) && (!storicoTo || d <= storicoTo);
-                          });
-                          const tot  = byDate.length;
-                          const pos  = byDate.filter(t => (t.pnl ?? 0) >= 0).length;
-                          const neg  = byDate.filter(t => (t.pnl ?? 0) <  0).length;
+                          const chiusi = storicoTrades.filter(t => !!t.exit_ts_utc);
+                          const tot  = chiusi.length;
+                          const pos  = chiusi.filter(t => (t.pnl ?? 0) >= 0).length;
+                          const neg  = chiusi.filter(t => (t.pnl ?? 0) <  0).length;
                           const ape  = storicoTrades.filter(t => !t.exit_ts_utc).length;
                           const live = ibkrAccount?.positions.length ?? 0;
                           return (
                             <span style={{fontWeight:400, marginLeft:6, fontSize:"0.65rem"}}>
                               <span style={{color:"#555"}}>(</span>
-                              <span style={{color:"#888"}} title="Trades chiusi nel periodo">{tot}</span>
+                              <span style={{color:"#888"}} title="Totale trades chiusi (lifetime)">{tot}</span>
                               <span style={{color:"#444"}}>/</span>
-                              <span style={{color:"#4ade80"}} title="PnL ≥ 0">{pos}</span>
+                              <span style={{color:"#4ade80"}} title="Trades chiusi positivi (lifetime)">{pos}</span>
                               <span style={{color:"#444"}}>/</span>
-                              <span style={{color:"#f87171"}} title="PnL < 0">{neg}</span>
+                              <span style={{color:"#f87171"}} title="Trades chiusi negativi (lifetime)">{neg}</span>
                               <span style={{color:"#444"}}>/</span>
-                              <span style={{color:"#fbbf24"}} title="Aperti">{ape}</span>
+                              <span style={{color:"#fbbf24"}} title="Trades ancora aperti nel journal">{ape}</span>
                               <span style={{color:"#555"}}>)</span>
-                              {posTab === "live" && live > 0 && (
-                                <span style={{color:"#555"}}> · live({live})</span>
+                              {live > 0 && (
+                                <span style={{color:"#555"}} title="Posizioni aperte sul broker"> · live({live})</span>
                               )}
                             </span>
                           );
@@ -3310,62 +3307,29 @@ export default function App() {
                       </span>
                     </div>
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px", marginTop:2}}
-                      disabled={posTab === "live" ? ibkrAccountLoading : storicoLoading}
-                      onClick={() => posTab === "live" ? void doFetchIbkrAccount() : void doFetchStorico()}>
-                      {(posTab === "live" ? ibkrAccountLoading : storicoLoading) ? "…" : "⟳"}
+                      disabled={storicoLoading || ibkrAccountLoading}
+                      onClick={() => { void doFetchStorico(); void doFetchIbkrAccount(); }}>
+                      {(storicoLoading || ibkrAccountLoading) ? "…" : "⟳"}
                     </button>
                   </div>
 
-                  {/* ── Riga filtri 1 — contesto: LIVE / STORICO ── */}
-                  <div style={{display:"flex", gap:4, marginBottom:4, flexWrap:"wrap", alignItems:"center"}}>
-                    {(["live","storico"] as const).map(t => {
-                      const active = posTab === t;
-                      const color = t === "live" ? "#4ade80" : "#60a5fa";
-                      const count = t === "live" ? (ibkrAccount?.positions.length ?? 0) : storicoTrades.length;
-                      return (
-                        <button key={t} onClick={() => {
-                          setPosTab(t);
-                          if (t === "storico" && storicoTrades.length === 0) void doFetchStorico();
-                        }} style={{
-                          fontSize:"0.6rem", padding:"2px 7px", borderRadius:3, cursor:"pointer",
-                          border:`1px solid ${active ? color : "#333"}`,
-                          background: active ? color+"15" : "transparent",
-                          color: active ? color : "#555",
-                          fontWeight: active ? 600 : 400,
-                          transition:"all 0.15s",
-                        }}>
-                          {t === "live" ? "LIVE" : "STORICO"} <span style={{opacity:0.7}}>({count})</span>
-                        </button>
-                      );
-                    })}
-                    {posTab === "live" && ibkrAccount && (
-                      <span style={{fontSize:"0.58rem", color: ibkrAccount.connected ? "var(--g1)" : "var(--muted)", marginLeft:4}}>
-                        {ibkrAccount.connected ? "LIVE" : "OFFLINE"}
-                        {ibkrAccount.net_liquidation != null && ` · €${ibkrAccount.net_liquidation.toLocaleString("it-IT",{maximumFractionDigits:0})}`}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* ── Riga filtri 2 — esito (solo STORICO) ── */}
-                  {posTab === "storico" && (() => {
-                    const base = storicoTrades.filter(t => {
+                  {/* ── Riga filtri 1 — esito + date sulla stessa riga ── */}
+                  {(() => {
+                    const byDate = storicoTrades.filter(t => {
+                      if (posOutcomeFilter === "aperti") return false;
                       const d = t.exit_ts_utc?.slice(0,10);
-                      return (!storicoFrom || (d && d >= storicoFrom)) && (!storicoTo || (d && d <= storicoTo));
+                      return d != null && (!storicoFrom || d >= storicoFrom) && (!storicoTo || d <= storicoTo);
                     });
                     const counts: Record<"tutti"|"positivi"|"negativi"|"aperti", number> = {
-                      tutti:    base.length,
-                      positivi: base.filter(t => (t.pnl ?? 0) >= 0).length,
-                      negativi: base.filter(t => (t.pnl ?? 0) <  0).length,
+                      tutti:    byDate.length,
+                      positivi: byDate.filter(t => (t.pnl ?? 0) >= 0).length,
+                      negativi: byDate.filter(t => (t.pnl ?? 0) <  0).length,
                       aperti:   storicoTrades.filter(t => !t.exit_ts_utc).length,
                     };
-                    const labels: Record<"tutti"|"positivi"|"negativi"|"aperti", string> = {
-                      tutti:"TUTTI", positivi:"POSITIVI", negativi:"NEGATIVI", aperti:"APERTI",
-                    };
-                    const colors: Record<"tutti"|"positivi"|"negativi"|"aperti", string> = {
-                      tutti:"#888", positivi:"#4ade80", negativi:"#f87171", aperti:"#fbbf24",
-                    };
+                    const labels = {tutti:"TUTTI", positivi:"POSITIVI", negativi:"NEGATIVI", aperti:"APERTI"};
+                    const colors = {tutti:"#888", positivi:"#4ade80", negativi:"#f87171", aperti:"#fbbf24"};
                     return (
-                      <div style={{display:"flex", gap:4, marginBottom:4, flexWrap:"wrap", alignItems:"center"}}>
+                      <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
                         {(["tutti","positivi","negativi","aperti"] as const).map(f => {
                           const active = posOutcomeFilter === f;
                           const col = colors[f];
@@ -3382,123 +3346,114 @@ export default function App() {
                             </button>
                           );
                         })}
+                        {/* date inputs sulla stessa riga, spintonati a destra */}
+                        <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:3, flexWrap:"nowrap"}}>
+                          <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
+                          <input type="date" value={storicoFrom} onChange={e => setStoricoFrom(e.target.value)}
+                            style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                              border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                          <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>al</span>
+                          <input type="date" value={storicoTo} onChange={e => setStoricoTo(e.target.value)}
+                            style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                              border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                          {(storicoFrom || storicoTo) && (
+                            <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"0 4px"}}
+                              onClick={() => { setStoricoFrom(""); setStoricoTo(""); }}>✕</button>
+                          )}
+                        </div>
                       </div>
                     );
                   })()}
 
-                  {/* ── Riga filtri 3 — intervallo date (solo STORICO) ── */}
-                  {posTab === "storico" && (
-                    <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap"}}>
-                      <span style={{fontSize:"0.58rem", color:"var(--dim)"}}>da</span>
-                      <input type="date" value={storicoFrom} onChange={e => setStoricoFrom(e.target.value)}
-                        style={{fontSize:"0.6rem", background:"var(--p2)", color:"var(--text)", border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px"}} />
-                      <span style={{fontSize:"0.58rem", color:"var(--dim)"}}>a</span>
-                      <input type="date" value={storicoTo} onChange={e => setStoricoTo(e.target.value)}
-                        style={{fontSize:"0.6rem", background:"var(--p2)", color:"var(--text)", border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px"}} />
-                      {(storicoFrom || storicoTo) && (
-                        <button className="btn btn-ghost" style={{fontSize:"0.58rem", padding:"0 4px"}}
-                          onClick={() => { setStoricoFrom(""); setStoricoTo(""); }}>✕</button>
-                      )}
-                    </div>
-                  )}
-                  {posTab === "live" && <div style={{marginBottom:8}} />}
+                  {/* ── Riga filtri 2 — strategia (dinamica dai dati) ── */}
+                  {(() => {
+                    const strategies = ["tutte", ...Array.from(new Set(
+                      storicoTrades.map(t => t.strategy).filter(Boolean)
+                    )).sort() as string[]];
+                    if (strategies.length <= 1) return null;
+                    return (
+                      <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                          letterSpacing:"0.06em", marginRight:2}}>str</span>
+                        {strategies.map(s => {
+                          const active = posStrategyFilter === s;
+                          return (
+                            <button key={s} onClick={() => setPosStrategyFilter(s)} style={{
+                              fontSize:"0.58rem", padding:"1px 6px", borderRadius:3, cursor:"pointer",
+                              border:`1px solid ${active ? "#60a5fa" : "#333"}`,
+                              background: active ? "#60a5fa18" : "transparent",
+                              color: active ? "#60a5fa" : "#555",
+                              fontWeight: active ? 600 : 400,
+                              transition:"all 0.15s",
+                            }}>
+                              {s === "tutte" ? "TUTTE" : s}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
 
-                  {/* ── TAB LIVE ── */}
-                  {posTab === "live" && (
-                    <div style={{overflowX:"auto", maxHeight:240, overflowY:"auto"}}>
-                      {!ibkrAccount && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessun dato disponibile.</div>}
-                      {ibkrAccount && ibkrAccount.positions.length === 0 && (
-                        <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessuna posizione aperta.</div>
-                      )}
-                      {ibkrAccount && ibkrAccount.positions.length > 0 && (
-                        <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
-                          <thead>
-                            <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>Scad.</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}>Strike</th>
-                              <th style={{textAlign:"center", padding:"2px 4px"}} title="P = Put · C = Call">P/C</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}} title="Qty negativo = posizione corta">Qty</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}} title="Profitto/perdita non realizzato">uPnL</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {ibkrAccount.positions.map((pos, i) => (
-                              <tr key={i} style={{borderBottom:"1px solid #222"}}>
-                                <td style={{padding:"2px 4px", color:"#666"}}>#{i+1}</td>
-                                <td style={{padding:"2px 4px", fontWeight:600}}>{pos.symbol}</td>
-                                <td style={{padding:"2px 4px", color:"#888", fontSize:"0.62rem"}}>{pos.expiry ?? "—"}</td>
-                                <td style={{padding:"2px 4px", textAlign:"right"}}>{pos.strike != null && pos.strike !== 0 ? pos.strike : "—"}</td>
-                                <td style={{padding:"2px 4px", textAlign:"center", color:pos.right==="C"?"#60a5fa":"#fb923c"}}>{pos.right ?? "—"}</td>
-                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.quantity??0)<0?"#f87171":"#4ade80"}}
-                                  title={(pos.quantity??0)<0?"Posizione corta":"Posizione lunga"}>{pos.quantity}</td>
-                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.unrealized_pnl??0)>=0?"#4ade80":"#f87171"}}>
-                                  {pos.unrealized_pnl!=null?`${pos.unrealized_pnl>=0?"+":""}${pos.unrealized_pnl.toFixed(0)}`:"—"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ── TAB STORICO ── */}
-                  {posTab === "storico" && (() => {
-                    // filtra per data + esito
-                    const byDate = storicoTrades.filter(t => {
-                      const exitDate = t.exit_ts_utc ? t.exit_ts_utc.slice(0, 10) : null;
-                      if (posOutcomeFilter === "aperti") return !t.exit_ts_utc;
-                      if (!exitDate) return false;
-                      if (storicoFrom && exitDate < storicoFrom) return false;
-                      if (storicoTo   && exitDate > storicoTo)   return false;
+                  {/* ── TABELLA ── applica tutti i filtri: esito + data + strategia ── */}
+                  {(() => {
+                    const filtered = storicoTrades.filter(t => {
+                      // filtro esito
+                      if (posOutcomeFilter === "aperti") {
+                        if (t.exit_ts_utc) return false;
+                      } else {
+                        const exitDate = t.exit_ts_utc?.slice(0,10);
+                        if (!exitDate) return false;
+                        if (storicoFrom && exitDate < storicoFrom) return false;
+                        if (storicoTo   && exitDate > storicoTo)   return false;
+                        if (posOutcomeFilter === "positivi" && (t.pnl ?? 0) <  0) return false;
+                        if (posOutcomeFilter === "negativi" && (t.pnl ?? 0) >= 0) return false;
+                      }
+                      // filtro strategia
+                      if (posStrategyFilter !== "tutte" && t.strategy !== posStrategyFilter) return false;
                       return true;
                     });
-                    const filtered = byDate.filter(t => {
-                      if (posOutcomeFilter === "positivi") return (t.pnl ?? 0) >= 0;
-                      if (posOutcomeFilter === "negativi") return (t.pnl ?? 0) <  0;
-                      return true; // "tutti" e "aperti" già gestiti sopra
-                    });
-                    const nTot = filtered.length;
-                    const nPos = filtered.filter(t => (t.pnl ?? 0) >= 0).length;
-                    const nNeg = filtered.filter(t => (t.pnl ?? 0) < 0).length;
+                    const nTot   = filtered.length;
+                    const nPos   = filtered.filter(t => (t.pnl ?? 0) >= 0).length;
                     const sumPnl = filtered.reduce((s, t) => s + (t.pnl ?? 0), 0);
-                    const maxWin  = filtered.length ? Math.max(...filtered.map(t => t.pnl ?? 0)) : null;
-                    const maxLoss = filtered.length ? Math.min(...filtered.map(t => t.pnl ?? 0)) : null;
+                    const maxWin  = nTot ? Math.max(...filtered.map(t => t.pnl ?? 0)) : null;
+                    const maxLoss = nTot ? Math.min(...filtered.map(t => t.pnl ?? 0)) : null;
                     const winRate = nTot > 0 ? (nPos / nTot * 100) : null;
-                    const fmtPnl = (v: number | null) => v == null ? "—" : `${v>=0?"+":""}${v.toFixed(0)}`;
+                    const fmtPnl  = (v: number | null) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(0)}`;
+                    const pill = (label: string, value: React.ReactNode, accent: string, tip?: string) => (
+                      <div key={label} title={tip} style={{
+                        flex:"1 1 auto", minWidth:54,
+                        background:"var(--p2)", border:`1px solid ${accent}22`,
+                        borderRadius:3, padding:"4px 6px",
+                      }}>
+                        <div style={{fontSize:"0.5rem", color:"#555", textTransform:"uppercase",
+                          letterSpacing:"0.05em", lineHeight:1}}>{label}</div>
+                        <div style={{fontSize:"0.8rem", fontWeight:700, color:accent, lineHeight:1.2}}>{value}</div>
+                      </div>
+                    );
                     return (
                       <div>
-                        {/* strip metriche — pill cards compatte */}
-                        {nTot > 0 && (() => {
-                          const pill = (label: string, value: React.ReactNode, accent: string, tip?: string) => (
-                            <div key={label} title={tip} style={{
-                              flex:"1 1 auto", minWidth:54,
-                              background:"var(--p2)", border:`1px solid ${accent}22`,
-                              borderRadius:3, padding:"4px 6px",
-                            }}>
-                              <div style={{fontSize:"0.5rem", color:"#555", textTransform:"uppercase", letterSpacing:"0.05em", lineHeight:1}}>{label}</div>
-                              <div style={{fontSize:"0.8rem", fontWeight:700, color:accent, lineHeight:1.2}}>{value}</div>
-                            </div>
-                          );
-                          return (
-                            <div style={{display:"flex", gap:5, marginBottom:8, flexWrap:"wrap", paddingBottom:8, borderBottom:"1px solid #1e1e1e"}}>
-                              {pill("P&L", fmtPnl(sumPnl), sumPnl >= 0 ? "#4ade80" : "#f87171", "PnL cumulato del periodo")}
-                              {pill("win%", winRate != null ? winRate.toFixed(0)+"%" : "—", winRate != null && winRate >= 50 ? "#4ade80" : "#fbbf24", "Percentuale trade in profitto")}
-                              {pill("▲ best", fmtPnl(maxWin), "#4ade80", "Trade migliore")}
-                              {pill("▼ worst", fmtPnl(maxLoss), "#f87171", "Trade peggiore")}
-                            </div>
-                          );
-                        })()}
-                        {storicoLoading && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Caricamento…</div>}
+                        {nTot > 0 && (
+                          <div style={{display:"flex", gap:5, marginBottom:8, flexWrap:"wrap",
+                            paddingBottom:8, borderBottom:"1px solid #1e1e1e"}}>
+                            {pill("P&L", fmtPnl(sumPnl), sumPnl >= 0 ? "#4ade80" : "#f87171", "PnL cumulato")}
+                            {pill("win%", winRate != null ? winRate.toFixed(0)+"%" : "—",
+                              winRate != null && winRate >= 50 ? "#4ade80" : "#fbbf24", "Win rate")}
+                            {pill("▲ best", fmtPnl(maxWin), "#4ade80", "Trade migliore")}
+                            {pill("▼ worst", fmtPnl(maxLoss), "#f87171", "Trade peggiore")}
+                          </div>
+                        )}
+                        {storicoLoading && (
+                          <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Caricamento…</div>
+                        )}
                         {!storicoLoading && filtered.length === 0 && (
                           <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>
-                            {storicoTrades.length === 0 ? "Nessun trade nel journal." : "Nessun trade nel periodo selezionato."}
+                            {storicoTrades.length === 0
+                              ? "Nessun trade nel journal."
+                              : "Nessun trade per i filtri selezionati."}
                           </div>
                         )}
                         {filtered.length > 0 && (
-                          <div style={{overflowX:"auto", maxHeight:200, overflowY:"auto"}}>
+                          <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
                             <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                               <thead>
                                 <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
@@ -3507,28 +3462,31 @@ export default function App() {
                                   <th style={{textAlign:"left", padding:"2px 4px"}}>Str</th>
                                   <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL realizzato">PnL</th>
                                   <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL %">%</th>
-                                  <th style={{textAlign:"left", padding:"2px 4px"}} title="Data uscita">Data</th>
+                                  <th style={{textAlign:"left", padding:"2px 4px"}}>
+                                    {posOutcomeFilter === "aperti" ? "Entrata" : "Uscita"}
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {filtered.map((t, i) => {
-                                  const pnl = t.pnl ?? null;
+                                  const pnl    = t.pnl ?? null;
                                   const pnlPct = t.pnl_pct ?? null;
-                                  const pnlColor = pnl==null?"#666":pnl>=0?"#4ade80":"#f87171";
+                                  const pnlCol = pnl == null ? "#666" : pnl >= 0 ? "#4ade80" : "#f87171";
+                                  const dateCol = posOutcomeFilter === "aperti"
+                                    ? (t.entry_ts_utc?.slice(0,10) ?? "—")
+                                    : (t.exit_ts_utc?.slice(0,10)  ?? "—");
                                   return (
                                     <tr key={i} style={{borderBottom:"1px solid #222"}}>
                                       <td style={{padding:"2px 4px", color:"#666"}}>#{i+1}</td>
                                       <td style={{padding:"2px 4px", fontWeight:600}}>{t.symbol||"—"}</td>
                                       <td style={{padding:"2px 4px", color:"#888", fontSize:"0.62rem"}}>{t.strategy||"—"}</td>
-                                      <td style={{padding:"2px 4px", textAlign:"right", color:pnlColor}}>
-                                        {pnl!=null?`${pnl>=0?"+":""}${pnl.toFixed(0)}`:"—"}
+                                      <td style={{padding:"2px 4px", textAlign:"right", color:pnlCol}}>
+                                        {pnl != null ? `${pnl >= 0 ? "+" : ""}${pnl.toFixed(0)}` : "—"}
                                       </td>
-                                      <td style={{padding:"2px 4px", textAlign:"right", color:pnlColor, fontSize:"0.62rem"}}>
-                                        {pnlPct!=null?`${pnlPct>=0?"+":""}${pnlPct.toFixed(1)}%`:"—"}
+                                      <td style={{padding:"2px 4px", textAlign:"right", color:pnlCol, fontSize:"0.62rem"}}>
+                                        {pnlPct != null ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%` : "—"}
                                       </td>
-                                      <td style={{padding:"2px 4px", color:"#555", fontSize:"0.62rem"}}>
-                                        {t.exit_ts_utc?t.exit_ts_utc.slice(0,10):"—"}
-                                      </td>
+                                      <td style={{padding:"2px 4px", color:"#555", fontSize:"0.62rem"}}>{dateCol}</td>
                                     </tr>
                                   );
                                 })}
@@ -3540,10 +3498,10 @@ export default function App() {
                     );
                   })()}
 
-                  {/* nota piè di tabella (identico SEGNALI) */}
+                  {/* nota piè di tabella */}
                   <div style={{textAlign:"right", marginTop:6, fontSize:"0.58rem", color:"var(--dim)"}}
-                    title={posTab==="live"?"Dati live dal broker. Include posizioni manuali e auto-paper. Per tracciato → METRICHE.":"Storico trades da paper journal (DuckDB)."}>
-                    {posTab==="live" ? "live broker · manuale + auto-paper · tracciato → METRICHE" : "source: paper journal · DuckDB"}
+                    title="Storico trades da paper journal (DuckDB). Cassa e posizioni aperte da broker IBKR.">
+                    source: paper journal · DuckDB
                   </div>
                 </div>{/* fine colonna destra */}
               </div>{/* fine lc-body */}
