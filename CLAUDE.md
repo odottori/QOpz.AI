@@ -199,6 +199,34 @@ PT1_MICRO (€1k–2k) richiede: R0 + R1 + R1B + R2 + R3 + R4
 
 ---
 
+## Vocabolario UI — Regola obbligatoria
+
+I codici interni NON appaiono mai nell'interfaccia utente, nei testi visibili all'operatore,
+né nelle discussioni su UX/design. Si usano SEMPRE i termini dell'UI già stabiliti.
+
+| Codice interno / tecnico | Termine operativo da usare |
+|--------------------------|----------------------------|
+| `F1-T5`, `R1B`, `D2.38`, qualsiasi sigla planner | — (mai citare in UI) |
+| `demo_pipeline` / `auto_demo_pipeline` | **pipeline dati** |
+| `scan_full` / `opportunity scan` | **genera segnali** |
+| `opportunity_candidates` | **segnali** |
+| `premarketRows` / `universeItems` / `scanCandidates` | **segnali** |
+| `universe_latest` / `universeLatest` | **universo** o **lista simboli** |
+| `history_readiness` | **completezza storico** |
+| `kelly_gate` / `kelly_enabled` | **soglia sizing** |
+| `WFA`, `OOS`, `IS` | — (mai citare in UI) |
+| `DTE` | **giorni alla scadenza** |
+| `OI` | **open interest** (o abbreviato **OI** solo in tabelle) |
+| `IVR` / `iv_rank` | **rango volatilità** (o **IVR** solo in tabelle) |
+| `pnl_cumulative` | **P&L cumulato** |
+| `compliance_violations` | **violazioni** |
+| `go_nogo` / `goGate` | **accesso al mercato** |
+| `source_system` / `data_mode` | **fonte dati** |
+| `paper` profile | **simulazione** |
+| `live` profile | **operativo** |
+
+---
+
 ## Note operative
 
 - Step lock attivo: modificare SOLO file nel `scope_profile` dello step corrente
