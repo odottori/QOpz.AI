@@ -790,6 +790,12 @@ export default function App() {
   const [ibkrChecking, setIbkrChecking] = useState<boolean>(false);
   const [ibkrAccount, setIbkrAccount] = useState<IbkrAccountResponse | null>(null);
   const [ibkrAccountLoading, setIbkrAccountLoading] = useState<boolean>(false);
+  const [posTab, setPosTab] = useState<"live"|"storico">("live");
+  const [storicoTrades, setStoricoTrades] = useState<any[]>([]);
+  const [storicoSummary, setStoricoSummary] = useState<any>(null);
+  const [storicoLoading, setStoricoLoading] = useState(false);
+  const [storicoFrom, setStoricoFrom] = useState<string>("");
+  const [storicoTo, setStoricoTo] = useState<string>("");
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
@@ -1410,6 +1416,19 @@ export default function App() {
       setIbkrAccountFetchedAt(Date.now());
     } catch (e) { /* silenzioso: account non critico */ }
     finally { setIbkrAccountLoading(false); }
+  }
+
+  async function doFetchStorico() {
+    setStoricoLoading(true);
+    try {
+      const [actData, sumData] = await Promise.all([
+        apiJson<any>(`${API_BASE}/opz/last-actions?limit=500`),
+        apiJson<any>(`${API_BASE}/opz/paper/summary?profile=paper&window_days=365`),
+      ]);
+      setStoricoTrades(actData.paper_trades ?? []);
+      setStoricoSummary(sumData);
+    } catch (e) { /* silenzioso */ }
+    finally { setStoricoLoading(false); }
   }
 
   function clearFetchErr(key: string) {
@@ -3201,64 +3220,197 @@ export default function App() {
                     </div>
                   );
                 })()}
-                {/* POSIZIONI APERTE */}
+                {/* POSIZIONI / STORICO */}
                 <div style={{flex:1, display:"flex", flexDirection:"column"}}>
-                  <div className="lc-screen-bar">
-                    <span className="lc-screen-title">POSIZIONI APERTE</span>
-                    {ibkrAccount && (
-                      <span style={{fontSize:"0.65rem", color: ibkrAccount.connected ? "var(--g1)" : "var(--muted)", marginLeft:8}}>
+                  {/* ── Header con tab LIVE | STORICO ── */}
+                  <div className="lc-screen-bar" style={{flexWrap:"wrap", gap:4}}>
+                    <span className="lc-screen-title">POSIZIONI</span>
+                    {/* Tab toggle */}
+                    {(["live","storico"] as const).map(t => (
+                      <button key={t} onClick={() => {
+                        setPosTab(t);
+                        if (t === "storico" && storicoTrades.length === 0) void doFetchStorico();
+                      }}
+                        style={{
+                          fontSize:"0.58rem", padding:"1px 7px", border:"none", borderRadius:2, cursor:"pointer",
+                          background: posTab === t ? (t === "live" ? "#4ade8022" : "#60a5fa22") : "transparent",
+                          color: posTab === t ? (t === "live" ? "#4ade80" : "#60a5fa") : "#555",
+                          fontWeight: posTab === t ? 600 : 400,
+                          textTransform:"uppercase", letterSpacing:"0.05em",
+                        }}>
+                        {t}
+                      </button>
+                    ))}
+                    {/* Info contestuale */}
+                    {posTab === "live" && ibkrAccount && (
+                      <span style={{fontSize:"0.65rem", color: ibkrAccount.connected ? "var(--g1)" : "var(--muted)", marginLeft:4}}>
                         {ibkrAccount.connected ? "LIVE" : "OFFLINE"}
                         {ibkrAccount.net_liquidation != null && ` · €${ibkrAccount.net_liquidation.toLocaleString("it-IT",{maximumFractionDigits:0})}`}
                       </span>
                     )}
-                    {ibkrAccount && <span className="sev-data" style={{fontWeight:400, marginLeft:6, fontSize:"0.65rem"}}>({ibkrAccount.positions.length})</span>}
+                    {posTab === "live" && ibkrAccount && (
+                      <span className="sev-data" style={{fontWeight:400, fontSize:"0.65rem"}}>({ibkrAccount.positions.length})</span>
+                    )}
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px", marginLeft:"auto"}}
-                      disabled={ibkrAccountLoading} onClick={() => void doFetchIbkrAccount()}>
-                      {ibkrAccountLoading ? "…" : "⟳"}
+                      disabled={posTab === "live" ? ibkrAccountLoading : storicoLoading}
+                      onClick={() => posTab === "live" ? void doFetchIbkrAccount() : void doFetchStorico()}>
+                      {(posTab === "live" ? ibkrAccountLoading : storicoLoading) ? "…" : "⟳"}
                     </button>
                   </div>
-                  <div className="lc-screen-body" style={{flex:1, overflowY:"auto", padding:"8px 10px"}}>
-                    <div style={{fontSize:"0.58rem", color:"var(--dim)", marginBottom:8}}
-                      title="Dati live dal broker. Include posizioni manuali e auto-paper. Per tracciato sistema → tab METRICHE.">
-                      Dati live broker · manuale + auto-paper · tracciato → METRICHE
-                    </div>
-                    {!ibkrAccount && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessun dato disponibile.</div>}
-                    {ibkrAccount && ibkrAccount.positions.length === 0 && (
-                      <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessuna posizione aperta.</div>
-                    )}
-                    {ibkrAccount && ibkrAccount.positions.length > 0 && (
-                      <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
-                        <thead>
-                          <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
-                            <th style={{textAlign:"left", padding:"3px 4px"}}>Sym</th>
-                            <th style={{textAlign:"left", padding:"3px 4px"}}>Scad.</th>
-                            <th style={{textAlign:"right", padding:"3px 4px"}}>Strike</th>
-                            <th style={{textAlign:"center", padding:"3px 4px"}} title="P = Put · C = Call">P/C</th>
-                            <th style={{textAlign:"right", padding:"3px 4px"}} title="Qty negativo = posizione corta (venduta).">Qty</th>
-                            <th style={{textAlign:"right", padding:"3px 4px"}} title="Profitto/perdita non realizzato.">uPnL</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ibkrAccount.positions.map((pos, i) => (
-                            <tr key={i} style={{borderBottom:"1px solid #1a1a1a"}}>
-                              <td style={{padding:"3px 4px", fontWeight:600}}>{pos.symbol}</td>
-                              <td style={{padding:"3px 4px", color:"#888", fontSize:"0.62rem"}}>{pos.expiry ?? "—"}</td>
-                              <td style={{padding:"3px 4px", textAlign:"right"}}>{pos.strike != null && pos.strike !== 0 ? pos.strike : "—"}</td>
-                              <td style={{padding:"3px 4px", textAlign:"center", color: pos.right === "C" ? "#60a5fa" : "#fb923c"}}>{pos.right ?? "—"}</td>
-                              <td style={{padding:"3px 4px", textAlign:"right", color:(pos.quantity??0)<0?"#f87171":"#4ade80"}}
-                                title={(pos.quantity??0) < 0 ? "Posizione corta" : "Posizione lunga"}>
-                                {pos.quantity}
-                              </td>
-                              <td style={{padding:"3px 4px", textAlign:"right", color:(pos.unrealized_pnl??0)>=0?"#4ade80":"#f87171"}}>
-                                {pos.unrealized_pnl != null ? `${pos.unrealized_pnl>=0?"+":""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
-                              </td>
+
+                  {/* ── TAB LIVE ── */}
+                  {posTab === "live" && (
+                    <div className="lc-screen-body" style={{flex:1, overflowY:"auto", padding:"8px 10px"}}>
+                      <div style={{fontSize:"0.58rem", color:"var(--dim)", marginBottom:8}}
+                        title="Dati live dal broker. Include posizioni manuali e auto-paper. Per tracciato sistema → tab METRICHE.">
+                        Dati live broker · manuale + auto-paper · tracciato → METRICHE
+                      </div>
+                      {!ibkrAccount && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessun dato disponibile.</div>}
+                      {ibkrAccount && ibkrAccount.positions.length === 0 && (
+                        <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessuna posizione aperta.</div>
+                      )}
+                      {ibkrAccount && ibkrAccount.positions.length > 0 && (
+                        <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                          <thead>
+                            <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>Scad.</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}>Strike</th>
+                              <th style={{textAlign:"center", padding:"2px 4px"}} title="P = Put · C = Call">P/C</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}} title="Qty negativo = posizione corta (venduta).">Qty</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}} title="Profitto/perdita non realizzato.">uPnL</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                </div>{/* fine flex:1 POSIZIONI APERTE */}
+                          </thead>
+                          <tbody>
+                            {ibkrAccount.positions.map((pos, i) => (
+                              <tr key={i} style={{borderBottom:"1px solid #222"}}>
+                                <td style={{padding:"2px 4px", color:"#666"}}>#{i+1}</td>
+                                <td style={{padding:"2px 4px", fontWeight:600}}>{pos.symbol}</td>
+                                <td style={{padding:"2px 4px", color:"#888", fontSize:"0.62rem"}}>{pos.expiry ?? "—"}</td>
+                                <td style={{padding:"2px 4px", textAlign:"right"}}>{pos.strike != null && pos.strike !== 0 ? pos.strike : "—"}</td>
+                                <td style={{padding:"2px 4px", textAlign:"center", color: pos.right === "C" ? "#60a5fa" : "#fb923c"}}>{pos.right ?? "—"}</td>
+                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.quantity??0)<0?"#f87171":"#4ade80"}}
+                                  title={(pos.quantity??0) < 0 ? "Posizione corta" : "Posizione lunga"}>
+                                  {pos.quantity}
+                                </td>
+                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.unrealized_pnl??0)>=0?"#4ade80":"#f87171"}}>
+                                  {pos.unrealized_pnl != null ? `${pos.unrealized_pnl>=0?"+":""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── TAB STORICO ── */}
+                  {posTab === "storico" && (() => {
+                    // Filtra i trade per range data (exit_ts_utc)
+                    const filtered = storicoTrades.filter(t => {
+                      const exitDate = t.exit_ts_utc ? t.exit_ts_utc.slice(0, 10) : null;
+                      if (!exitDate) return false; // escludi trades aperti
+                      if (storicoFrom && exitDate < storicoFrom) return false;
+                      if (storicoTo   && exitDate > storicoTo)   return false;
+                      return true;
+                    });
+                    const nTot = filtered.length;
+                    const nPos = filtered.filter(t => (t.pnl ?? 0) >= 0).length;
+                    const nNeg = filtered.filter(t => (t.pnl ?? 0) < 0).length;
+                    const sumPnl = filtered.reduce((s, t) => s + (t.pnl ?? 0), 0);
+                    const maxWin  = filtered.length ? Math.max(...filtered.map(t => t.pnl ?? 0)) : null;
+                    const maxLoss = filtered.length ? Math.min(...filtered.map(t => t.pnl ?? 0)) : null;
+                    const winRate = nTot > 0 ? (nPos / nTot * 100) : null;
+                    const fmtPnl = (v: number | null) => v == null ? "—" : `${v>=0?"+":""}${v.toFixed(0)}`;
+                    return (
+                      <div className="lc-screen-body" style={{flex:1, overflowY:"auto", padding:"8px 10px"}}>
+                        {/* filtro data */}
+                        <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                          <span style={{fontSize:"0.58rem", color:"var(--dim)"}}>da</span>
+                          <input type="date" value={storicoFrom} onChange={e => setStoricoFrom(e.target.value)}
+                            style={{fontSize:"0.6rem", background:"var(--p2)", color:"var(--text)", border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px"}} />
+                          <span style={{fontSize:"0.58rem", color:"var(--dim)"}}>a</span>
+                          <input type="date" value={storicoTo} onChange={e => setStoricoTo(e.target.value)}
+                            style={{fontSize:"0.6rem", background:"var(--p2)", color:"var(--text)", border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px"}} />
+                          {(storicoFrom || storicoTo) && (
+                            <button className="btn btn-ghost" style={{fontSize:"0.58rem", padding:"0 4px"}}
+                              onClick={() => { setStoricoFrom(""); setStoricoTo(""); }}>✕</button>
+                          )}
+                        </div>
+                        {/* strip metriche */}
+                        <div style={{display:"flex", gap:6, marginBottom:8, flexWrap:"wrap", paddingBottom:8, borderBottom:"1px solid #1e1e1e"}}>
+                          <span style={{fontSize:"0.6rem", color:"#555"}}
+                            title="Totale · chiusi in positivo · chiusi in negativo">
+                            <span style={{color:"#888"}}>{nTot}</span>
+                            <span style={{color:"#333"}}> · </span>
+                            <span style={{color:"#4ade80"}} title="Trades con PnL ≥ 0">✓{nPos}</span>
+                            <span style={{color:"#333"}}> · </span>
+                            <span style={{color:"#f87171"}} title="Trades con PnL < 0">✗{nNeg}</span>
+                          </span>
+                          <span style={{fontSize:"0.6rem", color: sumPnl >= 0 ? "#4ade80" : "#f87171"}}
+                            title="PnL cumulato nel periodo">
+                            P&L {fmtPnl(sumPnl)}
+                          </span>
+                          <span style={{fontSize:"0.6rem", color:"#888"}}
+                            title="Win rate (trades con PnL ≥ 0)">
+                            win {winRate != null ? winRate.toFixed(0)+"%" : "—"}
+                          </span>
+                          <span style={{fontSize:"0.6rem", color:"#4ade80"}}
+                            title="Trade migliore nel periodo">
+                            ▲{fmtPnl(maxWin)}
+                          </span>
+                          <span style={{fontSize:"0.6rem", color:"#f87171"}}
+                            title="Trade peggiore nel periodo">
+                            ▼{fmtPnl(maxLoss)}
+                          </span>
+                        </div>
+                        {storicoLoading && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Caricamento…</div>}
+                        {!storicoLoading && filtered.length === 0 && (
+                          <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>
+                            {storicoTrades.length === 0 ? "Nessun trade nel journal." : "Nessun trade nel periodo selezionato."}
+                          </div>
+                        )}
+                        {filtered.length > 0 && (
+                          <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                            <thead>
+                              <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                                <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
+                                <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
+                                <th style={{textAlign:"left", padding:"2px 4px"}}>Str</th>
+                                <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL realizzato">PnL</th>
+                                <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL in %">%</th>
+                                <th style={{textAlign:"left", padding:"2px 4px"}} title="Data uscita">Data</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filtered.map((t, i) => {
+                                const exitDay = t.exit_ts_utc ? t.exit_ts_utc.slice(0, 10) : "—";
+                                const pnl = t.pnl ?? null;
+                                const pnlPct = t.pnl_pct ?? null;
+                                const pnlColor = pnl == null ? "#666" : pnl >= 0 ? "#4ade80" : "#f87171";
+                                return (
+                                  <tr key={i} style={{borderBottom:"1px solid #222"}}>
+                                    <td style={{padding:"2px 4px", color:"#666"}}>#{i+1}</td>
+                                    <td style={{padding:"2px 4px", fontWeight:600}}>{t.symbol || "—"}</td>
+                                    <td style={{padding:"2px 4px", color:"#888", fontSize:"0.62rem"}}>{t.strategy || "—"}</td>
+                                    <td style={{padding:"2px 4px", textAlign:"right", color:pnlColor}}>
+                                      {pnl != null ? `${pnl>=0?"+":""}${pnl.toFixed(0)}` : "—"}
+                                    </td>
+                                    <td style={{padding:"2px 4px", textAlign:"right", color:pnlColor, fontSize:"0.62rem"}}>
+                                      {pnlPct != null ? `${pnlPct>=0?"+":""}${pnlPct.toFixed(1)}%` : "—"}
+                                    </td>
+                                    <td style={{padding:"2px 4px", color:"#555", fontSize:"0.62rem"}}>{exitDay}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>{/* fine flex:1 POSIZIONI/STORICO */}
                 </div>{/* fine lc-screen colonna destra */}
               </div>{/* fine lc-body */}
 
