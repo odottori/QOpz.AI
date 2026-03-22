@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/opz/briefing/list")
-def opz_briefing_list() -> Dict[str, Any]:
+def opz_briefing_list() -> List[str]:
     from api import opz_api as compat
 
     return compat.opz_briefing_list()

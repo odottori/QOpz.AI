@@ -52,3 +52,17 @@ def opz_paper_trade(req: TradeJournalRequest) -> Dict[str, Any]:
 
     return compat.opz_paper_trade(req)
 
+
+@router.delete("/opz/paper/trade/{trade_id}")
+def opz_delete_trade(trade_id: str) -> Dict[str, Any]:
+    from api import opz_api as compat
+
+    return compat.opz_delete_trade(trade_id)
+
+
+@router.delete("/opz/paper/snapshot/{snapshot_id}")
+def opz_delete_snapshot(snapshot_id: str) -> Dict[str, Any]:
+    from api import opz_api as compat
+
+    return compat.opz_delete_snapshot(snapshot_id)
+

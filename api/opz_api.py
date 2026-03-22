@@ -1107,7 +1107,7 @@ def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
 
     snapshots_rows = con.execute(
         """
-        SELECT created_at, asof_date, equity, note, profile, COALESCE(trigger, 'manual')
+        SELECT snapshot_id, created_at, asof_date, equity, note, profile, COALESCE(trigger, 'manual')
         FROM paper_equity_snapshots
         ORDER BY created_at DESC
         LIMIT ?
@@ -1116,7 +1116,7 @@ def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
     ).fetchall()
     trades_rows = con.execute(
         """
-        SELECT created_at, symbol, strategy, pnl, pnl_pct, slippage_ticks, violations, note, profile,
+        SELECT trade_id, created_at, symbol, strategy, pnl, pnl_pct, slippage_ticks, violations, note, profile,
                entry_ts_utc, exit_ts_utc, strikes_json, regime_at_entry, score_at_entry, kelly_fraction, exit_reason,
                COALESCE(trigger, 'manual')
         FROM paper_trades
@@ -1141,35 +1141,37 @@ def opz_last_actions(limit: int = 5) -> Dict[str, Any]:
 
     snapshots = [
         {
-            "ts_utc": _dt_to_iso_utc(r[0]),
-            "asof_date": str(r[1]) if r[1] is not None else "",
-            "equity": float(r[2]) if r[2] is not None else None,
-            "note": str(r[3]) if r[3] is not None else "",
-            "profile": str(r[4]) if r[4] is not None else "",
-            "trigger": str(r[5]) if r[5] is not None else "manual",
+            "snapshot_id": str(r[0]) if r[0] is not None else "",
+            "ts_utc": _dt_to_iso_utc(r[1]),
+            "asof_date": str(r[2]) if r[2] is not None else "",
+            "equity": float(r[3]) if r[3] is not None else None,
+            "note": str(r[4]) if r[4] is not None else "",
+            "profile": str(r[5]) if r[5] is not None else "",
+            "trigger": str(r[6]) if r[6] is not None else "manual",
         }
         for r in snapshots_rows
     ]
 
     trades = [
         {
-            "ts_utc": _dt_to_iso_utc(r[0]),
-            "symbol": str(r[1]) if r[1] is not None else "",
-            "strategy": str(r[2]) if r[2] is not None else "",
-            "pnl": float(r[3]) if r[3] is not None else None,
-            "pnl_pct": float(r[4]) if r[4] is not None else None,
-            "slippage_ticks": float(r[5]) if r[5] is not None else None,
-            "violations": int(r[6]) if r[6] is not None else 0,
-            "note": str(r[7]) if r[7] is not None else "",
-            "profile": str(r[8]) if r[8] is not None else "",
-            "entry_ts_utc": _dt_to_iso_utc(r[9]),
-            "exit_ts_utc": _dt_to_iso_utc(r[10]),
-            "strikes_json": str(r[11]) if r[11] is not None else "",
-            "regime_at_entry": str(r[12]) if r[12] is not None else "",
-            "score_at_entry": float(r[13]) if r[13] is not None else None,
-            "kelly_fraction": float(r[14]) if r[14] is not None else None,
-            "exit_reason": str(r[15]) if r[15] is not None else "",
-            "trigger": str(r[16]) if r[16] is not None else "manual",
+            "trade_id": str(r[0]) if r[0] is not None else "",
+            "ts_utc": _dt_to_iso_utc(r[1]),
+            "symbol": str(r[2]) if r[2] is not None else "",
+            "strategy": str(r[3]) if r[3] is not None else "",
+            "pnl": float(r[4]) if r[4] is not None else None,
+            "pnl_pct": float(r[5]) if r[5] is not None else None,
+            "slippage_ticks": float(r[6]) if r[6] is not None else None,
+            "violations": int(r[7]) if r[7] is not None else 0,
+            "note": str(r[8]) if r[8] is not None else "",
+            "profile": str(r[9]) if r[9] is not None else "",
+            "entry_ts_utc": _dt_to_iso_utc(r[10]),
+            "exit_ts_utc": _dt_to_iso_utc(r[11]),
+            "strikes_json": str(r[12]) if r[12] is not None else "",
+            "regime_at_entry": str(r[13]) if r[13] is not None else "",
+            "score_at_entry": float(r[14]) if r[14] is not None else None,
+            "kelly_fraction": float(r[15]) if r[15] is not None else None,
+            "exit_reason": str(r[16]) if r[16] is not None else "",
+            "trigger": str(r[17]) if r[17] is not None else "manual",
         }
         for r in trades_rows
     ]
@@ -1340,6 +1342,18 @@ def opz_paper_equity_snapshot(req: EquitySnapshotRequest) -> Dict[str, Any]:
         d = _date.fromisoformat(req.asof_date)
     except ValueError:
         raise HTTPException(status_code=400, detail="invalid asof_date (expected YYYY-MM-DD)")
+    # upsert by date: delete existing snapshot for same (profile, asof_date) before inserting
+    try:
+        ucon = _connect()
+        ucon.execute(
+            "DELETE FROM paper_equity_snapshots WHERE profile = ? AND asof_date = ?",
+            (profile, d.isoformat()),
+        )
+        if hasattr(ucon, "commit"):
+            ucon.commit()
+        ucon.close()
+    except Exception:
+        pass
     sid = record_equity_snapshot(profile=profile, asof_date=d, equity=equity, note=req.note.strip(), trigger=req.trigger)
     return {"ok": True, "snapshot_id": sid}
 
@@ -1386,6 +1400,32 @@ def opz_paper_trade(req: TradeJournalRequest) -> Dict[str, Any]:
         trigger=req.trigger,
     )
     return {"ok": True, "trade_id": tid}
+
+
+def opz_delete_trade(trade_id: str) -> Dict[str, Any]:
+    tid = trade_id.strip()
+    if not tid:
+        raise HTTPException(status_code=400, detail="trade_id required")
+    init_execution_schema()
+    con = _connect()
+    con.execute("DELETE FROM paper_trades WHERE trade_id = ?", (tid,))
+    if hasattr(con, "commit"):
+        con.commit()
+    con.close()
+    return {"ok": True, "deleted": tid}
+
+
+def opz_delete_snapshot(snapshot_id: str) -> Dict[str, Any]:
+    sid = snapshot_id.strip()
+    if not sid:
+        raise HTTPException(status_code=400, detail="snapshot_id required")
+    init_execution_schema()
+    con = _connect()
+    con.execute("DELETE FROM paper_equity_snapshots WHERE snapshot_id = ?", (sid,))
+    if hasattr(con, "commit"):
+        con.commit()
+    con.close()
+    return {"ok": True, "deleted": sid}
 
 
 def execution_preview(req: PreviewRequest) -> PreviewResponse:
@@ -3351,7 +3391,7 @@ def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
         con2 = _connect()
         sess_rows = con2.execute(
             """
-            SELECT started_at, session_type, regime, errors
+            SELECT started_at, session_type, regime, errors_json
             FROM session_logs
             ORDER BY started_at DESC
             LIMIT ?

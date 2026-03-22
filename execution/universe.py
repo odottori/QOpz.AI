@@ -470,6 +470,8 @@ def init_universe_schema() -> None:
             con.execute("ALTER TABLE universe_scan_batches ADD COLUMN IF NOT EXISTS ibkr_settings_exists BOOLEAN")
             con.execute("ALTER TABLE universe_scan_batches ADD COLUMN IF NOT EXISTS market_rows_available INTEGER")
             con.execute("ALTER TABLE universe_scan_batches ADD COLUMN IF NOT EXISTS filter_fallback BOOLEAN")
+            con.execute("ALTER TABLE universe_scan_items ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'PENDING'")
+            con.execute("ALTER TABLE universe_scan_items ADD COLUMN IF NOT EXISTS trade_id VARCHAR")
         except Exception:
             pass
         con.close()
@@ -519,6 +521,8 @@ def init_universe_schema() -> None:
         con.execute("ALTER TABLE universe_scan_batches ADD COLUMN IF NOT EXISTS ibkr_settings_exists INTEGER")
         con.execute("ALTER TABLE universe_scan_batches ADD COLUMN IF NOT EXISTS market_rows_available INTEGER")
         con.execute("ALTER TABLE universe_scan_batches ADD COLUMN IF NOT EXISTS filter_fallback INTEGER")
+        con.execute("ALTER TABLE universe_scan_items ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'PENDING'")
+        con.execute("ALTER TABLE universe_scan_items ADD COLUMN IF NOT EXISTS trade_id TEXT")
     except Exception:
         pass
 
@@ -1043,7 +1047,82 @@ def build_universe_compare(*, settings_path: str | None = None, ocr_path: str | 
     }
 
 
+def update_scan_item_status(
+    item_id: str,
+    status: str,
+    trade_id: str | None = None,
+) -> None:
+    """Update human-layer status of a scan item: PENDING | EXECUTED | EXPIRED."""
+    init_universe_schema()
+    con = _connect()
+    if trade_id is not None:
+        con.execute(
+            "UPDATE universe_scan_items SET status = ?, trade_id = ? WHERE item_id = ?",
+            (status, trade_id, item_id),
+        )
+    else:
+        con.execute(
+            "UPDATE universe_scan_items SET status = ? WHERE item_id = ?",
+            (status, item_id),
+        )
+    if hasattr(con, "commit"):
+        con.commit()
+    con.close()
 
 
+def expire_pending_scan_items(profile: str, before_ts: str) -> int:
+    """Mark all PENDING items from batches older than before_ts as EXPIRED.
+    Called by EOD session. Returns count of expired items."""
+    init_universe_schema()
+    con = _connect()
+    result = con.execute(
+        """
+        UPDATE universe_scan_items
+        SET status = 'EXPIRED'
+        WHERE status = 'PENDING'
+          AND batch_id IN (
+              SELECT batch_id FROM universe_scan_batches
+              WHERE profile = ? AND created_at < ?
+          )
+        """,
+        (profile, before_ts),
+    )
+    count = result.rowcount if hasattr(result, "rowcount") else 0
+    if hasattr(con, "commit"):
+        con.commit()
+    con.close()
+    return count or 0
+
+
+def query_backtest_applied(
+    profile: str,
+    from_ts: str,
+    to_ts: str,
+) -> list[dict]:
+    """Backtest 'a trading applicato': all scan items in period with execution outcome."""
+    init_universe_schema()
+    con = _connect()
+    rows = con.execute(
+        """
+        SELECT
+            si.item_id, si.batch_id, si.rank, si.symbol, si.strategy,
+            si.score, si.status, si.trade_id,
+            sb.created_at AS batch_ts, sb.regime,
+            pt.pnl, pt.pnl_pct, pt.exit_reason, pt.trigger AS trade_trigger
+        FROM universe_scan_items si
+        JOIN universe_scan_batches sb ON si.batch_id = sb.batch_id
+        LEFT JOIN paper_trades pt ON si.trade_id = pt.trade_id
+        WHERE sb.profile = ?
+          AND sb.created_at >= ?
+          AND sb.created_at <= ?
+        ORDER BY sb.created_at ASC, si.rank ASC
+        """,
+        (profile, from_ts, to_ts),
+    ).fetchall()
+    con.close()
+    keys = ["item_id", "batch_id", "rank", "symbol", "strategy", "score",
+            "status", "trade_id", "batch_ts", "regime", "pnl", "pnl_pct",
+            "exit_reason", "trade_trigger"]
+    return [dict(zip(keys, r)) for r in rows]
 
 

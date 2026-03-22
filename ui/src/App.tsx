@@ -37,6 +37,7 @@ type PaperSummaryResponse = {
 type LastActionsResponse = {
   limit: number;
   paper_snapshots: Array<{
+    snapshot_id: string;
     ts_utc: string;
     asof_date: string;
     equity: number | null;
@@ -45,6 +46,7 @@ type LastActionsResponse = {
     trigger: string;
   }>;
   paper_trades: Array<{
+    trade_id: string;
     ts_utc: string;
     symbol: string;
     strategy: string;
@@ -406,8 +408,7 @@ type IbwrServiceResponse = {
   message?: string;
 };
 
-type TabKey = "warroom" | "pipeline";
-type CenterPhase = "ante" | "op" | "post" | "old";
+type CenterPhase = "ante" | "op" | "post";
 type AnteSubTab = "dati" | "analisi" | "briefing";
 type OpSubTab = "trading" | "wheel" | "metriche" | "backtest";
 type PostSubTab = "chiusura" | "report";
@@ -755,8 +756,7 @@ export default function App() {
   const [busy, setBusy] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<TabKey>("warroom");
-  const [centerPhase, setCenterPhase] = useState<CenterPhase>("old");
+  const [centerPhase, setCenterPhase] = useState<CenterPhase>("ante");
   const [anteSubTab, setAnteSubTab] = useState<AnteSubTab>("dati");
   const [opSubTab, setOpSubTab] = useState<OpSubTab>("trading");
   const [postSubTab, setPostSubTab] = useState<PostSubTab>("chiusura");
@@ -771,10 +771,6 @@ export default function App() {
   const [universeSettingsPath, setUniverseSettingsPath] = useState<string>("");
   const [universeSubTab, setUniverseSubTab] = useState<UniverseSubTab>("titoli");
   const [universeProvenance, setUniverseProvenance] = useState<UniverseProvenanceResponse | null>(null);
-  const [oppDecision, setOppDecision] = useState<"APPROVE" | "REJECT" | "MODIFY">("APPROVE");
-  const [oppConfidence, setOppConfidence] = useState<string>("3");
-  const [oppNote, setOppNote] = useState<string>("");
-  const [selectedOpportunityKey, setSelectedOpportunityKey] = useState<string>("");
   const [oppScanResult, setOppScanResult] = useState<ScanFullResponse | null>(null);
   const [oppScanBusy, setOppScanBusy] = useState<boolean>(false);
   const [briefingBusy, setBriefingBusy] = useState<boolean>(false);
@@ -797,7 +793,6 @@ export default function App() {
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
-  const [navDate, setNavDate] = useState<string>(""); // YYYY-MM-DD — vuoto = oggi
   const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
   const [activityStream, setActivityStream] = useState<ActivityStreamResponse | null>(null);
   const [activityOpen, setActivityOpen] = useState<boolean>(true);
@@ -809,22 +804,6 @@ export default function App() {
   const [wheelFetchedAt, setWheelFetchedAt] = useState<number | null>(null);
   const [tierInfo, setTierInfo] = useState<TierResponse | null>(null);
 
-  const [snapDate, setSnapDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [snapEquity, setSnapEquity] = useState<string>("10000");
-  const [snapNote, setSnapNote] = useState<string>("");
-
-  const [tradeEntryTs, setTradeEntryTs] = useState<string>("");
-  const [tradeExitTs, setTradeExitTs] = useState<string>("");
-  const [tradeStrikes, setTradeStrikes] = useState<string>("");
-  const [tradeRegime, setTradeRegime] = useState<string>("");
-  const [tradeScore, setTradeScore] = useState<string>("");
-  const [tradeKelly, setTradeKelly] = useState<string>("");
-  const [tradeExitReason, setTradeExitReason] = useState<string>("");
-  const [tradePnl, setTradePnl] = useState<string>("0");
-  const [tradePnlPct, setTradePnlPct] = useState<string>("");
-  const [tradeSlip, setTradeSlip] = useState<string>("");
-  const [tradeViol, setTradeViol] = useState<string>("0");
-  const [tradeNote, setTradeNote] = useState<string>("");
 
   const [symbol, setSymbol] = useState("IWM");
   const [strategy, setStrategy] = useState("BULL_PUT");
@@ -839,17 +818,8 @@ export default function App() {
   const [exitCandidatesFetchedAt, setExitCandidatesFetchedAt] = useState<number | null>(null);
   const [fetchErrors, setFetchErrors] = useState<Set<string>>(new Set());
   const [aiDrawerOpen, setAiDrawerOpen] = useState<boolean>(false);
-  const [warEquityOpen, setWarEquityOpen] = useState<boolean>(true);
-  const [warSystemOpen, setWarSystemOpen] = useState<boolean>(true);
-  const [warIbkrOpen, setWarIbkrOpen] = useState<boolean>(true);
-  const [warDrawdownOpen, setWarDrawdownOpen] = useState<boolean>(false);
-  const [warGateOpen, setWarGateOpen] = useState<boolean>(false);
-  const [warHistoryOpen, setWarHistoryOpen] = useState<boolean>(false);
-  const [warRegimeOpen, setWarRegimeOpen] = useState<boolean>(false);
-  const [warPipelineOpen, setWarPipelineOpen] = useState<boolean>(false);
-  const [warIbkrPositionsOpen, setWarIbkrPositionsOpen] = useState<boolean>(true);
-  const [warIbkrExitOpen, setWarIbkrExitOpen] = useState<boolean>(true);
-  const [warWheelOpen, setWarWheelOpen] = useState<boolean>(true);
+  const [opExecOpen, setOpExecOpen] = useState<boolean>(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [leftKellyOpen, setLeftKellyOpen] = useState<boolean>(false);
   const [leftPhaseOpen, setLeftPhaseOpen] = useState<boolean>(false);
   const [leftExecWindowOpen, setLeftExecWindowOpen] = useState<boolean>(false);
@@ -864,7 +834,6 @@ export default function App() {
   const [slideDataRecordsOpen, setSlideDataRecordsOpen] = useState<boolean>(false);
   const [slideDataModeOpen, setSlideDataModeOpen] = useState<boolean>(false);
   const [slideDataLatencyOpen, setSlideDataLatencyOpen] = useState<boolean>(false);
-  const [slideStepDataOpen, setSlideStepDataOpen] = useState<boolean>(true);
   const [controlStatus, setControlStatus] = useState<ControlStatusResponse | null>(null);
   const [ibwrBusy, setIbwrBusy] = useState<boolean>(false);
   const [narratorTutorial, setNarratorTutorial] = useState<NarratorTutorialResponse | null>(null);
@@ -1274,12 +1243,24 @@ export default function App() {
         decision: confirmDecision,
         payload: { symbol: symbol.trim(), strategy: strategy.trim(), payload: parsedPayload },
       };
-      await apiJson(`${API_BASE}/opz/execution/confirm`, {
+      const confirmResult = await apiJson<{ ok: boolean; trade_id?: string }>(`${API_BASE}/opz/execution/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      // If operator selected a scan candidate, mark it as EXECUTED
+      if (selectedItemId && confirmDecision === "APPROVE") {
+        const tradeId = confirmResult?.trade_id ?? undefined;
+        void apiJson(`${API_BASE}/opz/universe/scan_item/${selectedItemId}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "EXECUTED", trade_id: tradeId ?? null }),
+        }).catch(() => {/* non-critical */});
+        setSelectedItemId(null);
+      }
       setMessage("Confirm sent.");
+      setPreview(null);
+      setPreviewSignature(null);
       await refreshAll();
     } catch (e) {
       setError(String(e));
@@ -1347,205 +1328,8 @@ export default function App() {
     }
   }
 
-  async function doAddSnapshot() {
-    const eq = parseFiniteInput(snapEquity, "Equity");
-    if (!eq.ok) {
-      setError(eq.message);
-      setMessage("");
-      return;
-    }
-    if (eq.value <= 0) {
-      setError("Equity deve essere > 0.");
-      setMessage("");
-      return;
-    }
 
-    setBusy(true);
-    setError("");
-    setMessage("");
-    try {
-      await apiJson(`${API_BASE}/opz/paper/equity_snapshot`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile: "paper", asof_date: snapDate, equity: eq.value, note: snapNote }),
-      });
-      setMessage("Equity snapshot recorded.");
-      await refreshAll();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
 
-  async function doAddTrade() {
-    const pnl = parseFiniteInput(tradePnl, "PnL");
-    if (!pnl.ok) {
-      setError(pnl.message);
-      setMessage("");
-      return;
-    }
-    const viol = parseIntInput(tradeViol, "Violations");
-    if (!viol.ok || viol.value < 0) {
-      setError("Violations deve essere un intero >= 0.");
-      setMessage("");
-      return;
-    }
-
-    const body: Record<string, unknown> = {
-      profile: "paper",
-      symbol: symbol.trim(),
-      strategy: strategy.trim(),
-      pnl: pnl.value,
-      violations: viol.value,
-      note: tradeNote,
-    };
-
-    if (tradeEntryTs.trim()) {
-      const d = new Date(tradeEntryTs);
-      if (Number.isNaN(d.getTime())) {
-        setError("Entry TS UTC non valido.");
-        setMessage("");
-        return;
-      }
-      body.entry_ts_utc = d.toISOString();
-    }
-    if (tradeExitTs.trim()) {
-      const d = new Date(tradeExitTs);
-      if (Number.isNaN(d.getTime())) {
-        setError("Exit TS UTC non valido.");
-        setMessage("");
-        return;
-      }
-      body.exit_ts_utc = d.toISOString();
-    }
-    if (tradeStrikes.trim()) {
-      try {
-        const arr = JSON.parse(tradeStrikes);
-        if (!Array.isArray(arr) || arr.some((x) => !Number.isFinite(Number(x)))) throw new Error("invalid strikes array");
-        body.strikes = arr.map((x) => Number(x));
-      } catch {
-        setError("Strikes deve essere un JSON array numerico, es: [185,180]");
-        setMessage("");
-        return;
-      }
-    }
-    if (tradeRegime.trim()) body.regime_at_entry = tradeRegime.trim();
-    if (tradeScore.trim()) {
-      const score = parseFiniteInput(tradeScore, "Score at entry");
-      if (!score.ok) {
-        setError(score.message);
-        setMessage("");
-        return;
-      }
-      body.score_at_entry = score.value;
-    }
-    if (tradeKelly.trim()) {
-      const kelly = parseFiniteInput(tradeKelly, "Kelly fraction");
-      if (!kelly.ok || kelly.value < 0 || kelly.value > 1) {
-        setError("Kelly fraction deve essere tra 0 e 1.");
-        setMessage("");
-        return;
-      }
-      body.kelly_fraction = kelly.value;
-    }
-    if (tradeExitReason.trim()) body.exit_reason = tradeExitReason.trim();
-    if (tradePnlPct.trim()) {
-      const pct = parseFiniteInput(tradePnlPct, "PnL %");
-      if (!pct.ok) {
-        setError(pct.message);
-        setMessage("");
-        return;
-      }
-      body.pnl_pct = pct.value;
-    }
-    if (tradeSlip.trim()) {
-      const slip = parseFiniteInput(tradeSlip, "Slippage ticks");
-      if (!slip.ok || slip.value < 0) {
-        setError("Slippage ticks deve essere >= 0.");
-        setMessage("");
-        return;
-      }
-      body.slippage_ticks = slip.value;
-    }
-
-    if (!String(body.symbol).trim() || !String(body.strategy).trim()) {
-      setError("Symbol e Strategy sono obbligatori anche per il trade journal.");
-      setMessage("");
-      return;
-    }
-
-    setBusy(true);
-    setError("");
-    setMessage("");
-    try {
-      await apiJson(`${API_BASE}/opz/paper/trade`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      setMessage("Paper trade recorded.");
-      await refreshAll();
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function doOpportunityDecision() {
-    // Priorità: candidato da scan_full; fallback: candidato da universe items
-    const scanC = oppScanResult?.candidates.find((c) => `${c.symbol}::${c.strategy}::${c.expiry}` === selectedScanKey)
-      ?? oppScanResult?.candidates[0] ?? null;
-    const candidate = scanC ?? selectedOpportunity;
-    if (!candidate) {
-      setError("Nessun candidato disponibile per validazione Opportunity.");
-      setMessage("");
-      return;
-    }
-    const conf = parseIntInput(oppConfidence, "Confidence");
-    if (!conf.ok || conf.value < 1 || conf.value > 5) {
-      setError("Confidence deve essere un intero tra 1 e 5.");
-      setMessage("");
-      return;
-    }
-
-    const batchId = oppScanResult?.batch_id ?? universeLatest?.batch_id ?? undefined;
-    const regime = oppScanResult?.regime ?? universeLatest?.regime ?? universeRegime;
-    const source = oppScanResult ? "opportunity_scanner" : (universeLatest?.source ?? universeSource);
-
-    setBusy(true);
-    setError("");
-    setMessage("");
-    try {
-      await apiJson(`${API_BASE}/opz/opportunity/decision`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile: "paper",
-          batch_id: batchId,
-          symbol: candidate.symbol,
-          strategy: candidate.strategy,
-          score: candidate.score,
-          regime,
-          scanner_name: universeLatest?.scanner_name ?? selectedScanner?.scanner_name ?? "",
-          source,
-          decision: oppDecision,
-          confidence: conf.value,
-          note: oppNote.trim(),
-        }),
-      });
-      setMessage(
-        `Opportunity logged: ${oppDecision} ${candidate.symbol} (score=${candidate.score.toFixed(2)}, conf=${conf.value}/5).`
-      );
-      await refreshAll();
-    } catch (e) {
-      setError(String(e));
-      setMessage("");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function doScanFull() {
     const syms = oppScanSymbols.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
@@ -1638,26 +1422,15 @@ export default function App() {
     } catch (e) { markFetchErr("regime"); }
   }
 
-  async function doFetchEquityHistory(asof?: string) {
+  async function doFetchEquityHistory() {
     try {
-      const dateParam = asof ?? navDate;
-      const url = dateParam
-        ? `${API_BASE}/opz/paper/equity_history?profile=${ACTIVE_PROFILE}&limit=60&asof_date=${dateParam}`
-        : `${API_BASE}/opz/paper/equity_history?profile=${ACTIVE_PROFILE}&limit=60`;
+      const url = `${API_BASE}/opz/paper/equity_history?profile=${ACTIVE_PROFILE}&limit=60`;
       const r = await apiJson<EquityHistoryResponse>(url);
       setEquityHistory(r);
       clearFetchErr("equity");
     } catch (e) { markFetchErr("equity"); }
   }
 
-  function shiftDate(days: number) {
-    const base = navDate || new Date().toISOString().slice(0, 10);
-    const d = new Date(base);
-    d.setDate(d.getDate() + days);
-    const next = d.toISOString().slice(0, 10);
-    setNavDate(next);
-    void doFetchEquityHistory(next);
-  }
 
   async function doFetchExitCandidates() {
     try {
@@ -1909,9 +1682,6 @@ export default function App() {
   }
 
   const opzioniRows = universeItems;
-  const opportunityKeyOf = (item: UniverseScanItem): string => `${item.rank}::${item.symbol}::${item.strategy}`;
-  const opportunityTop = universeItems[0] ?? null;
-  const selectedOpportunity = universeItems.find((x) => opportunityKeyOf(x) === selectedOpportunityKey) ?? opportunityTop;
   const opportunityReady = universeItems.filter((x) => x.score >= 0.55).length;
   const scanCandidates: ScanFullCandidate[] = oppScanResult?.candidates ?? [];
   const premarketUsesScanFull = scanCandidates.length > 0;
@@ -2011,7 +1781,7 @@ export default function App() {
     // Fallback: nessun dato regime ancora disponibile
     if (hasPaperData) return { cls: "regime-caution", text: "CAUTION" };
     return { cls: "regime-offline", text: "UNKNOWN" };
-  }, [apiOnline, goGate?.pass, hasPaperData]);
+  }, [apiOnline, regimeCurrent?.regime, hasPaperData]);
 
   const kellyHalf = useMemo(() => {
     const p = paperSummary?.win_rate;
@@ -2137,17 +1907,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!universeItems.length) {
-      if (selectedOpportunityKey) setSelectedOpportunityKey("");
-      return;
-    }
-    const hasSelection = universeItems.some((x) => opportunityKeyOf(x) === selectedOpportunityKey);
-    if (!hasSelection) {
-      setSelectedOpportunityKey(opportunityKeyOf(universeItems[0]));
-    }
-  }, [universeItems, selectedOpportunityKey]);
-
-  useEffect(() => {
     const tick = () => {
       const t = new Date().toLocaleString("sv-SE", { hour12: false, timeZone: "America/New_York" }).replace("T", " ");
       setClockText(`${t} EST`);
@@ -2201,17 +1960,6 @@ export default function App() {
       ?? { visible: true, interactive: true, gate: "unknown", reason: null };
   }
 
-  const oldNavItems: Array<{ id: TabKey; label: string }> = [
-    { id: "warroom", label: "WAR ROOM" },
-    { id: "pipeline", label: "PIPELINE AUTO" },
-  ];
-  const resolvedTab: TabKey = centerPhase === "old"
-    ? activeTab
-    : "warroom";
-  const openOldTab = (tab: TabKey): void => {
-    setCenterPhase("old");
-    setActiveTab(tab);
-  };
   const releaseView = useMemo(() => parseReleaseMd(releaseMd), [releaseMd]);
   const ddPct = (paperSummary?.max_drawdown ?? 0) * 100;
   const ddFill = Math.max(0, Math.min(100, (ddPct / 20) * 100));
@@ -2641,7 +2389,6 @@ export default function App() {
             <button className={`tab ${centerPhase === "ante" ? "active" : ""}`} onClick={() => setCenterPhase("ante")}>ANTE</button>
             <button className={`tab ${centerPhase === "op" ? "active" : ""}`} onClick={() => setCenterPhase("op")}>OP</button>
             <button className={`tab ${centerPhase === "post" ? "active" : ""}`} onClick={() => setCenterPhase("post")}>POST</button>
-            <button className={`tab ${centerPhase === "old" ? "active" : ""}`} onClick={() => setCenterPhase("old")}>OLD</button>
           </div>
           {centerPhase === "ante" && (
             <div className="tabs subtabs">
@@ -2664,16 +2411,6 @@ export default function App() {
               <button className={`tab ${postSubTab === "report" ? "active" : ""}`} onClick={() => setPostSubTab("report")}>REPORT</button>
             </div>
           )}
-          {centerPhase === "old" && (
-            <div className="tabs subtabs old-tabs">
-              {oldNavItems.map((tab) => (
-                <button key={tab.id} className={`tab ${activeTab === tab.id ? "active" : ""}`} onClick={() => setActiveTab(tab.id)}>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* ══════════════════════════════════════════════════════════════
                LIFECYCLE PANELS — ANTE / OP / POST  (dati reali, no mock)
               ══════════════════════════════════════════════════════════════ */}
@@ -2927,8 +2664,8 @@ export default function App() {
                       )}
                     </div>
                     <div className="lc-action-bar">
-                      <button className="btn btn-primary" onClick={() => void doScanFull()} disabled={busy || !apiOnline}>
-                        {busy ? "..." : "▶ Scan completo"}
+                      <button className="btn btn-primary" onClick={() => void doScanFull()} disabled={oppScanBusy}>
+                        {oppScanBusy ? "⏳ scan..." : "▶ Scan completo"}
                       </button>
                       <button className="btn btn-ghost" onClick={refreshAll} disabled={busy}>⟳</button>
                     </div>
@@ -3062,38 +2799,92 @@ export default function App() {
                 </span>
               </div>
               <div className="lc-body">
-                <div className="lc-panel">
-                  <div className="lc-panel-title">Candidati — filtri duri + score</div>
-                  {scanCandidates.length === 0 && universeItems.length === 0 && (
+                <div className="lc-panel" style={{overflowY:"auto"}}>
+                  {/* ── Segnali candidati ── */}
+                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+                    <span className="lc-panel-title" style={{margin:0}}>
+                      SEGNALI — filtri duri + score
+                      <span className="sev-data" style={{fontWeight:400, marginLeft:6}}>({premarketRows.length})</span>
+                    </span>
+                    <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}} onClick={refreshAll} disabled={busy}>⟳</button>
+                  </div>
+                  {premarketRows.length === 0 ? (
                     <div style={{color:"var(--dim)", fontSize:"0.7rem", padding:"8px 0"}}>
-                      Nessun candidato. Esegui scan dalla tab ANALISI.
+                      Nessun segnale. Esegui scan dalla tab ANALISI.
+                    </div>
+                  ) : (
+                    <div style={{overflowX:"auto", maxHeight:200, overflowY:"auto"}}>
+                      <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                        <thead>
+                          <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                            <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
+                            <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
+                            <th style={{textAlign:"left", padding:"2px 4px"}}>Strategia</th>
+                            <th style={{textAlign:"right", padding:"2px 4px"}}>Score</th>
+                            <th style={{textAlign:"right", padding:"2px 4px"}}>Spread%</th>
+                            <th style={{textAlign:"right", padding:"2px 4px"}}>IVR%</th>
+                            <th style={{textAlign:"left", padding:"2px 4px"}}>Fonte</th>
+                            <th style={{padding:"2px 4px"}}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {premarketRows.map((c, i) => {
+                            const isSelected = selectedItemId != null && (c as any).item_id != null && selectedItemId === (c as any).item_id;
+                            return (
+                            <tr key={i} style={{borderBottom:"1px solid #222", background: isSelected ? "rgba(74,222,128,0.08)" : undefined}}>
+                              <td style={{padding:"2px 4px", color:"#666"}}>#{i + 1}</td>
+                              <td style={{padding:"2px 4px", fontWeight:600}}>{c.symbol}</td>
+                              <td style={{padding:"2px 4px", color:"#888"}}>{c.strategy}</td>
+                              <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                {c.scorePct !== undefined ? (
+                                  <span className={c.scorePct >= 65 ? "sev-ok" : c.scorePct >= 50 ? "sev-warn" : "sev-error"}>
+                                    {c.scorePct.toFixed(0)}
+                                  </span>
+                                ) : "—"}
+                              </td>
+                              <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
+                                {c.spreadPct != null ? c.spreadPct.toFixed(1) : "—"}
+                              </td>
+                              <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
+                                {c.ivRankPct != null ? c.ivRankPct.toFixed(0) : "—"}
+                              </td>
+                              <td style={{padding:"2px 4px", color:"#555", fontSize:"0.6rem"}}>{c.source ?? "—"}</td>
+                              <td style={{padding:"2px 2px"}}>
+                                <button
+                                  className="btn btn-ghost"
+                                  style={{fontSize:"0.6rem", padding:"1px 6px", whiteSpace:"nowrap"}}
+                                  onClick={() => {
+                                    setSymbol(c.symbol ?? "");
+                                    setStrategy(c.strategy ?? "BULL_PUT");
+                                    setPayload(JSON.stringify({symbol: c.symbol, strategy: c.strategy, legs: []}, null, 2));
+                                    setSelectedItemId((c as any).item_id ?? null);
+                                    setOpExecOpen(true);
+                                  }}
+                                >→ ESEGUI</button>
+                              </td>
+                            </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   )}
-                  {premarketRows.slice(0, 8).map((c, i) => (
-                    <div key={i} className="lc-candidate-row">
-                      <span className="lc-candidate-rank">#{i + 1}</span>
-                      <span className="lc-candidate-sym">
-                        <span style={{color:"var(--text)", fontWeight:600}}>{c.symbol}</span>
-                        <span style={{color:"var(--dim)", fontSize:"0.6rem"}}> {c.strategy}</span>
-                      </span>
-                      {c.scorePct !== undefined && (
-                        <span className={`lc-badge ${c.scorePct >= 65 ? "ok" : c.scorePct >= 50 ? "warn" : "bad"}`}>{c.scorePct.toFixed(0)}</span>
-                      )}
-                    </div>
-                  ))}
+
+                  {/* ── Exit urgenti ── */}
                   {urgentExits.length > 0 && (
-                    <div style={{marginTop:14}}>
+                    <div style={{marginTop:10}}>
                       <div className="lc-panel-title" style={{color:"var(--amber)"}}>Exit urgenti 🚨 ({urgentExits.length})</div>
                       {urgentExits.map((c, i) => (
                         <div key={i} className="lc-candidate-row">
                           <span className="lc-candidate-rank" style={{color:"var(--red)"}}>!</span>
-                          <span className="lc-candidate-sym">{c.symbol} <span style={{color:"var(--dim)", fontSize:"0.6rem"}}>{c.right ?? ""} {c.strike ?? ""}</span></span>
+                          <span className="lc-candidate-sym" style={{flex:1}}>{c.symbol} <span style={{color:"var(--dim)", fontSize:"0.6rem"}}>{c.right ?? ""} {c.strike ?? ""}</span></span>
                           <span className="lc-badge warn">exit {c.exit_score}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                  <div className="lc-kpi-grid" style={{marginTop:14}}>
+
+                  <div className="lc-kpi-grid" style={{marginTop:10}}>
                     <div className="lc-kpi-item">
                       <div className="lc-kpi-label">Gate Go/No-Go</div>
                       <div className={`lc-kpi-value ${goGate?.pass ? "sev-ok" : "sev-error"}`}>{goGate?.pass ? "GO ✓" : "NO-GO"}</div>
@@ -3115,7 +2906,122 @@ export default function App() {
                       <div className="lc-kpi-sub">evita 09:30–45</div>
                     </div>
                   </div>
+
+                  {/* ── EXEC FORM ── */}
+                  <div style={{borderTop:"1px solid var(--border)", marginTop:12, paddingTop:8}}>
+                    <div style={{display:"flex", alignItems:"center", gap:6, marginBottom:6}}>
+                      <button type="button" className="panel-fold-btn" onClick={() => setOpExecOpen(v => !v)}>
+                        {opExecOpen ? "▾" : "▸"}
+                      </button>
+                      <span className="lc-panel-title" style={{margin:0}}>ESECUZIONE ORDINE</span>
+                      {!opExecOpen && symbol && <span className="sev-meta" style={{fontSize:"0.65rem"}}>{symbol} · {strategy}</span>}
+                    </div>
+                    {opExecOpen && (
+                      <>
+                        {!blk("order_preview").interactive && blk("order_preview").reason && (
+                          <div className="notice error" style={{marginBottom:6, fontSize:"0.7rem"}}>
+                            🛑 {blk("order_preview").reason}
+                          </div>
+                        )}
+                        <div className="form-grid" style={{fontSize:"0.72rem"}}>
+                          <label>Symbol</label>
+                          <input value={symbol} onChange={e => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
+                          <label>Strategy</label>
+                          <select value={strategy} onChange={e => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive}
+                            style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
+                            <option value="BULL_PUT">BULL_PUT</option>
+                            {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
+                            {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
+                            {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
+                            {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
+                            {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE"].includes(strategy) && <option value={strategy}>{strategy}</option>}
+                          </select>
+                          <label>Payload JSON</label>
+                          <textarea rows={4} value={payload} onChange={e => setPayload(e.target.value)} disabled={!blk("order_preview").interactive}
+                            style={{fontSize:"0.68rem", fontFamily:"monospace"}} />
+                        </div>
+                        {payloadJsonError && <div className="notice error" style={{fontSize:"0.7rem"}}>Payload JSON non valido.</div>}
+                        {previewDirty && <div className="notice error" style={{fontSize:"0.7rem"}}>Preview non allineata al payload.</div>}
+                        <div className="actions" style={{marginTop:6}}>
+                          <button className="btn btn-primary" onClick={() => void doPreview()}
+                            disabled={busy || payloadJsonError || !blk("order_preview").interactive}>
+                            {busy ? "..." : "▶ PREVIEW"}
+                          </button>
+                          <select value={confirmDecision} onChange={e => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}
+                            disabled={!blk("order_confirm").interactive}
+                            style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
+                            <option value="APPROVE">APPROVE</option>
+                            <option value="REJECT">REJECT</option>
+                          </select>
+                          <button
+                            className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
+                            onClick={doConfirm}
+                            disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
+                            title={confirmArmed ? "Clicca ancora per inviare" : "Prima conferma"}
+                          >{confirmArmed ? "⚠ CONFERMA?" : "CONFIRM"}</button>
+                        </div>
+                        {preview && <pre className="console" style={{fontSize:"0.62rem", marginTop:6}}>{JSON.stringify(preview, null, 2)}</pre>}
+                      </>
+                    )}
+                  </div>
+
+                  {/* ── Posizioni IBKR ── */}
+                  <div style={{borderTop:"1px solid var(--border)", marginTop:12, paddingTop:8}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
+                      <span className="lc-panel-title" style={{margin:0}}>
+                        POSIZIONI APERTE
+                        {ibkrAccount && <span className="sev-data" style={{fontWeight:400, marginLeft:6}}>({ibkrAccount.positions.length})</span>}
+                      </span>
+                      <div style={{display:"flex", gap:6, alignItems:"center"}}>
+                        {ibkrAccount && (
+                          <span style={{fontSize:"0.65rem", color: ibkrAccount.connected ? "var(--g1)" : "var(--muted)"}}>
+                            {ibkrAccount.connected ? "LIVE" : "OFFLINE"}
+                            {ibkrAccount.net_liquidation != null && ` · €${ibkrAccount.net_liquidation.toLocaleString("it-IT",{maximumFractionDigits:0})}`}
+                          </span>
+                        )}
+                        <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}}
+                          disabled={ibkrAccountLoading} onClick={() => void doFetchIbkrAccount()}>
+                          {ibkrAccountLoading ? "…" : "⟳"}
+                        </button>
+                      </div>
+                    </div>
+                    {!ibkrAccount && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessun dato — clicca ⟳.</div>}
+                    {ibkrAccount && ibkrAccount.positions.length === 0 && (
+                      <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Nessuna posizione aperta.</div>
+                    )}
+                    {ibkrAccount && ibkrAccount.positions.length > 0 && (
+                      <div style={{overflowX:"auto", maxHeight:130, overflowY:"auto"}}>
+                        <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                          <thead>
+                            <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>Exp</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}>Strike</th>
+                              <th style={{textAlign:"center", padding:"2px 4px"}}>P/C</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}>Qty</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}>uPnL</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ibkrAccount.positions.map((pos, i) => (
+                              <tr key={i} style={{borderBottom:"1px solid #222"}}>
+                                <td style={{padding:"2px 4px"}}>{pos.symbol}</td>
+                                <td style={{padding:"2px 4px", color:"#888"}}>{pos.expiry ?? "—"}</td>
+                                <td style={{padding:"2px 4px", textAlign:"right"}}>{pos.strike ?? "—"}</td>
+                                <td style={{padding:"2px 4px", textAlign:"center", color: pos.right === "C" ? "#60a5fa" : "#fb923c"}}>{pos.right ?? "—"}</td>
+                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.quantity??0)<0?"#f87171":"#4ade80"}}>{pos.quantity}</td>
+                                <td style={{padding:"2px 4px", textAlign:"right", color:(pos.unrealized_pnl??0)>=0?"#4ade80":"#f87171"}}>
+                                  {pos.unrealized_pnl != null ? `${pos.unrealized_pnl>=0?"+":""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
                 <div className="lc-screen">
                   <div className="lc-screen-bar">
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
@@ -3137,10 +3043,7 @@ export default function App() {
                       </div>
                     )}
                     <div className="lc-action-bar">
-                      <button className="btn btn-primary" onClick={() => void doPreview()} disabled={busy || !goGate?.pass || !apiOnline}>
-                        {busy ? "..." : "▶ Preview ordine"}
-                      </button>
-                      <button className="btn btn-ghost" onClick={refreshAll} disabled={busy}>⟳</button>
+                      <button className="btn btn-ghost" onClick={refreshAll} disabled={busy}>⟳ refresh</button>
                     </div>
                   </div>
                 </div>
@@ -3527,9 +3430,6 @@ export default function App() {
                       <button className="btn btn-primary" onClick={() => void doRunSession("eod")} disabled={sessionStatus?.running || !apiOnline}>
                         ▶ EOD manuale
                       </button>
-                      <button className="btn btn-ghost" onClick={() => void doAddSnapshot()} disabled={busy || !apiOnline}>
-                        + Snapshot
-                      </button>
                       <button className="btn btn-ghost" onClick={() => void doFetchSessionStatus()} disabled={busy}>⟳</button>
                     </div>
                   </div>
@@ -3646,878 +3546,7 @@ export default function App() {
             </div>
           )}
 
-                    {centerPhase === "old" && resolvedTab === "warroom" && (
-            <>
-            {/* ── BANNER SESSIONI ──────────────────────────────────────────────── */}
-            {sessionStatus && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: "1.5rem",
-                padding: "6px 14px", background: "var(--card2)",
-                borderBottom: "1px solid var(--border)",
-                fontSize: "0.7rem", color: "var(--muted)", flexWrap: "wrap",
-              }}>
-                <span style={{ color: sessionStatus.enabled ? "var(--p1)" : "var(--muted)", fontWeight: 600 }}>
-                  {sessionStatus.enabled ? "● SCHEDULER ON" : "○ SCHEDULER OFF"}
-                </span>
-                {sessionStatus.running && (
-                  <span style={{ color: "var(--warn)", fontWeight: 600 }}>⟳ SESSIONE IN CORSO</span>
-                )}
-                {sessionStatus.last_morning && (
-                  <span>Ultima morning: <strong style={{ color: "var(--text)" }}>{sessionStatus.last_morning.replace("T", " ").slice(0, 16)} UTC</strong></span>
-                )}
-                {sessionStatus.last_eod && (
-                  <span>Ultima EOD: <strong style={{ color: "var(--text)" }}>{sessionStatus.last_eod.replace("T", " ").slice(0, 16)} UTC</strong></span>
-                )}
-                {sessionStatus.next_morning && !sessionStatus.running && (
-                  <span>Prossima morning: <strong style={{ color: "var(--p1)" }}>{sessionStatus.next_morning.replace("T", " ").slice(0, 16)}</strong></span>
-                )}
-                {sessionStatus.next_eod && !sessionStatus.running && (
-                  <span>Prossima EOD: <strong style={{ color: "var(--p1)" }}>{sessionStatus.next_eod.replace("T", " ").slice(0, 16)}</strong></span>
-                )}
-                <span style={{ marginLeft: "auto", display: "flex", gap: "6px", alignItems: "center" }}>
-                  <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px" }}
-                    disabled={sessionStatus.running}
-                    onClick={() => void doRunSession("morning")}
-                    title="Avvia sessione morning manualmente">▶ Morning</button>
-                  <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px" }}
-                    disabled={sessionStatus.running}
-                    onClick={() => void doRunSession("eod")}
-                    title="Avvia sessione EOD manualmente">▶ EOD</button>
-                  <button className="btn btn-ghost" style={{ fontSize: "0.65rem", padding: "2px 8px" }}
-                    onClick={() => void doFetchSessionStatus()} title="Aggiorna stato sessioni">⟳</button>
-                </span>
-              </div>
-            )}
-            {/* ── NARRATORE — player inline ───────────────────────────────────── */}
-            <div className="narrator-player-bar">
-              {/* label + track */}
-              <div className="narrator-player-track">
-                <span className="narrator-player-icon">📻</span>
-                <span className="narrator-player-label">{briefingLabel}</span>
-              </div>
-              {/* transport controls */}
-              <div className="narrator-player-transport">
-                <button className="btn btn-ghost narrator-btn"
-                  onClick={doBriefingPrev}
-                  disabled={briefingListIdx >= briefingList.length - 1 || briefingList.length === 0}
-                  title="Briefing precedente">◀ PREV</button>
-                <button
-                  className={`btn narrator-btn-main ${briefingPlaying ? "btn-warning" : "btn-primary"}`}
-                  onClick={briefingPlaying ? doBriefingStop : doBriefingPlay}
-                  disabled={!apiOnline || (!briefingPlaying && briefingList.length === 0)}
-                >{briefingPlaying ? "■ STOP" : "▶ PLAY"}</button>
-                <button className="btn btn-ghost narrator-btn"
-                  onClick={doBriefingNext}
-                  disabled={briefingListIdx <= 0}
-                  title="Briefing successivo">NEXT ▶</button>
-                <button className="btn btn-ghost narrator-btn"
-                  onClick={() => void doBriefingGenerate()}
-                  disabled={briefingBusy || !apiOnline}
-                  title="Genera nuovo briefing e invia su Telegram"
-                >{briefingBusy ? "..." : "⊕ GENERA"}</button>
-              </div>
-              {/* automation switches */}
-              <div className="narrator-player-switches">
-                <label className="narrator-switch-row">
-                  <span>Auto-apri</span>
-                  <span className={`toggle-pill ${briefingAutoOpen ? "on" : ""}`}
-                    onClick={() => setBriefingAutoOpen(v => !v)} role="switch"
-                    aria-checked={briefingAutoOpen} tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && setBriefingAutoOpen(v => !v)}>
-                    <span className="toggle-knob" />
-                  </span>
-                </label>
-                <label className="narrator-switch-row">
-                  <span>AutoPlay</span>
-                  <span className={`toggle-pill ${briefingAutoPlay ? "on" : ""}`}
-                    onClick={() => setBriefingAutoPlay(v => !v)} role="switch"
-                    aria-checked={briefingAutoPlay} tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && setBriefingAutoPlay(v => !v)}>
-                    <span className="toggle-knob" />
-                  </span>
-                </label>
-              </div>
-            </div>
 
-            <div className="panel-grid three">
-              <article className="panel">
-                {/* ── ROC10: equity sparkline header ── */}
-                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarEquityOpen((v) => !v)}>
-                      {warEquityOpen ? "▾" : "▸"}
-                    </button>
-                    <Tooltip text={TOOLTIPS.equity_curve}><span>EQUITY CURVE</span></Tooltip>
-                  </span>
-                  {equityHistory && equityHistory.n_points > 0 && (() => {
-                    const init = equityHistory.initial_equity!;
-                    const last = equityHistory.latest_equity!;
-                    const pnl = last - init;
-                    const pct = (pnl / init) * 100;
-                    return (
-                      <span style={{ color: pnl >= 0 ? "#4ade80" : "#f87171", fontWeight: 700, fontSize: "0.75rem" }}>
-                        €{last.toLocaleString("it-IT", { minimumFractionDigits: 0 })}
-                        {" "}{pnl >= 0 ? "+" : ""}{pct.toFixed(1)}%
-                      </span>
-                    );
-                  })()}
-                </div>
-                {warEquityOpen && (
-                <>
-                {/* ── Navigazione temporale equity ── */}
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4, flexWrap: "nowrap", overflowX: "auto" }}>
-                  <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px" }}
-                    onClick={() => shiftDate(-1)} title="Giorno precedente">◀ -1g</button>
-                  <input
-                    type="date"
-                    value={navDate}
-                    min={equityHistory?.min_date ?? undefined}
-                    max={equityHistory?.max_date ?? new Date().toISOString().slice(0, 10)}
-                    onChange={e => { setNavDate(e.target.value); void doFetchEquityHistory(e.target.value); }}
-                    style={{ fontSize: "0.65rem", width: 118, minWidth: 118, background: "var(--panel)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 3, padding: "1px 4px" }}
-                  />
-                  <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px" }}
-                    onClick={() => shiftDate(+1)} title="Giorno successivo">+1g ▶</button>
-                  {navDate && (
-                    <button className="btn btn-secondary" style={{ fontSize: "0.62rem", padding: "2px 5px", color: "var(--p1)" }}
-                      onClick={() => { setNavDate(""); void doFetchEquityHistory(""); }}>OGGI</button>
-                  )}
-                  {navDate && <span style={{ fontSize: "0.62rem", color: "var(--muted)", whiteSpace: "nowrap" }}>— vista al {navDate}</span>}
-                </div>
-
-                <EqSparkline points={equityHistory?.points ?? []} w={240} h={56} />
-
-                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarDrawdownOpen((v) => !v)}>
-                      {warDrawdownOpen ? "▾" : "▸"}
-                    </button>
-                    <Tooltip text={TOOLTIPS.drawdown_gauge}>DRAWDOWN - 3 LAYER</Tooltip>
-                    <span className="sev-data">{fmtPct(paperSummary?.max_drawdown ?? null)}</span>
-                  </span>
-                </div>
-                {warDrawdownOpen ? (
-                  <>
-                    <div className="dd-gauge">
-                      <div className="dd-track">
-                        <div className="dd-fill" style={{ width: `${ddFill}%` }} />
-                        <div className="dd-mark dd-mark10" />
-                        <div className="dd-mark dd-mark15" />
-                      </div>
-                      <div className="dd-labels">
-                        <span>0%</span><span>10%</span><span>15%</span><span>20%</span>
-                      </div>
-                    </div>
-                    <div className="sev-meta">DD attuale: {fmtPct(paperSummary?.max_drawdown ?? null)} / limite 20%</div>
-                  </>
-                ) : (
-                  <div className="subgroup-summary sev-meta">DD attuale {fmtPct(paperSummary?.max_drawdown ?? null)} · limite 20%</div>
-                )}
-
-                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarGateOpen((v) => !v)}>
-                      {warGateOpen ? "▾" : "▸"}
-                    </button>
-                    GATE STATUS
-                    <span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "GO" : "NO-GO"}</span>
-                  </span>
-                </div>
-                {warGateOpen ? (
-                  <>
-                    <div className="gate-line"><span><Tooltip text={TOOLTIPS.go_nogo}>GO/NO-GO</Tooltip></span>{goGate ? <GateBadge pass={goGate.pass} /> : <span className="sev-neutral">-</span>}</div>
-                    {goGate?.reasons.map((r) => <div key={`go-${r}`} className="reason">- {r}</div>)}
-                    <div className="gate-line"><span><Tooltip text={TOOLTIPS.f6_t1}>F6-T1 acceptance</Tooltip></span>{f6Gate ? <GateBadge pass={f6Gate.pass} /> : <span className="sev-neutral">-</span>}</div>
-                    {f6Gate?.reasons.map((r) => <div key={`f6-${r}`} className="reason">- {r}</div>)}
-                    <div className="gate-line"><span><Tooltip text={TOOLTIPS.f6_t2}>F6-T2 completeness</Tooltip></span>{f6t2Gate ? <GateBadge pass={f6t2Gate.pass} /> : <span className="sev-neutral">-</span>}</div>
-                    {f6t2Gate && <div className="sev-meta">completeness: <Tooltip text={TOOLTIPS.f6_t2_ratio}>{(f6t2Gate.completeness_ratio * 100).toFixed(0)}%</Tooltip></div>}
-                  </>
-                ) : (
-                  <div className="subgroup-summary sev-meta">
-                    {goGate ? `GO/NO-GO ${goGate.pass ? "PASS" : "FAIL"}` : "GO/NO-GO —"} ·
-                    {f6Gate ? ` F6-T1 ${f6Gate.pass ? "PASS" : "FAIL"}` : " F6-T1 —"} ·
-                    {f6t2Gate ? ` F6-T2 ${(f6t2Gate.completeness_ratio * 100).toFixed(0)}%` : " F6-T2 —"}
-                  </div>
-                )}
-                </>
-                )}
-              </article>
-
-              <article className="panel">
-                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarSystemOpen((v) => !v)}>
-                      {warSystemOpen ? "▾" : "▸"}
-                    </button>
-                    <span>SYSTEM STATUS</span>
-                  </span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: "0.62rem", color: "#555" }}>agg: {_agoLabel(sysStatusFetchedAt)}</span>
-                    <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "2px 6px" }}
-                      onClick={() => void doFetchSysStatus()}>⟳</button>
-                  </span>
-                </div>
-                {warSystemOpen && (
-                <>
-                {/* Signal grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "3px 8px", alignItems: "center", fontSize: "0.72rem", marginTop: 4 }}>
-                  {(sysStatus?.signals ?? []).map((sig) => {
-                    const detail = sanitizeSignalDetail(sig.detail, sig.status);
-                    return [
-                      <span key={`sn-${sig.name}`} className="dim" style={{ whiteSpace: "nowrap" }}>{sig.name}</span>,
-                      <span key={`sd-${sig.name}`} className="sev-neutral" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{detail}</span>,
-                      <span key={`ss-${sig.name}`} className={sevClassForSignalStatus(sig.status)} style={{ fontWeight: 700, textAlign: "right" }}>{sig.status}</span>,
-                    ];
-                  })}
-
-                  {/* Campi aggiuntivi */}
-                  <span className="dim">regime</span>
-                  <span className={sevClassForRegime(sysStatus?.regime)}>
-                    {sysStatus?.regime ?? "—"}
-                  </span>
-                  <span />
-
-                  <span className="dim">trades completati</span>
-                  <span className="sev-data">{sysStatus?.n_closed_trades ?? "—"}</span>
-                  <span />
-
-                  <span className="dim">api</span>
-                  <span className="sev-neutral">{apiOnline ? "ONLINE" : "OFFLINE"}</span>
-                  <span className={apiOnline ? "sev-ok" : "sev-error"} style={{ fontWeight: 700 }}>{apiOnline ? "OK" : "ALERT"}</span>
-                </div>
-
-                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarHistoryOpen((v) => !v)}>
-                      {warHistoryOpen ? "▾" : "▸"}
-                    </button>
-                    <Tooltip text={TOOLTIPS.history_readiness}>HISTORY READINESS</Tooltip>
-                    <span className={historyReadiness?.ready ? "sev-ok" : "sev-warn"}>
-                      {historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "…"}
-                    </span>
-                  </span>
-                </div>
-                {warHistoryOpen ? (
-                  historyReadiness ? (
-                    <div className={`history-readiness-box ${historyStatusClass}`}>
-                      <div className="history-readiness-head">
-                        <span>{historyReadiness.ready ? "READY" : "BUILDING"}</span>
-                        <span>{historyReadiness.score_pct.toFixed(1)}%</span>
-                      </div>
-                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_window}>Finestra</Tooltip></span><span>{historyReadiness.window_days}g</span></div>
-                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_days}>Giorni coperti</Tooltip></span><span>{historyReadiness.days_observed}/{historyReadiness.target_days}</span></div>
-                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_events}>Eventi</Tooltip></span><span>{historyReadiness.events_observed}/{historyReadiness.target_events}</span></div>
-                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_quality}>Qualita journal</Tooltip></span><span>{(historyReadiness.quality_completeness * 100).toFixed(1)}%</span></div>
-                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_violations}>Violazioni window</Tooltip></span><span>{historyReadiness.compliance_violations_window}</span></div>
-                      <div className="checklist-item"><span className="ci-label"><Tooltip text={TOOLTIPS.history_eta}>ETA</Tooltip></span><span>{historyEtaLabel}</span></div>
-                      {!historyReadiness.ready && historyReadiness.blockers.length > 0 && (
-                        <div className="history-blockers">
-                          {historyReadiness.blockers.join(" | ")}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="sev-meta" style={{ fontSize: "0.7rem" }}>Caricamento readiness...</div>
-                  )
-                ) : (
-                  <div className="subgroup-summary sev-meta">
-                    {historyReadiness
-                      ? `${historyReadiness.ready ? "READY" : "BUILDING"} · giorni ${historyReadiness.days_observed}/${historyReadiness.target_days} · eventi ${historyReadiness.events_observed}/${historyReadiness.target_events}`
-                      : "Readiness in caricamento..."}
-                  </div>
-                )}
-
-                {sysStatus?.kill_switch_active && (
-                  <div style={{ marginTop: 8, padding: "6px 10px", background: "#3a1010", border: "1px solid #f87171", borderRadius: 4, color: "#f87171", fontWeight: 700, fontSize: "0.75rem" }}>
-                    ⚠ KILL SWITCH ATTIVO — Esecuzione bloccata
-                  </div>
-                )}
-
-                {sysStatus?.timestamp_utc && (
-                  <div className="dim" style={{ marginTop: 4, fontSize: "0.65rem" }}>
-                    Agg: {fmtTs(sysStatus.timestamp_utc)}
-                  </div>
-                )}
-
-                {/* ── ROC9: Regime distribution bar ──────────────────────── */}
-                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarRegimeOpen((v) => !v)}>
-                      {warRegimeOpen ? "▾" : "▸"}
-                    </button>
-                    REGIME
-                    <span className="sev-data">({regimeCurrent?.n_recent ?? 0} sample)</span>
-                    <span
-                      className={
-                        regimeCurrent?.regime === "SHOCK"
-                          ? "sev-error"
-                          : regimeCurrent?.regime === "CAUTION"
-                            ? "sev-warn"
-                            : regimeCurrent?.regime === "NORMAL"
-                              ? "sev-ok"
-                              : "sev-neutral"
-                      }
-                      style={{ fontWeight: 700, fontSize: "0.72rem" }}
-                    >
-                      {regimeCurrent?.regime ?? "—"}
-                    </span>
-                  </span>
-                </div>
-
-                {warRegimeOpen ? (
-                  regimeCurrent && regimeCurrent.n_recent > 0 ? (
-                    <>
-                      {/* Stacked bar */}
-                      <div style={{ display: "flex", height: 10, borderRadius: 4, overflow: "hidden", gap: 1, marginTop: 2 }}>
-                        {(["NORMAL", "CAUTION", "SHOCK"] as const).map((lbl) => {
-                          const pct = regimeCurrent.regime_pct[lbl] ?? 0;
-                          const color = lbl === "NORMAL" ? "#4ade80" : lbl === "CAUTION" ? "#fbbf24" : "#f87171";
-                          return pct > 0 ? (
-                            <div key={lbl} style={{ width: `${pct}%`, background: color, transition: "width 0.4s" }} title={`${lbl}: ${pct}%`} />
-                          ) : null;
-                        })}
-                      </div>
-                      {/* Legend */}
-                      <div style={{ display: "flex", gap: 10, fontSize: "0.65rem", marginTop: 3 }}>
-                        {(["NORMAL", "CAUTION", "SHOCK"] as const).map((lbl) => {
-                          const color = lbl === "NORMAL" ? "#4ade80" : lbl === "CAUTION" ? "#fbbf24" : "#f87171";
-                          const pct = regimeCurrent.regime_pct[lbl] ?? 0;
-                          const cnt = regimeCurrent.regime_counts[lbl] ?? 0;
-                          return (
-                            <span key={lbl} style={{ color }}>
-                              {lbl[0]}{lbl.slice(1).toLowerCase()} {pct}% ({cnt})
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="sev-meta" style={{ fontSize: "0.7rem" }}>
-                      {regimeCurrent ? "Nessun dato campione" : "Caricamento…"}
-                    </div>
-                  )
-                ) : (
-                  <div className="subgroup-summary sev-meta">
-                    {regimeCurrent
-                      ? `${regimeCurrent.regime} · sample ${regimeCurrent.n_recent}`
-                      : "Regime in caricamento..."}
-                  </div>
-                )}
-
-                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarPipelineOpen((v) => !v)}>
-                      {warPipelineOpen ? "▾" : "▸"}
-                    </button>
-                    AUTOMATION PIPELINE
-                    <span className={pipeHasRegime ? "sev-ok" : "sev-warn"}>{pipeHasRegime ? "READY" : "WAIT"}</span>
-                  </span>
-                </div>
-                {warPipelineOpen ? (
-                  <>
-                    <div className="pipeline-row">
-                      <Tooltip text={TOOLTIPS.pipe_data}><span className="pipe-step done">DATA</span></Tooltip>
-                      <span className="pipe-arrow">→</span>
-                      <Tooltip text={TOOLTIPS.pipe_ivr}><span className="pipe-step done">IVR</span></Tooltip>
-                      <span className="pipe-arrow">→</span>
-                      <Tooltip text={TOOLTIPS.pipe_regime}><span className={`pipe-step ${pipeRegimeStep}`}>REGIME</span></Tooltip>
-                      <span className="pipe-arrow">→</span>
-                      <Tooltip text={TOOLTIPS.pipe_score}><span className={`pipe-step ${pipeScoreStep}`}>SCORE</span></Tooltip>
-                      <span className="pipe-arrow">→</span>
-                      <Tooltip text={TOOLTIPS.pipe_kelly}><span className={`pipe-step ${pipeKellyStep}`}>KELLY</span></Tooltip>
-                    </div>
-                    <div className="sev-meta" style={{ fontSize: "0.65rem", marginTop: 3 }}>
-                      {pipeHasRegime
-                        ? `${regimeCurrent?.n_recent ?? 0} sample · ultimo scan ${regimeCurrent?.last_scan_ts ? new Date(regimeCurrent.last_scan_ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "—"}`
-                        : "In attesa dati regime…"}
-                    </div>
-                  </>
-                ) : (
-                  <div className="subgroup-summary sev-meta">
-                    {`DATA→IVR→${pipeRegimeStep.toUpperCase()}→${pipeScoreStep.toUpperCase()}→${pipeKellyStep.toUpperCase()}`}
-                  </div>
-                )}
-
-                {/* ── ROC16: Quick-nav action strip ───────────────────── */}
-                <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                  <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "3px 8px", flex: 1 }}
-                    onClick={() => { setCenterPhase("ante"); setAnteSubTab("analisi"); }}>
-                    → SCAN
-                  </button>
-                  <button className="btn btn-secondary" style={{ fontSize: "0.65rem", padding: "3px 8px", flex: 1 }}
-                    onClick={() => openOldTab("pipeline")}>
-                    → PIPELINE
-                  </button>
-                </div>
-                </>
-                )}
-              </article>
-
-              {/* ── ROC7: IBKR ACCOUNT panel ──────────────────────────────── */}
-              <article className="panel">
-                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarIbkrOpen((v) => !v)}>
-                      {warIbkrOpen ? "▾" : "▸"}
-                    </button>
-                    IBKR ACCOUNT
-                    {hasUrgentExit && (
-                      <span style={{
-                        fontSize: "0.65rem", padding: "1px 6px", borderRadius: 3,
-                        background: "#3a0808", border: "1px solid #f87171",
-                        color: "#f87171", fontWeight: 700,
-                        animation: "pulse-run 0.8s infinite",
-                      }} title={`${urgentExits.length} posizione/i con urgenza alta`}>
-                        🚨 EXIT {urgentExits.length}
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: "0.62rem", color: "#555" }}>agg: {_agoLabel(ibkrAccountFetchedAt)}</span>
-                    <span style={{
-                      fontSize: "0.7rem", padding: "2px 8px", borderRadius: 4,
-                      background: ibkrAccount?.connected ? "#1a4a1a" : "#2a2a2a",
-                      color: ibkrAccount?.connected ? "#4ade80" : "#666",
-                      border: `1px solid ${ibkrAccount?.connected ? "#4ade80" : "#444"}`,
-                    }}>
-                      {ibkrAccount?.connected ? `LIVE · ${ibkrAccount.account_id ?? "—"}` : "NOT CONNECTED"}
-                    </span>
-                  </span>
-                </div>
-                {warIbkrOpen && (
-                <>
-                {ibkrAccountLoading && <div className="dim">Caricamento account…</div>}
-
-                {!ibkrAccount && !ibkrAccountLoading && (
-                  <div className="dim">Nessun dato — clicca ⟳ per aggiornare.</div>
-                )}
-
-                {ibkrAccount && (
-                  <>
-                    <div className="form-grid" style={{ marginTop: 8 }}>
-                      <span className="dim">Net Liq</span>
-                      <span style={{ color: "#4ade80", fontWeight: 600 }}>
-                        {ibkrAccount.net_liquidation != null
-                          ? `€${ibkrAccount.net_liquidation.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
-                          : "—"}
-                      </span>
-                      <span className="dim">Buying Power</span>
-                      <span>
-                        {ibkrAccount.buying_power != null
-                          ? `€${ibkrAccount.buying_power.toLocaleString("it-IT", { minimumFractionDigits: 2 })}`
-                          : "—"}
-                      </span>
-                      <span className="dim">P&amp;L realizzato</span>
-                      <span style={{ color: (ibkrAccount.realized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
-                        {ibkrAccount.realized_pnl != null
-                          ? `${ibkrAccount.realized_pnl >= 0 ? "+" : ""}${ibkrAccount.realized_pnl.toFixed(2)}`
-                          : "—"}
-                      </span>
-                      <span className="dim">P&amp;L non realizzato</span>
-                      <span style={{ color: (ibkrAccount.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
-                        {ibkrAccount.unrealized_pnl != null
-                          ? `${ibkrAccount.unrealized_pnl >= 0 ? "+" : ""}${ibkrAccount.unrealized_pnl.toFixed(2)}`
-                          : "—"}
-                      </span>
-                      {ibkrAccount.net_liquidation != null && ibkrAccount.net_liquidation > 0 && (() => {
-                        const totalPnl = (ibkrAccount.realized_pnl ?? 0) + (ibkrAccount.unrealized_pnl ?? 0);
-                        const pct = (totalPnl / ibkrAccount.net_liquidation) * 100;
-                        return (
-                          <>
-                            <span className="dim">P&amp;L portafoglio %</span>
-                            <span style={{ color: pct >= 0 ? "#4ade80" : "#f87171", fontWeight: 600 }}>
-                              {pct >= 0 ? "+" : ""}{pct.toFixed(2)}%
-                            </span>
-                          </>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <button type="button" className="panel-fold-btn" onClick={() => setWarIbkrPositionsOpen((v) => !v)}>
-                          {warIbkrPositionsOpen ? "▾" : "▸"}
-                        </button>
-                        POSIZIONI APERTE <span className="sev-data">({ibkrAccount.positions.length})</span>
-                      </span>
-                    </div>
-                    {warIbkrPositionsOpen && (
-                      ibkrAccount.positions.length === 0 ? (
-                        <div className="dim">Nessuna posizione aperta.</div>
-                      ) : (
-                        <div style={{ overflowX: "auto", maxHeight: 150, overflowY: "auto" }}>
-                          <table style={{ width: "100%", fontSize: "0.7rem", borderCollapse: "collapse" }}>
-                            <thead>
-                              <tr style={{ color: "#666", borderBottom: "1px solid #333" }}>
-                                <th style={{ textAlign: "left", padding: "2px 4px" }}>Sym</th>
-                                <th style={{ textAlign: "left", padding: "2px 4px" }}>Exp</th>
-                                <th style={{ textAlign: "right", padding: "2px 4px" }}>Strike</th>
-                                <th style={{ textAlign: "center", padding: "2px 4px" }}>P/C</th>
-                                <th style={{ textAlign: "right", padding: "2px 4px" }}>Qty</th>
-                                <th style={{ textAlign: "right", padding: "2px 4px" }}>MktVal</th>
-                                <th style={{ textAlign: "right", padding: "2px 4px" }}>uPnL</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {ibkrAccount.positions.map((pos, i) => (
-                                <tr key={i} style={{ borderBottom: "1px solid #222" }}>
-                                  <td style={{ padding: "2px 4px" }}>{pos.symbol}</td>
-                                  <td style={{ padding: "2px 4px", color: "#888" }}>{pos.expiry ?? "—"}</td>
-                                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{pos.strike ?? "—"}</td>
-                                  <td style={{ padding: "2px 4px", textAlign: "center", color: pos.right === "C" ? "#60a5fa" : "#fb923c" }}>{pos.right ?? "—"}</td>
-                                  <td style={{ padding: "2px 4px", textAlign: "right", color: (pos.quantity ?? 0) < 0 ? "#f87171" : "#4ade80" }}>{pos.quantity}</td>
-                                  <td style={{ padding: "2px 4px", textAlign: "right" }}>{pos.market_value?.toFixed(0) ?? "—"}</td>
-                                  <td style={{ padding: "2px 4px", textAlign: "right", color: (pos.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
-                                    {pos.unrealized_pnl != null ? `${pos.unrealized_pnl >= 0 ? "+" : ""}${pos.unrealized_pnl.toFixed(0)}` : "—"}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )
-                    )}
-                  </>
-                )}
-
-                <button
-                  className="btn btn-secondary mt10"
-                  style={{ fontSize: "0.7rem", padding: "3px 8px" }}
-                  disabled={ibkrAccountLoading}
-                  onClick={() => void doFetchIbkrAccount()}
-                >
-                  {ibkrAccountLoading ? "…" : "⟳ ACCOUNT"}
-                </button>
-
-                {/* ── ROC14: Exit Candidates ──────────────────────────── */}
-                <div className="panel-title mt10 subgroup-title" style={{ display: "flex", alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarIbkrExitOpen((v) => !v)}>
-                      {warIbkrExitOpen ? "▾" : "▸"}
-                    </button>
-                    EXIT CANDIDATES
-                    <span
-                      className={!exitCandidates ? "sev-neutral" : exitCandidates.n_flagged > 0 ? "sev-warn" : "sev-data"}
-                      style={{ fontSize: "0.62rem", marginLeft: 8 }}
-                    >
-                      {exitCandidates ? `${exitCandidates.n_flagged}/${exitCandidates.n_total} flagged` : "—"}
-                    </span>
-                    <span className="sev-meta" style={{ fontSize: "0.62rem", marginLeft: 8 }}>
-                      agg: {_agoLabel(exitCandidatesFetchedAt)}
-                    </span>
-                  </span>
-                </div>
-
-                {warIbkrExitOpen && (
-                  <>
-                    {!exitCandidates && (
-                      <div className="dim" style={{ fontSize: "0.7rem" }}>Caricamento…</div>
-                    )}
-
-                    {exitCandidates && exitCandidates.candidates.length === 0 && (
-                      <div className="dim" style={{ fontSize: "0.7rem" }}>
-                        Nessuna posizione con segnale di uscita.
-                      </div>
-                    )}
-
-                    {exitCandidates && exitCandidates.candidates.map((c, i) => {
-                      const score = c.exit_score;
-                      const color = score >= 5 ? "#f87171" : score >= 3 ? "#fbbf24" : "#60a5fa";
-                      const dot   = score >= 5 ? "🔴" : score >= 3 ? "🟡" : "🔵";
-                      const pnlColor = (c.unrealized_pnl ?? 0) >= 0 ? "#4ade80" : "#f87171";
-                      return (
-                        <div key={i} style={{
-                          marginTop: 6, padding: "6px 8px",
-                          background: "#1a1a1a", borderRadius: 4,
-                          borderLeft: `3px solid ${color}`,
-                          fontSize: "0.72rem",
-                        }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontWeight: 700 }}>
-                              {dot} {c.symbol} {c.strike ?? "—"}{c.right ?? ""}
-                            </span>
-                            <span style={{ color, fontWeight: 700 }}>score {score}</span>
-                          </div>
-                          <div style={{ color: "#888", marginTop: 2 }}>
-                            exp {c.expiry ?? "—"}
-                            {c.unrealized_pnl != null && (
-                              <span style={{ color: pnlColor, marginLeft: 8 }}>
-                                uPnL {c.unrealized_pnl >= 0 ? "+" : ""}{c.unrealized_pnl.toFixed(0)}
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ color: "#666", marginTop: 2, fontStyle: "italic" }}>
-                            {c.exit_reasons.join(" · ")}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {exitCandidates && (
-                      <button
-                        className="btn btn-secondary mt10"
-                        style={{ fontSize: "0.7rem", padding: "3px 8px" }}
-                        onClick={() => void doFetchExitCandidates()}
-                      >
-                        ⟳ EXIT SCAN
-                      </button>
-                    )}
-                  </>
-                )}
-                </>
-                )}
-              </article>
-
-              {/* ── WHEEL POSITIONS ── */}
-              {(() => {
-                // Copilot model: due livelli separati
-                // wheelAvailable: capitale sufficiente (capital_tier ≥ SMALL) — pannello visibile
-                // wheelValidated: gate superato (active_mode ≥ SMALL) — operazione certificata
-                const wheelAvailable  = tierInfo?.features_available?.wheel  ?? false;
-                const wheelValidated  = tierInfo?.features_validated?.wheel  ?? false;
-                const wheelWarning    = wheelAvailable && !wheelValidated;
-                const capitalTierName = tierInfo?.capital_tier ?? "MICRO";
-                return (
-              <article className="panel" style={{ gridColumn: "1 / -1", position: "relative" }}>
-                <div className="panel-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <button type="button" className="panel-fold-btn" onClick={() => setWarWheelOpen((v) => !v)}>
-                      {warWheelOpen ? "▾" : "▸"}
-                    </button>
-                    🔄 WHEEL POSITIONS
-                  </span>
-                  <span style={{ fontSize: "0.65rem", color: "#555", fontWeight: 400 }}>
-                    {!wheelAvailable
-                      ? <span style={{ color: "#a78bfa" }}>🔒 Capitale insufficiente</span>
-                      : wheelWarning
-                        ? <span style={{ color: "#f97316" }}>⚠ Non ancora validato</span>
-                        : (wheelFetchedAt ? new Date(wheelFetchedAt).toLocaleTimeString("it-IT") : "—")
-                    }
-                  </span>
-                </div>
-                {warWheelOpen && (
-                  <>
-
-                {/* BLOCCO REALE: capitale insufficiente */}
-                {!wheelAvailable && (
-                  <div style={{
-                    padding: "16px 12px",
-                    background: "rgba(167,139,250,0.06)",
-                    border: "1px dashed #a78bfa44",
-                    borderRadius: 6,
-                    fontSize: "0.72rem", color: "#888",
-                    display: "flex", alignItems: "center", gap: 10,
-                  }}>
-                    <span style={{ fontSize: "1.2rem" }}>🔒</span>
-                    <div>
-                      <div style={{ color: "#a78bfa", fontWeight: 700, marginBottom: 2 }}>Wheel richiede capitale SMALL (€2k–5k)</div>
-                      <div>Capitale attuale: <strong style={{ color: "#60a5fa" }}>{capitalTierName}</strong> — aumenta il capitale per accedere a questa strategia.</div>
-                      {tierInfo?.next_capital_tier && (
-                        <div style={{ marginTop: 4, color: "#555" }}>
-                          Prossimo tier capitale → {tierInfo.next_capital_tier}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* WARNING COPILOTA: capitale ok, gate non ancora superato */}
-                {wheelWarning && (
-                  <div style={{
-                    padding: "10px 12px",
-                    background: "rgba(249,115,22,0.08)",
-                    border: "1px solid #f9731644",
-                    borderRadius: 6,
-                    fontSize: "0.72rem", color: "#f97316",
-                    display: "flex", alignItems: "center", gap: 10,
-                    marginBottom: 10,
-                  }}>
-                    <span style={{ fontSize: "1.1rem" }}>⚠</span>
-                    <div>
-                      <strong>Strategia non ancora validata sul tuo track record.</strong>
-                      {" "}Procedi con consapevolezza.
-                      {tierInfo?.next_operational_tier && (
-                        <span style={{ color: "#888", marginLeft: 6 }}>
-                          Gate operativo: 50 trade chiusi · Sharpe OOS ≥ 0.6 · 0 violazioni
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {wheelAvailable && !wheelPositions && (
-                  <div className="dim" style={{ fontSize: "0.7rem" }}>Nessun dato — clicca ⟳ per aggiornare.</div>
-                )}
-
-                {wheelAvailable && wheelPositions && wheelPositions.positions.length === 0 && (
-                  <div className="dim" style={{ fontSize: "0.7rem" }}>Nessuna posizione Wheel attiva.</div>
-                )}
-
-                {wheelAvailable && wheelPositions && wheelPositions.positions.length > 0 && (
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.7rem" }}>
-                      <thead>
-                        <tr style={{ color: "#555", borderBottom: "1px solid #2a2a2a" }}>
-                          <th style={{ textAlign: "left", padding: "3px 6px" }}>SYMBOL</th>
-                          <th style={{ textAlign: "left", padding: "3px 6px" }}>STATE</th>
-                          <th style={{ textAlign: "right", padding: "3px 6px" }}>CSP K</th>
-                          <th style={{ textAlign: "left", padding: "3px 6px" }}>CSP EXP</th>
-                          <th style={{ textAlign: "right", padding: "3px 6px" }}>CC K</th>
-                          <th style={{ textAlign: "left", padding: "3px 6px" }}>CC EXP</th>
-                          <th style={{ textAlign: "right", padding: "3px 6px" }}>PREMIUM</th>
-                          <th style={{ textAlign: "right", padding: "3px 6px" }}>CYCLES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {wheelPositions.positions.map((p) => {
-                          const stateColor: Record<string, string> = {
-                            IDLE: "#555",
-                            OPEN_CSP: "#60a5fa",
-                            ASSIGNED: "#fbbf24",
-                            OPEN_CC: "#a78bfa",
-                            CLOSED: "#4ade80",
-                          };
-                          const col = stateColor[p.state] ?? "#888";
-                          return (
-                            <tr key={p.position_id} style={{ borderBottom: "1px solid #1a1a1a" }}>
-                              <td style={{ padding: "4px 6px", fontWeight: 700 }}>{p.symbol}</td>
-                              <td style={{ padding: "4px 6px" }}>
-                                <span style={{
-                                  color: col, fontWeight: 700,
-                                  background: col + "22", borderRadius: 3,
-                                  padding: "1px 5px", fontSize: "0.65rem",
-                                }}>{p.state}</span>
-                              </td>
-                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#ccc" }}>
-                                {p.csp_strike ?? "—"}
-                              </td>
-                              <td style={{ padding: "4px 6px", color: "#777" }}>
-                                {p.csp_expiry ?? "—"}
-                              </td>
-                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#ccc" }}>
-                                {p.cc_strike ?? "—"}
-                              </td>
-                              <td style={{ padding: "4px 6px", color: "#777" }}>
-                                {p.cc_expiry ?? "—"}
-                              </td>
-                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#4ade80" }}>
-                                +{p.total_premium_collected.toFixed(0)}
-                              </td>
-                              <td style={{ padding: "4px 6px", textAlign: "right", color: "#888" }}>
-                                {p.cycle_count}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {wheelAvailable && (
-                  <button
-                    className="btn btn-secondary mt10"
-                    style={{ fontSize: "0.7rem", padding: "3px 8px" }}
-                    onClick={() => void doFetchWheelPositions()}
-                  >
-                    ⟳ WHEEL REFRESH
-                  </button>
-                )}
-                  </>
-                )}
-                {!warWheelOpen && (
-                  <div className="dim" style={{ fontSize: "0.7rem", marginTop: 6 }}>
-                    {!wheelAvailable
-                      ? "Wheel bloccata: capitale insufficiente (richiede SMALL)."
-                      : wheelWarning
-                        ? "Strategia non ancora validata sul track record (gate operativo richiesto)."
-                        : wheelPositions?.positions?.length
-                          ? `${wheelPositions.positions.length} posizione/i Wheel attive.`
-                          : "Nessuna posizione Wheel attiva."}
-                  </div>
-                )}
-              </article>
-                );
-              })()}
-            </div>
-            </>
-          )}
-
-          {centerPhase === "old" && resolvedTab === "pipeline" && (
-            <div className="panel-grid three">
-              <article className="panel">
-                <div className="panel-title">EQUITY SNAPSHOT</div>
-                <div className="form-grid">
-                  <label>Date UTC</label><input value={snapDate} onChange={(e) => setSnapDate(e.target.value)} />
-                  <label>Equity</label><input value={snapEquity} onChange={(e) => setSnapEquity(e.target.value)} />
-                  <label>Note</label><input value={snapNote} onChange={(e) => setSnapNote(e.target.value)} />
-                </div>
-                <button className="btn btn-primary" onClick={doAddSnapshot} disabled={busy}>ADD SNAPSHOT</button>
-              </article>
-
-              <article className="panel">
-                <div className="panel-title">TRADE JOURNAL</div>
-                <div className="form-grid">
-                  <label>Entry TS UTC</label><input value={tradeEntryTs} onChange={(e) => setTradeEntryTs(e.target.value)} placeholder="2026-03-05T15:30:00Z" />
-                  <label>Exit TS UTC</label><input value={tradeExitTs} onChange={(e) => setTradeExitTs(e.target.value)} placeholder="2026-03-05T17:30:00Z" />
-                  <label>Strikes JSON</label><input value={tradeStrikes} onChange={(e) => setTradeStrikes(e.target.value)} placeholder="[185,180]" />
-                  <label>Regime</label><input value={tradeRegime} onChange={(e) => setTradeRegime(e.target.value)} />
-                  <label>Score</label><input value={tradeScore} onChange={(e) => setTradeScore(e.target.value)} />
-                  <label>Kelly</label><input value={tradeKelly} onChange={(e) => setTradeKelly(e.target.value)} />
-                  <label>Exit reason</label><input value={tradeExitReason} onChange={(e) => setTradeExitReason(e.target.value)} />
-                  <label>PnL</label><input value={tradePnl} onChange={(e) => setTradePnl(e.target.value)} />
-                  <label>PnL %</label><input value={tradePnlPct} onChange={(e) => setTradePnlPct(e.target.value)} />
-                  <label>Slippage</label><input value={tradeSlip} onChange={(e) => setTradeSlip(e.target.value)} />
-                  <label>Violations</label><input value={tradeViol} onChange={(e) => setTradeViol(e.target.value)} />
-                  <label>Note</label><input value={tradeNote} onChange={(e) => setTradeNote(e.target.value)} />
-                </div>
-                <button className="btn btn-primary" onClick={doAddTrade} disabled={busy}>ADD TRADE</button>
-              </article>
-
-              <article className="panel">
-                <div className="panel-title">EXEC PREVIEW/CONFIRM</div>
-                {!blk("order_preview").interactive && blk("order_preview").reason && (
-                  <div className="notice error" style={{ marginBottom: 6 }}>
-                    🛑 {blk("order_preview").reason}
-                  </div>
-                )}
-                <div className="form-grid">
-                  <label>Symbol</label><input value={symbol} onChange={(e) => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
-                  <label>Strategy</label>
-                  <select value={strategy} onChange={(e) => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive} style={{ background: "#111", color: "#ccc", border: "1px solid #333", padding: "2px 4px", fontSize: "0.75rem" }}>
-                    {/* Tier-aware strategy list — shows only strategies available for current capital_tier */}
-                    <option value="BULL_PUT">BULL_PUT</option>
-                    {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
-                    {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
-                    {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
-                    {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
-                    {(tierInfo?.features_available?.ratio_spread ?? false) && <option value="RATIO_SPREAD">RATIO_SPREAD</option>}
-                    {(tierInfo?.features_available?.delta_overlay ?? false) && <option value="DELTA_OVERLAY">DELTA_OVERLAY</option>}
-                    {/* Allow custom value if already set (e.g. loaded from scan) */}
-                    {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE","RATIO_SPREAD","DELTA_OVERLAY"].includes(strategy) && (
-                      <option value={strategy}>{strategy}</option>
-                    )}
-                  </select>
-                  <label>Payload JSON</label><textarea rows={6} value={payload} onChange={(e) => setPayload(e.target.value)} disabled={!blk("order_preview").interactive} />
-                </div>
-                {payloadJsonError && <div className="notice error">Payload JSON non valido.</div>}
-                {previewDirty && <div className="notice error">Preview non allineata al payload corrente.</div>}
-                <div className="actions">
-                  <button className="btn btn-primary" onClick={doPreview} disabled={busy || payloadJsonError || !blk("order_preview").interactive}>PREVIEW</button>
-                  <select value={confirmDecision} onChange={(e) => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")} disabled={!blk("order_confirm").interactive}>
-                    <option value="APPROVE">APPROVE</option><option value="REJECT">REJECT</option>
-                  </select>
-                  <button
-                    className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
-                    onClick={doConfirm}
-                    disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
-                    title={!blk("order_confirm").interactive ? (blk("order_confirm").reason ?? "Non disponibile") : confirmArmed ? "Clicca ancora per inviare l'ordine" : "Prima conferma — secondo click invia"}
-                  >{confirmArmed ? "⚠ CONFERMA ORDINE?" : "CONFIRM"}</button>
-                </div>
-                <pre className="console">{preview ? JSON.stringify(preview, null, 2) : "Nessuna anteprima."}</pre>
-              </article>
-            </div>
-          )}
 
         </section>
 
