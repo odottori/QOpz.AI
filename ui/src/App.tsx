@@ -843,6 +843,8 @@ export default function App() {
   const [segnaliStrategyFilter, setSegnaliStrategyFilter] = useState<string>("tutte");
   const [segnaliFrom, setSegnaliFrom] = useState<string>("");
   const [segnaliTo, setSegnaliTo] = useState<string>("");
+  const [segnaliFiltersOpen, setSegnaliFiltersOpen] = useState(false);
+  const [posFiltersOpen, setPosFiltersOpen] = useState(false);
   const [signalLifecycle, setSignalLifecycle] = useState<SignalLifecycleResponse | null>(null);
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
   const [lifecycleFilter, setLifecycleFilter] = useState<"all"|"new"|"confirmed"|"dead">("all");
@@ -3103,133 +3105,137 @@ export default function App() {
                     </span>
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}} onClick={refreshAll} disabled={busy}>⟳</button>
                   </div>
-                  {/* ── Riga filtri 0 — lifecycle stato segnale ── */}
+                  {/* ── Filtri SEGNALI — collassabili ── */}
                   {(() => {
                     const lcItems = signalLifecycle?.signals ?? [];
-                    const counts = {
-                      all:       lcItems.length,
-                      new:       lcItems.filter(s => s.state === "NEW").length,
+                    const lcCounts = {
+                      all: lcItems.length,
+                      new: lcItems.filter(s => s.state === "NEW").length,
                       confirmed: lcItems.filter(s => s.state === "CONFIRMED").length,
-                      dead:      lcItems.filter(s => s.state === "DEAD").length,
+                      dead: lcItems.filter(s => s.state === "DEAD").length,
                     };
-                    const lcDefs: {id: typeof lifecycleFilter; label: string; color: string}[] = [
-                      { id:"all",       label:"TUTTI",     color:"#888"    },
-                      { id:"new",       label:"NEW",       color:"#4ade80" },
-                      { id:"confirmed", label:"CONFIRMED", color:"#60a5fa" },
-                      { id:"dead",      label:"DEAD",      color:"#f87171" },
-                    ];
-                    return (
-                      <div style={{display:"flex", gap:4, marginBottom:4, flexWrap:"wrap", alignItems:"center"}}>
-                        <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
-                          letterSpacing:"0.06em", marginRight:2, flexShrink:0}}>stato</span>
-                        {lcDefs.map(({id, label, color}) => {
-                          const active = lifecycleFilter === id;
-                          const n = counts[id];
-                          const hasData = id === "all" || n > 0;
-                          return (
-                            <button key={id} onClick={() => setLifecycleFilter(id)} style={{
-                              fontSize:"0.6rem", padding:"2px 7px", borderRadius:3,
-                              cursor: hasData ? "pointer" : "default",
-                              border:`1px solid ${active ? color : hasData ? "#333" : "#1e1e1e"}`,
-                              background: active ? `${color}18` : "transparent",
-                              color: active ? color : hasData ? "#555" : "#2a2a2a",
-                              fontWeight: active ? 600 : 400,
-                              transition:"all 0.15s",
-                            }}>
-                              {label} <span style={{opacity:0.7}}>({n})</span>
-                            </button>
-                          );
-                        })}
-                        {lifecycleLoading && (
-                          <span style={{fontSize:"0.55rem", color:"var(--dim)", marginLeft:4}}>aggiornamento…</span>
-                        )}
-                        {signalLifecycle?.scan_dates && signalLifecycle.scan_dates.length > 0 && (
-                          <span style={{fontSize:"0.5rem", color:"#333", marginLeft:"auto"}}
-                            title={`Batch analizzati: ${signalLifecycle.scan_dates.join(", ")}`}>
-                            {signalLifecycle.scan_dates.length} scan
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* ── Riga filtri 1 — score + date scan (stessa riga) ── */}
-                  <div style={{display:"flex", gap:4, marginBottom:4, flexWrap:"wrap", alignItems:"center"}}>
-                    {(["all","high","mid","low"] as const).map(f => {
-                      const labels: Record<typeof f, string> = {
-                        all:"TUTTO", high:"≥65 ottimo", mid:"50–64 borderline", low:"<50 basso",
-                      };
-                      const colors: Record<typeof f, string> = {
-                        all:"#888", high:"#4ade80", mid:"#fbbf24", low:"#f87171",
-                      };
-                      const active = scoreFilter === f;
-                      const count = f === "all" ? premarketRows.length
-                        : f === "high" ? premarketRows.filter(c => (c.scorePct ?? 0) >= 65).length
-                        : f === "mid"  ? premarketRows.filter(c => (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65).length
-                        : premarketRows.filter(c => (c.scorePct ?? 0) < 50).length;
-                      return (
-                        <button key={f} onClick={() => setScoreFilter(f)} style={{
-                          fontSize:"0.6rem", padding:"2px 7px", borderRadius:3, cursor:"pointer",
-                          border:`1px solid ${active ? colors[f] : "#333"}`,
-                          background: active ? `${colors[f]}18` : "transparent",
-                          color: active ? colors[f] : "#555",
-                          fontWeight: active ? 600 : 400,
-                          transition:"all 0.15s",
-                        }}>
-                          {labels[f]} <span style={{opacity:0.7}}>({count})</span>
-                        </button>
-                      );
-                    })}
-                    {/* date freschezza scan — spintonati a destra */}
-                    <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:3, flexWrap:"nowrap"}}>
-                      <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
-                      <input type="date" value={segnaliFrom} onChange={e => setSegnaliFrom(e.target.value)}
-                        style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
-                          border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
-                      <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>al</span>
-                      <input type="date" value={segnaliTo} onChange={e => setSegnaliTo(e.target.value)}
-                        style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
-                          border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
-                      {(segnaliFrom || segnaliTo) && (
-                        <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"0 4px"}}
-                          onClick={() => { setSegnaliFrom(""); setSegnaliTo(""); }}>✕</button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* ── Riga filtri 2 — strategia (lista fissa, sempre visibile) ── */}
-                  {(() => {
                     const KNOWN = ["WHEEL","BULL_PUT","IRON_CONDOR","CALENDAR","PMCC_CALENDAR","HEDGE_ACTIVE"];
                     const extra = Array.from(new Set(
                       premarketRows.map(c => c.strategy).filter((s): s is string => !!s && !KNOWN.includes(s))
                     )).sort();
                     const strategies = ["tutte", ...KNOWN, ...extra];
-                    const countFor = (s: string) =>
-                      s === "tutte" ? premarketRows.length
-                        : premarketRows.filter(c => c.strategy === s).length;
+                    const stratCount = (s: string) => s === "tutte" ? premarketRows.length
+                      : premarketRows.filter(c => c.strategy === s).length;
+                    const activeCount =
+                      (lifecycleFilter !== "all" ? 1 : 0) +
+                      (scoreFilter !== "all" ? 1 : 0) +
+                      (segnaliStrategyFilter !== "tutte" ? 1 : 0) +
+                      ((segnaliFrom || segnaliTo) ? 1 : 0);
+                    const filterBtnStyle = (active: boolean, color: string, hasData = true) => ({
+                      fontSize:"0.6rem" as const, padding:"2px 7px", borderRadius:3,
+                      cursor: hasData ? "pointer" as const : "default" as const,
+                      border:`1px solid ${active ? color : hasData ? "#333" : "#1e1e1e"}`,
+                      background: active ? `${color}18` : "transparent",
+                      color: active ? color : hasData ? "#555" : "#2a2a2a",
+                      fontWeight: active ? 600 : 400,
+                      transition:"all 0.15s",
+                    });
                     return (
-                      <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap"}}>
-                        <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
-                          letterSpacing:"0.06em", marginRight:2, flexShrink:0}}>str</span>
-                        {strategies.map(s => {
-                          const active = segnaliStrategyFilter === s;
-                          const n = countFor(s);
-                          const hasData = s === "tutte" || n > 0;
-                          return (
-                            <button key={s} onClick={() => setSegnaliStrategyFilter(s)} style={{
-                              fontSize:"0.58rem", padding:"1px 6px", borderRadius:3,
-                              cursor: hasData ? "pointer" : "default",
-                              border:`1px solid ${active ? "#60a5fa" : hasData ? "#333" : "#1e1e1e"}`,
-                              background: active ? "#60a5fa18" : "transparent",
-                              color: active ? "#60a5fa" : hasData ? "#555" : "#2a2a2a",
-                              fontWeight: active ? 600 : 400,
-                              transition:"all 0.15s",
-                            }}>
-                              {s === "tutte" ? "TUTTE" : s}
-                              {s !== "tutte" && <span style={{opacity:0.5, marginLeft:2}}>({n})</span>}
-                            </button>
-                          );
-                        })}
+                      <div style={{marginBottom:6}}>
+                        {/* header collassabile */}
+                        <div style={{
+                          display:"flex", alignItems:"center", gap:5, cursor:"pointer",
+                          padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: segnaliFiltersOpen ? 6 : 0,
+                        }} onClick={() => setSegnaliFiltersOpen(v => !v)}>
+                          <span style={{fontSize:"0.62rem", color:"#444"}}>🔍</span>
+                          <span style={{
+                            fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", flex:1,
+                            color: activeCount > 0 ? "#60a5fa" : "#3a3a3a",
+                            fontWeight: activeCount > 0 ? 600 : 400,
+                          }}>
+                            FILTRI{activeCount > 0 ? ` · ${activeCount} attiv${activeCount === 1 ? "o" : "i"}` : ""}
+                          </span>
+                          <span style={{fontSize:"0.5rem", color:"#333"}}>{segnaliFiltersOpen ? "▾" : "▸"}</span>
+                        </div>
+
+                        {segnaliFiltersOpen && (<>
+                          {/* stato lifecycle */}
+                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>stato:</span>
+                            {([
+                              {id:"all" as const,       label:"TUTTI",     color:"#888"},
+                              {id:"new" as const,       label:"NEW",       color:"#4ade80"},
+                              {id:"confirmed" as const, label:"CONFIRMED", color:"#60a5fa"},
+                              {id:"dead" as const,      label:"DEAD",      color:"#f87171"},
+                            ]).map(({id, label, color}) => {
+                              const n = lcCounts[id];
+                              return (
+                                <button key={id} onClick={() => setLifecycleFilter(id)}
+                                  style={filterBtnStyle(lifecycleFilter === id, color, id === "all" || n > 0)}>
+                                  {label} <span style={{opacity:0.7}}>({n})</span>
+                                </button>
+                              );
+                            })}
+                            {lifecycleLoading && <span style={{fontSize:"0.5rem", color:"var(--dim)", marginLeft:4}}>…</span>}
+                            {signalLifecycle?.scan_dates?.length && (
+                              <span style={{fontSize:"0.48rem", color:"#2a2a2a", marginLeft:"auto"}}
+                                title={`Batch: ${signalLifecycle.scan_dates.join(", ")}`}>
+                                {signalLifecycle.scan_dates.length} scan
+                              </span>
+                            )}
+                          </div>
+
+                          {/* score */}
+                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>score:</span>
+                            {(["all","high","mid","low"] as const).map(f => {
+                              const label = {all:"TUTTO", high:"≥65", mid:"50–64", low:"<50"}[f];
+                              const color = {all:"#888", high:"#4ade80", mid:"#fbbf24", low:"#f87171"}[f];
+                              const count = f === "all" ? premarketRows.length
+                                : f === "high" ? premarketRows.filter(c => (c.scorePct ?? 0) >= 65).length
+                                : f === "mid"  ? premarketRows.filter(c => (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65).length
+                                : premarketRows.filter(c => (c.scorePct ?? 0) < 50).length;
+                              return (
+                                <button key={f} onClick={() => setScoreFilter(f)}
+                                  style={filterBtnStyle(scoreFilter === f, color)}>
+                                  {label} <span style={{opacity:0.7}}>({count})</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* strategia */}
+                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>str:</span>
+                            {strategies.map(s => {
+                              const n = stratCount(s);
+                              const hasData = s === "tutte" || n > 0;
+                              return (
+                                <button key={s} onClick={() => setSegnaliStrategyFilter(s)}
+                                  style={filterBtnStyle(segnaliStrategyFilter === s, "#60a5fa", hasData)}>
+                                  {s === "tutte" ? "TUTTE" : s}
+                                  {s !== "tutte" && <span style={{opacity:0.5, marginLeft:2}}>({n})</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* data scan (freschezza batch) */}
+                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>scan:</span>
+                            <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
+                            <input type="date" value={segnaliFrom} onChange={e => setSegnaliFrom(e.target.value)}
+                              style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                                border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                            <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>al</span>
+                            <input type="date" value={segnaliTo} onChange={e => setSegnaliTo(e.target.value)}
+                              style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                                border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                            {(segnaliFrom || segnaliTo) && (
+                              <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"0 4px"}}
+                                onClick={() => { setSegnaliFrom(""); setSegnaliTo(""); }}>✕</button>
+                            )}
+                          </div>
+                        </>)}
                       </div>
                     );
                   })()}
@@ -3287,7 +3293,27 @@ export default function App() {
                         </span>
                       );
                     };
+                    const csvSegnali = () => {
+                      const cols = ["#","Simbolo","Strategia","Score","Spread%","IVR%","Stato","Prima vista"];
+                      const body = [
+                        ...liveRows.map((c, i) => {
+                          const lc = lcMap.get(`${c.symbol}|${c.strategy}`);
+                          return [i+1, c.symbol, c.strategy, c.scorePct?.toFixed(0)??"", c.spreadPct?.toFixed(1)??"", c.ivRankPct?.toFixed(0)??"", lc?.state??"", lc?.first_seen??""].join(",");
+                        }),
+                        ...deadRows.map(d => ["—",d.symbol,d.strategy,d.score.toFixed(0),d.spread_pct?.toFixed(1)??"","","DEAD",d.first_seen].join(",")),
+                      ];
+                      const blob = new Blob([[cols.join(","), ...body].join("\n")], {type:"text/csv"});
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a"); a.href=url;
+                      a.download=`segnali_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+                      URL.revokeObjectURL(url);
+                    };
                     return (
+                      <>
+                      <div style={{display:"flex", justifyContent:"flex-end", marginBottom:2}}>
+                        <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 5px"}}
+                          onClick={csvSegnali} title="Scarica CSV dei segnali filtrati">⬇ CSV</button>
+                      </div>
                       <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
                         <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                           <thead>
@@ -3396,6 +3422,7 @@ export default function App() {
                           </tbody>
                         </table>
                       </div>
+                      </>
                     );
                   })()}
 
@@ -3476,37 +3503,40 @@ export default function App() {
                           );
                         })()}
                       </span>
-                      {/* sub-line: date range + live status */}
-                      <span style={{fontSize:"0.58rem", color:"var(--dim)", lineHeight:1.3}}>
-                        {(storicoFrom || storicoTo) && (
-                          <span style={{color:"#555", marginRight:6}}>
-                            dal {storicoFrom||"—"} al {storicoTo||"—"}
-                          </span>
-                        )}
-                        {ibkrAccount && (
-                          <span style={{color: ibkrAccount.connected ? "var(--g1)" : "#555"}}>
-                            {ibkrAccount.connected ? "LIVE" : "OFFLINE"}
-                            {ibkrAccount.net_liquidation != null && (
-                              <span style={{color:"#888"}}> · €{ibkrAccount.net_liquidation.toLocaleString("it-IT",{maximumFractionDigits:0})}
-                                {ibkrAccount.positions.length > 0 && ` (${ibkrAccount.positions.length})`}
-                              </span>
-                            )}
-                          </span>
-                        )}
-                        {storicoSummary && (
-                          <span style={{marginLeft:6, color:"#555"}}>
-                            ROI <span style={{color:(storicoSummary.roi_pct??0)>=0?"#4ade80":"#f87171"}}>
-                              {storicoSummary.roi_pct!=null?`${storicoSummary.roi_pct>=0?"+":""}${Number(storicoSummary.roi_pct).toFixed(1)}%`:"—"}
-                            </span>
-                            {storicoSummary.max_drawdown_pct != null && (
-                              <span style={{color:"#f87171", marginLeft:4}}>
-                                maxDown {Number(storicoSummary.max_drawdown_pct).toFixed(1)}%
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </span>
                     </div>
+                    {/* metrics strip */}
+                    {(() => {
+                      const chiusi = storicoTrades.filter(t => !!t.exit_ts_utc);
+                      const nPos = chiusi.filter(t => (t.pnl ?? 0) >= 0).length;
+                      const maxWin  = chiusi.length ? Math.max(...chiusi.map(t => t.pnl ?? 0)) : null;
+                      const maxLoss = chiusi.length ? Math.min(...chiusi.map(t => t.pnl ?? 0)) : null;
+                      const winPct  = chiusi.length > 0 ? nPos / chiusi.length * 100 : null;
+                      const roi     = storicoSummary?.roi_pct ?? null;
+                      const dd      = storicoSummary?.max_drawdown_pct ?? null;
+                      const cassa   = ibkrAccount?.net_liquidation ?? null;
+                      const brokerStatus = ibkrAccount
+                        ? (ibkrAccount.connected ? "broker ON" : "broker OFF")
+                        : null;
+                      const mc = (label: string, val: string, col: string, tip?: string) => (
+                        <div key={label} title={tip} style={{
+                          flex:"1 1 0", minWidth:46, background:"var(--p2)",
+                          border:"1px solid #1a1a1a", borderRadius:3, padding:"3px 5px", textAlign:"center",
+                        }}>
+                          <div style={{fontSize:"0.46rem", color:"#3a3a3a", textTransform:"uppercase", letterSpacing:"0.05em"}}>{label}</div>
+                          <div style={{fontSize:"0.7rem", fontWeight:700, color:col, lineHeight:1.25}}>{val}</div>
+                        </div>
+                      );
+                      return (
+                        <div style={{display:"flex", gap:4, marginTop:5, marginBottom:8}}>
+                          {mc("cassa", cassa != null ? `€${cassa.toLocaleString("it-IT",{maximumFractionDigits:0})}` : "—", "#888", brokerStatus ?? "Patrimonio netto broker")}
+                          {mc("ROI", roi != null ? `${roi>=0?"+":""}${Number(roi).toFixed(1)}%` : "—", (roi??0)>=0?"#4ade80":"#f87171", "Rendimento totale journal")}
+                          {mc("▼ maxDown", dd != null ? `${Number(dd).toFixed(1)}%` : "—", "#f87171", "Drawdown massimo dal picco")}
+                          {mc("▲ maxWin", maxWin != null ? `+${maxWin.toFixed(0)}` : "—", "#4ade80", "Trade migliore (€)")}
+                          {mc("▼ maxLoss", maxLoss != null ? `${maxLoss.toFixed(0)}` : "—", "#f87171", "Trade peggiore (€)")}
+                          {mc("win%", winPct != null ? `${winPct.toFixed(0)}%` : "—", winPct != null && winPct>=50?"#4ade80":"#f87171", "Percentuale trade chiusi positivi")}
+                        </div>
+                      );
+                    })()}
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px", marginTop:2}}
                       disabled={storicoLoading || ibkrAccountLoading}
                       onClick={() => { void doFetchStorico(); void doFetchIbkrAccount(); }}>
@@ -3514,104 +3544,106 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* ── Riga filtri 1 — esito + date sulla stessa riga ── */}
+                  {/* ── Filtri POSIZIONI — collassabili ── */}
                   {(() => {
-                    const byDate = storicoTrades.filter(t => {
-                      if (posOutcomeFilter === "aperti") return false;
-                      const d = t.exit_ts_utc?.slice(0,10);
-                      return d != null && (!storicoFrom || d >= storicoFrom) && (!storicoTo || d <= storicoTo);
-                    });
-                    const counts: Record<"tutti"|"positivi"|"negativi"|"aperti", number> = {
-                      tutti:    byDate.length,
-                      positivi: byDate.filter(t => (t.pnl ?? 0) >= 0).length,
-                      negativi: byDate.filter(t => (t.pnl ?? 0) <  0).length,
-                      aperti:   storicoTrades.filter(t => !t.exit_ts_utc).length,
-                    };
-                    const labels = {tutti:"TUTTI", positivi:"POSITIVI", negativi:"NEGATIVI", aperti:"APERTI"};
-                    const colors = {tutti:"#888", positivi:"#4ade80", negativi:"#f87171", aperti:"#fbbf24"};
-                    return (
-                      <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                        {(["tutti","positivi","negativi","aperti"] as const).map(f => {
-                          const active = posOutcomeFilter === f;
-                          const col = colors[f];
-                          return (
-                            <button key={f} onClick={() => setPosOutcomeFilter(f)} style={{
-                              fontSize:"0.6rem", padding:"2px 7px", borderRadius:3, cursor:"pointer",
-                              border:`1px solid ${active ? col : "#333"}`,
-                              background: active ? col+"18" : "transparent",
-                              color: active ? col : "#555",
-                              fontWeight: active ? 600 : 400,
-                              transition:"all 0.15s",
-                            }}>
-                              {labels[f]} <span style={{opacity:0.7}}>({counts[f]})</span>
-                            </button>
-                          );
-                        })}
-                        {/* date inputs sulla stessa riga, spintonati a destra */}
-                        <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:3, flexWrap:"nowrap"}}>
-                          <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
-                          <input type="date" value={storicoFrom} onChange={e => setStoricoFrom(e.target.value)}
-                            style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
-                              border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
-                          <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>al</span>
-                          <input type="date" value={storicoTo} onChange={e => setStoricoTo(e.target.value)}
-                            style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
-                              border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
-                          {(storicoFrom || storicoTo) && (
-                            <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"0 4px"}}
-                              onClick={() => { setStoricoFrom(""); setStoricoTo(""); }}>✕</button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* ── Riga filtri 2 — strategia (lista fissa, sempre visibile) ── */}
-                  {(() => {
-                    // Strategie note del sistema — sempre mostrate, indipendentemente dai dati
                     const KNOWN: string[] = ["WHEEL","BULL_PUT","IRON_CONDOR","CALENDAR","PMCC_CALENDAR","HEDGE_ACTIVE"];
-                    // Aggiunge eventuali strategie presenti nei dati ma non nella lista fissa
                     const extra = Array.from(new Set(
                       storicoTrades.map(t => t.strategy).filter((s): s is string => !!s && !KNOWN.includes(s))
                     )).sort();
                     const strategies = ["tutte", ...KNOWN, ...extra];
-                    // Conta per strategia sui dati filtrati per data (non per strategia stessa)
-                    const byDate = storicoTrades.filter(t => {
+                    const byDateBase = storicoTrades.filter(t => {
                       if (posOutcomeFilter === "aperti") return !t.exit_ts_utc;
                       const d = t.exit_ts_utc?.slice(0,10);
-                      return d != null
-                        && (!storicoFrom || d >= storicoFrom)
-                        && (!storicoTo   || d <= storicoTo)
-                        && (posOutcomeFilter === "tutti"    || true)
+                      return d != null && (!storicoFrom || d >= storicoFrom) && (!storicoTo || d <= storicoTo)
                         && (posOutcomeFilter === "positivi" ? (t.pnl ?? 0) >= 0 : true)
                         && (posOutcomeFilter === "negativi" ? (t.pnl ?? 0) <  0 : true);
                     });
-                    const countFor = (s: string) =>
-                      s === "tutte" ? byDate.length : byDate.filter(t => t.strategy === s).length;
+                    const outcomeColors = {tutti:"#888", positivi:"#4ade80", negativi:"#f87171", aperti:"#fbbf24"};
+                    const outcomeCounts: Record<"tutti"|"positivi"|"negativi"|"aperti", number> = {
+                      tutti:    storicoTrades.filter(t => { const d = t.exit_ts_utc?.slice(0,10); return d != null && (!storicoFrom||d>=storicoFrom) && (!storicoTo||d<=storicoTo); }).length,
+                      positivi: storicoTrades.filter(t => { const d = t.exit_ts_utc?.slice(0,10); return d != null && (!storicoFrom||d>=storicoFrom) && (!storicoTo||d<=storicoTo) && (t.pnl??0)>=0; }).length,
+                      negativi: storicoTrades.filter(t => { const d = t.exit_ts_utc?.slice(0,10); return d != null && (!storicoFrom||d>=storicoFrom) && (!storicoTo||d<=storicoTo) && (t.pnl??0)<0; }).length,
+                      aperti:   storicoTrades.filter(t => !t.exit_ts_utc).length,
+                    };
+                    const activeCount =
+                      (posOutcomeFilter !== "tutti" ? 1 : 0) +
+                      (posStrategyFilter !== "tutte" ? 1 : 0) +
+                      ((storicoFrom || storicoTo) ? 1 : 0);
+                    const fbs = (active: boolean, color: string, hasData = true) => ({
+                      fontSize:"0.6rem" as const, padding:"2px 7px", borderRadius:3,
+                      cursor: hasData ? "pointer" as const : "default" as const,
+                      border:`1px solid ${active ? color : hasData ? "#333" : "#1e1e1e"}`,
+                      background: active ? `${color}18` : "transparent",
+                      color: active ? color : hasData ? "#555" : "#2a2a2a",
+                      fontWeight: active ? 600 : 400,
+                      transition:"all 0.15s",
+                    });
                     return (
-                      <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap"}}>
-                        <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
-                          letterSpacing:"0.06em", marginRight:2, flexShrink:0}}>str</span>
-                        {strategies.map(s => {
-                          const active = posStrategyFilter === s;
-                          const n = countFor(s);
-                          // strategie senza dati = "spente" (dimmer, non cliccabili)
-                          const hasData = s === "tutte" || n > 0;
-                          return (
-                            <button key={s} onClick={() => setPosStrategyFilter(s)} style={{
-                              fontSize:"0.58rem", padding:"1px 6px", borderRadius:3,
-                              cursor: hasData ? "pointer" : "default",
-                              border:`1px solid ${active ? "#60a5fa" : hasData ? "#333" : "#1e1e1e"}`,
-                              background: active ? "#60a5fa18" : "transparent",
-                              color: active ? "#60a5fa" : hasData ? "#555" : "#2a2a2a",
-                              fontWeight: active ? 600 : 400,
-                              transition:"all 0.15s",
-                            }}>
-                              {s === "tutte" ? "TUTTE" : s}
-                              {s !== "tutte" && <span style={{opacity:0.5, marginLeft:2}}>({n})</span>}
-                            </button>
-                          );
-                        })}
+                      <div style={{marginBottom:6}}>
+                        <div style={{
+                          display:"flex", alignItems:"center", gap:5, cursor:"pointer",
+                          padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: posFiltersOpen ? 6 : 0,
+                        }} onClick={() => setPosFiltersOpen(v => !v)}>
+                          <span style={{fontSize:"0.62rem", color:"#444"}}>🔍</span>
+                          <span style={{
+                            fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", flex:1,
+                            color: activeCount > 0 ? "#60a5fa" : "#3a3a3a",
+                            fontWeight: activeCount > 0 ? 600 : 400,
+                          }}>
+                            FILTRI{activeCount > 0 ? ` · ${activeCount} attiv${activeCount===1?"o":"i"}` : ""}
+                          </span>
+                          <span style={{fontSize:"0.5rem", color:"#333"}}>{posFiltersOpen ? "▾" : "▸"}</span>
+                        </div>
+
+                        {posFiltersOpen && (<>
+                          {/* esito */}
+                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>esito:</span>
+                            {(["tutti","positivi","negativi","aperti"] as const).map(f => (
+                              <button key={f} onClick={() => setPosOutcomeFilter(f)}
+                                style={fbs(posOutcomeFilter === f, outcomeColors[f])}>
+                                {{tutti:"TUTTI",positivi:"POSITIVI",negativi:"NEGATIVI",aperti:"APERTI"}[f]}
+                                {" "}<span style={{opacity:0.7}}>({outcomeCounts[f]})</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* data */}
+                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>data:</span>
+                            <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
+                            <input type="date" value={storicoFrom} onChange={e => setStoricoFrom(e.target.value)}
+                              style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                                border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                            <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>al</span>
+                            <input type="date" value={storicoTo} onChange={e => setStoricoTo(e.target.value)}
+                              style={{fontSize:"0.58rem", background:"var(--p2)", color:"var(--text)",
+                                border:"1px solid var(--border)", borderRadius:2, padding:"1px 3px", width:96}} />
+                            {(storicoFrom || storicoTo) && (
+                              <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"0 4px"}}
+                                onClick={() => { setStoricoFrom(""); setStoricoTo(""); }}>✕</button>
+                            )}
+                          </div>
+
+                          {/* strategia */}
+                          <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
+                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                              letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>str:</span>
+                            {strategies.map(s => {
+                              const n = s === "tutte" ? byDateBase.length : byDateBase.filter(t => t.strategy === s).length;
+                              const hasData = s === "tutte" || n > 0;
+                              return (
+                                <button key={s} onClick={() => setPosStrategyFilter(s)}
+                                  style={fbs(posStrategyFilter === s, "#60a5fa", hasData)}>
+                                  {s === "tutte" ? "TUTTE" : s}
+                                  {s !== "tutte" && <span style={{opacity:0.5, marginLeft:2}}>({n})</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>)}
                       </div>
                     );
                   })()}
@@ -3665,6 +3697,23 @@ export default function App() {
                           </div>
                         )}
                         {/* tabella sempre visibile — header fissa, messaggio inline nel tbody */}
+                        <div style={{display:"flex", justifyContent:"flex-end", marginBottom:2}}>
+                          <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 5px"}}
+                            title="Scarica CSV dei trade filtrati"
+                            onClick={() => {
+                              const cols = ["#","Simbolo","Strategia","PnL","PnL%","Data"];
+                              const body = filtered.map((t, i) => [
+                                i+1, t.symbol??""  , t.strategy??"",
+                                (t.pnl??0).toFixed(2), (t.pnl_pct??0).toFixed(2),
+                                (posOutcomeFilter==="aperti" ? t.entry_ts_utc : t.exit_ts_utc)?.slice(0,10)??"",
+                              ].join(","));
+                              const blob = new Blob([[cols.join(","), ...body].join("\n")], {type:"text/csv"});
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a"); a.href=url;
+                              a.download=`posizioni_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+                              URL.revokeObjectURL(url);
+                            }}>⬇ CSV</button>
+                        </div>
                         <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
                           <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                             <thead>
