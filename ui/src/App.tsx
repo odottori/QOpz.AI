@@ -198,6 +198,17 @@ type ScanFullResponse = {
   ranking_suspended: boolean; suspension_reason: string | null;
   candidates: ScanFullCandidate[];
 };
+type SignalLifecycleItem = {
+  symbol: string; strategy: string;
+  state: "NEW" | "CONFIRMED" | "DEAD";
+  n_confirmed: number;
+  first_seen: string; last_seen: string;
+  score: number; spread_pct: number | null; source: string | null;
+};
+type SignalLifecycleResponse = {
+  ok: boolean; profile: string; generated_at: string;
+  scan_dates: string[]; signals: SignalLifecycleItem[];
+};
 type IbkrStatusResponse = {
   ok: boolean; connected: boolean; host: string; port: number | null;
   client_id: number; source_system: string; connected_at: string | null;
@@ -832,6 +843,9 @@ export default function App() {
   const [segnaliStrategyFilter, setSegnaliStrategyFilter] = useState<string>("tutte");
   const [segnaliFrom, setSegnaliFrom] = useState<string>("");
   const [segnaliTo, setSegnaliTo] = useState<string>("");
+  const [signalLifecycle, setSignalLifecycle] = useState<SignalLifecycleResponse | null>(null);
+  const [lifecycleLoading, setLifecycleLoading] = useState(false);
+  const [lifecycleFilter, setLifecycleFilter] = useState<"all"|"new"|"confirmed"|"dead">("all");
   const [kpiExpanded, setKpiExpanded] = useState<string|null>(null); // blocco KPI espanso nel tab TRADING
   const [pinnedKpis, setPinnedKpis] = useState<string[]>([]);        // KPI bloccati nella colonna destra
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -1185,6 +1199,7 @@ export default function App() {
       void doFetchTier();
       void doFetchBriefingList();
       void doFetchControlStatus();
+      void doFetchLifecycle();
       if (!universeScannerName && ic?.scanners && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
@@ -1433,6 +1448,15 @@ export default function App() {
       setStoricoSummary(sumData);
     } catch (e) { /* silenzioso */ }
     finally { setStoricoLoading(false); }
+  }
+
+  async function doFetchLifecycle() {
+    setLifecycleLoading(true);
+    try {
+      const data = await apiJson<SignalLifecycleResponse>(`${API_BASE}/opz/signals/lifecycle?profile=paper&lookback=5`);
+      setSignalLifecycle(data);
+    } catch (e) { /* silenzioso */ }
+    finally { setLifecycleLoading(false); }
   }
 
   function clearFetchErr(key: string) {
@@ -3079,6 +3103,56 @@ export default function App() {
                     </span>
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}} onClick={refreshAll} disabled={busy}>⟳</button>
                   </div>
+                  {/* ── Riga filtri 0 — lifecycle stato segnale ── */}
+                  {(() => {
+                    const lcItems = signalLifecycle?.signals ?? [];
+                    const counts = {
+                      all:       lcItems.length,
+                      new:       lcItems.filter(s => s.state === "NEW").length,
+                      confirmed: lcItems.filter(s => s.state === "CONFIRMED").length,
+                      dead:      lcItems.filter(s => s.state === "DEAD").length,
+                    };
+                    const lcDefs: {id: typeof lifecycleFilter; label: string; color: string}[] = [
+                      { id:"all",       label:"TUTTI",     color:"#888"    },
+                      { id:"new",       label:"NEW",       color:"#4ade80" },
+                      { id:"confirmed", label:"CONFIRMED", color:"#60a5fa" },
+                      { id:"dead",      label:"DEAD",      color:"#f87171" },
+                    ];
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:4, flexWrap:"wrap", alignItems:"center"}}>
+                        <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                          letterSpacing:"0.06em", marginRight:2, flexShrink:0}}>stato</span>
+                        {lcDefs.map(({id, label, color}) => {
+                          const active = lifecycleFilter === id;
+                          const n = counts[id];
+                          const hasData = id === "all" || n > 0;
+                          return (
+                            <button key={id} onClick={() => setLifecycleFilter(id)} style={{
+                              fontSize:"0.6rem", padding:"2px 7px", borderRadius:3,
+                              cursor: hasData ? "pointer" : "default",
+                              border:`1px solid ${active ? color : hasData ? "#333" : "#1e1e1e"}`,
+                              background: active ? `${color}18` : "transparent",
+                              color: active ? color : hasData ? "#555" : "#2a2a2a",
+                              fontWeight: active ? 600 : 400,
+                              transition:"all 0.15s",
+                            }}>
+                              {label} <span style={{opacity:0.7}}>({n})</span>
+                            </button>
+                          );
+                        })}
+                        {lifecycleLoading && (
+                          <span style={{fontSize:"0.55rem", color:"var(--dim)", marginLeft:4}}>aggiornamento…</span>
+                        )}
+                        {signalLifecycle?.scan_dates && signalLifecycle.scan_dates.length > 0 && (
+                          <span style={{fontSize:"0.5rem", color:"#333", marginLeft:"auto"}}
+                            title={`Batch analizzati: ${signalLifecycle.scan_dates.join(", ")}`}>
+                            {signalLifecycle.scan_dates.length} scan
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* ── Riga filtri 1 — score + date scan (stessa riga) ── */}
                   <div style={{display:"flex", gap:4, marginBottom:4, flexWrap:"wrap", alignItems:"center"}}>
                     {(["all","high","mid","low"] as const).map(f => {
@@ -3168,21 +3242,51 @@ export default function App() {
                       (segnaliFrom && scanDate && scanDate < segnaliFrom) ||
                       (segnaliTo   && scanDate && scanDate > segnaliTo)
                     );
-                    // applica score + strategia
-                    const filtered = scanOutOfRange ? [] : premarketRows.filter(c => {
+                    // mappa lifecycle per (symbol+strategy)
+                    const lcMap = new Map<string, SignalLifecycleItem>();
+                    (signalLifecycle?.signals ?? []).forEach(s => lcMap.set(`${s.symbol}|${s.strategy}`, s));
+                    // applica score + strategia + lifecycle
+                    const liveRows = scanOutOfRange ? [] : premarketRows.filter(c => {
                       const scoreOk =
                         scoreFilter === "all"  ? true :
                         scoreFilter === "high" ? (c.scorePct ?? 0) >= 65 :
                         scoreFilter === "mid"  ? (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65 :
                         (c.scorePct ?? 0) < 50;
                       const stratOk = segnaliStrategyFilter === "tutte" || c.strategy === segnaliStrategyFilter;
-                      return scoreOk && stratOk;
+                      const lc = lcMap.get(`${c.symbol}|${c.strategy}`);
+                      const lcOk = lifecycleFilter === "all" || lifecycleFilter === "dead" ? true
+                        : lifecycleFilter === "new"       ? lc?.state === "NEW"
+                        : lifecycleFilter === "confirmed" ? lc?.state === "CONFIRMED"
+                        : true;
+                      return scoreOk && stratOk && lcOk;
                     });
+                    // righe DEAD (dal lifecycle, assenti dall'ultimo scan)
+                    const deadRows: SignalLifecycleItem[] = (lifecycleFilter === "all" || lifecycleFilter === "dead")
+                      ? (signalLifecycle?.signals ?? []).filter(s =>
+                          s.state === "DEAD" &&
+                          (segnaliStrategyFilter === "tutte" || s.strategy === segnaliStrategyFilter)
+                        )
+                      : [];
+                    const totalRows = liveRows.length + deadRows.length;
                     // messaggio vuoto
                     const emptyMsg = busy ? "Caricamento…"
                       : scanOutOfRange ? `scan del ${scanDate ?? "?"} fuori dal periodo selezionato`
-                      : premarketRows.length === 0 ? "nessun segnale — esegui scan dalla tab ANALISI"
+                      : totalRows === 0 && premarketRows.length === 0 ? "nessun segnale — esegui scan dalla tab ANALISI"
                       : "nessun segnale per i filtri selezionati";
+                    // badge stato
+                    const lcBadge = (sym: string, str: string) => {
+                      const lc = lcMap.get(`${sym}|${str}`);
+                      if (!lc) return null;
+                      const col = lc.state === "NEW" ? "#4ade80" : lc.state === "CONFIRMED" ? "#60a5fa" : "#f87171";
+                      const label = lc.state === "CONFIRMED" ? `×${lc.n_confirmed}` : lc.state;
+                      return (
+                        <span style={{fontSize:"0.5rem", color:col, border:`1px solid ${col}30`,
+                          borderRadius:2, padding:"0 3px", whiteSpace:"nowrap"}}
+                          title={`${lc.state} — visto dal ${lc.first_seen}`}>
+                          {label}
+                        </span>
+                      );
+                    };
                     return (
                       <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
                         <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
@@ -3198,17 +3302,17 @@ export default function App() {
                                 title="Spread bid-ask % del mid. Soglia dura ≤10%">Spr%</th>
                               <th style={{textAlign:"right", padding:"2px 4px"}}
                                 title="IV Rank percentile. Soglia dura ≥20">IVR%</th>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>Fonte</th>
+                              <th style={{textAlign:"left", padding:"2px 4px"}}>Stato</th>
                               <th style={{padding:"2px 4px"}}></th>
                             </tr>
                           </thead>
                           <tbody>
-                            {filtered.length === 0 ? (
+                            {totalRows === 0 ? (
                               <tr><td colSpan={8} style={{padding:"8px 4px", color:"#2a2a2a", fontSize:"0.7rem"}}>
                                 {emptyMsg}
                               </td></tr>
-                            ) : (
-                              filtered.map((c, i) => {
+                            ) : (<>
+                              {liveRows.map((c, i) => {
                                 const isSelected = selectedItemId != null && (c as any).item_id != null
                                   && selectedItemId === (c as any).item_id;
                                 const stratTip: Record<string, string> = {
@@ -3246,7 +3350,7 @@ export default function App() {
                                         ? c.ivRankPct.toFixed(0)
                                         : <span title="Dato non acquisito">—</span>}
                                     </td>
-                                    <td style={{padding:"2px 4px", color:"#555", fontSize:"0.6rem"}}>{c.source ?? "—"}</td>
+                                    <td style={{padding:"2px 4px"}}>{lcBadge(c.symbol ?? "", c.strategy ?? "")}</td>
                                     <td style={{padding:"2px 2px"}}>
                                       {(c.spreadPct == null || c.spreadPct === 0 || c.ivRankPct == null || c.ivRankPct === 0) ? (
                                         <span title="Dati incompleti — aggiorna scan"
@@ -3265,8 +3369,30 @@ export default function App() {
                                     </td>
                                   </tr>
                                 );
-                              })
-                            )}
+                              })}
+                              {deadRows.map((d, i) => (
+                                <tr key={`dead-${i}`} style={{borderBottom:"1px solid #1a1a1a", opacity:0.45}}>
+                                  <td style={{padding:"2px 4px", color:"#555"}}>—</td>
+                                  <td style={{padding:"2px 4px", color:"#555", fontWeight:600}}>{d.symbol}</td>
+                                  <td style={{padding:"2px 4px", color:"#444"}}>{d.strategy}</td>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#444"}}>
+                                    {d.score > 0 ? d.score.toFixed(0) : "—"}
+                                  </td>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#444"}}>
+                                    {d.spread_pct != null ? d.spread_pct.toFixed(1) : "—"}
+                                  </td>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#444"}}>—</td>
+                                  <td style={{padding:"2px 4px"}}>
+                                    <span style={{fontSize:"0.5rem", color:"#f87171", border:"1px solid #f8717130",
+                                      borderRadius:2, padding:"0 3px"}}
+                                      title={`Scomparso il ${d.last_seen} — era presente dal ${d.first_seen}`}>
+                                      DEAD
+                                    </span>
+                                  </td>
+                                  <td style={{padding:"2px 4px"}}></td>
+                                </tr>
+                              ))}
+                            </>)}
                           </tbody>
                         </table>
                       </div>

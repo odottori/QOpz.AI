@@ -3546,6 +3546,132 @@ def opz_activity_stream(n: int = 30, profile: str = "dev") -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Signal lifecycle — NEW / CONFIRMED / DEAD across last N scan batches
+# ---------------------------------------------------------------------------
+@app.get("/opz/signals/lifecycle")
+def opz_signals_lifecycle(profile: str = "paper", lookback: int = 5) -> Dict[str, Any]:
+    """
+    Confronta gli ultimi `lookback` batch di scan (per data) e classifica ogni
+    segnale (symbol+strategy):
+      NEW       = presente nell'ultimo batch, assente nel precedente
+      CONFIRMED = presente in N batch consecutivi (N >= 2)
+      DEAD      = assente nell'ultimo batch, presente in almeno uno precedente
+    """
+    try:
+        init_execution_schema()
+        con = _connect()
+
+        # Ultime `lookback` date distinte di scan (una per giorno, prende il batch più recente)
+        dates_rows = con.execute(
+            """
+            SELECT DISTINCT CAST(scan_ts AS DATE)::VARCHAR AS scan_date
+            FROM opportunity_candidates
+            WHERE profile = ?
+            ORDER BY scan_date DESC
+            LIMIT ?
+            """,
+            (profile, lookback),
+        ).fetchall()
+
+        if not dates_rows:
+            con.close()
+            return {"ok": True, "profile": profile, "scan_dates": [], "signals": []}
+
+        scan_dates = [r[0] for r in dates_rows]  # ['2026-03-22', '2026-03-21', ...]
+        latest_date = scan_dates[0]
+
+        # Per ogni data prende solo il batch più recente (max scan_ts) e dedup per symbol+strategy
+        placeholders = ",".join("?" * len(scan_dates))
+        rows = con.execute(
+            f"""
+            WITH ranked AS (
+                SELECT
+                    CAST(scan_ts AS DATE)::VARCHAR AS scan_date,
+                    symbol, strategy, score, spread_pct, source,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY CAST(scan_ts AS DATE), symbol, strategy
+                        ORDER BY scan_ts DESC
+                    ) AS rn
+                FROM opportunity_candidates
+                WHERE profile = ?
+                  AND CAST(scan_ts AS DATE)::VARCHAR IN ({placeholders})
+            )
+            SELECT scan_date, symbol, strategy, score, spread_pct, source
+            FROM ranked
+            WHERE rn = 1
+            ORDER BY scan_date DESC, score DESC
+            """,
+            [profile] + scan_dates,
+        ).fetchall()
+        con.close()
+
+        # Raggruppa per (symbol, strategy) → lista date in cui è comparso
+        from collections import defaultdict
+        seen: dict = defaultdict(list)
+        latest_score: dict = {}
+        latest_spread: dict = {}
+        latest_source: dict = {}
+
+        for scan_date, symbol, strategy, score, spread_pct, source in rows:
+            key = (symbol, strategy)
+            if scan_date not in seen[key]:
+                seen[key].append(scan_date)
+            if scan_date == latest_date and key not in latest_score:
+                latest_score[key] = score
+                latest_spread[key] = spread_pct
+                latest_source[key] = source
+            # Per DEAD usiamo l'ultimo valore disponibile
+            if key not in latest_score:
+                latest_score[key] = score
+                latest_spread[key] = spread_pct
+                latest_source[key] = source
+
+        signals = []
+        for (symbol, strategy), dates in seen.items():
+            dates_sorted = sorted(dates, reverse=True)
+            is_in_latest = latest_date in dates_sorted
+
+            if is_in_latest:
+                n_confirmed = 0
+                for sd in scan_dates:
+                    if sd in dates_sorted:
+                        n_confirmed += 1
+                    else:
+                        break
+                state = "NEW" if n_confirmed == 1 else "CONFIRMED"
+            else:
+                n_confirmed = 0
+                state = "DEAD"
+
+            raw_score = latest_score.get((symbol, strategy)) or 0
+            signals.append({
+                "symbol": symbol,
+                "strategy": strategy,
+                "state": state,
+                "n_confirmed": n_confirmed,
+                "first_seen": dates_sorted[-1],
+                "last_seen": dates_sorted[0],
+                "score": round(raw_score * 100 if raw_score <= 1.0 else raw_score, 1),
+                "spread_pct": latest_spread.get((symbol, strategy)),
+                "source": latest_source.get((symbol, strategy)),
+            })
+
+        state_order = {"CONFIRMED": 0, "NEW": 1, "DEAD": 2}
+        signals.sort(key=lambda s: (state_order.get(s["state"], 99), -(s.get("score") or 0)))
+
+        return {
+            "ok": True,
+            "profile": profile,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "scan_dates": scan_dates,
+            "signals": signals,
+        }
+    except Exception as exc:
+        logger.warning("signals_lifecycle error: %s", exc)
+        return {"ok": False, "error": str(exc), "scan_dates": [], "signals": []}
+
+
+# ---------------------------------------------------------------------------
 # System log endpoint — espone il buffer in-memory del logger
 # ---------------------------------------------------------------------------
 @app.get("/opz/system/log")
