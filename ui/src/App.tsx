@@ -820,6 +820,7 @@ export default function App() {
   const [aiDrawerOpen, setAiDrawerOpen] = useState<boolean>(false);
   const [opExecOpen, setOpExecOpen] = useState<boolean>(false);
   const [execWindowOpen, setExecWindowOpen] = useState<boolean>(false);  // collassato di default
+  const [dumpOpen, setDumpOpen] = useState<boolean>(false);              // DUMP block collassato di default
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [leftKellyOpen, setLeftKellyOpen] = useState<boolean>(false);
   const [leftPhaseOpen, setLeftPhaseOpen] = useState<boolean>(false);
@@ -3017,64 +3018,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* ── EXEC FORM ── */}
-                  <div style={{borderTop:"1px solid var(--border)", marginTop:12, paddingTop:8}}>
-                    <div style={{display:"flex", alignItems:"center", gap:6, marginBottom:6}}>
-                      <button type="button" className="panel-fold-btn" onClick={() => setOpExecOpen(v => !v)}>
-                        {opExecOpen ? "▾" : "▸"}
-                      </button>
-                      <span className="lc-panel-title" style={{margin:0}}>ESECUZIONE ORDINE</span>
-                      {!opExecOpen && symbol && <span className="sev-meta" style={{fontSize:"0.65rem"}}>{symbol} · {strategy}</span>}
-                    </div>
-                    {opExecOpen && (
-                      <>
-                        {!blk("order_preview").interactive && blk("order_preview").reason && (
-                          <div className="notice error" style={{marginBottom:6, fontSize:"0.7rem"}}>
-                            🛑 {blk("order_preview").reason}
-                          </div>
-                        )}
-                        <div className="form-grid" style={{fontSize:"0.72rem"}}>
-                          <label>Symbol</label>
-                          <input value={symbol} onChange={e => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
-                          <label>Strategy</label>
-                          <select value={strategy} onChange={e => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive}
-                            style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
-                            <option value="BULL_PUT">BULL_PUT</option>
-                            {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
-                            {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
-                            {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
-                            {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
-                            {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE"].includes(strategy) && <option value={strategy}>{strategy}</option>}
-                          </select>
-                          <label>Payload JSON</label>
-                          <textarea rows={4} value={payload} onChange={e => setPayload(e.target.value)} disabled={!blk("order_preview").interactive}
-                            style={{fontSize:"0.68rem", fontFamily:"monospace"}} />
-                        </div>
-                        {payloadJsonError && <div className="notice error" style={{fontSize:"0.7rem"}}>Payload JSON non valido.</div>}
-                        {previewDirty && <div className="notice error" style={{fontSize:"0.7rem"}}>Preview non allineata al payload.</div>}
-                        <div className="actions" style={{marginTop:6}}>
-                          <button className="btn btn-primary" onClick={() => void doPreview()}
-                            disabled={busy || payloadJsonError || !blk("order_preview").interactive}>
-                            {busy ? "..." : "▶ PREVIEW"}
-                          </button>
-                          <select value={confirmDecision} onChange={e => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}
-                            disabled={!blk("order_confirm").interactive}
-                            style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
-                            <option value="APPROVE">APPROVE</option>
-                            <option value="REJECT">REJECT</option>
-                          </select>
-                          <button
-                            className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
-                            onClick={doConfirm}
-                            disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
-                            title={confirmArmed ? "Clicca ancora per inviare" : "Prima conferma"}
-                          >{confirmArmed ? "⚠ CONFERMA?" : "CONFIRM"}</button>
-                        </div>
-                        {preview && <pre className="console" style={{fontSize:"0.62rem", marginTop:6}}>{JSON.stringify(preview, null, 2)}</pre>}
-                      </>
-                    )}
-                  </div>
-
                   {/* ── Posizioni IBKR ── */}
                   <div style={{borderTop:"1px solid var(--border)", marginTop:12, paddingTop:8}}>
                     <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
@@ -3138,32 +3081,113 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* ── Execution window — dettaglio tecnico, collassato di default ── */}
+                {/* ══════════════════════════════════════════════════════
+                    DUMP — contenuto tecnico/dev · collassato di default
+                    Il semaforino (🔴🟡🟢) è il marker visivo universale
+                    di questo pattern: contenuto tecnico, non operativo.
+                    ══════════════════════════════════════════════════════ */}
                 <div className="lc-screen" style={{marginTop:8}}>
-                  <div className="lc-screen-bar" style={{cursor:"pointer"}} onClick={() => setExecWindowOpen(o => !o)}>
+                  {/* Header DUMP — toggle top-level */}
+                  <div className="lc-screen-bar" style={{cursor:"pointer"}} onClick={() => setDumpOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
-                    <span className="lc-screen-title">execution_window.log</span>
-                    <span style={{marginLeft:"auto", fontSize:"0.6rem", color:"var(--dim)", paddingRight:4}}>{execWindowOpen ? "▲ chiudi" : "▼ espandi"}</span>
+                    <span className="lc-screen-title">DUMP</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.6rem", color:"var(--dim)", paddingRight:4}}>
+                      {dumpOpen ? "▲ chiudi" : "▼ espandi"}
+                    </span>
                   </div>
-                  {execWindowOpen && (
-                    <div className="lc-screen-body">
-                      <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
-                      <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE 🛑" : "off"}</span></div>
-                      <div className="lc-screen-row"><span className="lc-dim">go_nogo_gate</span><span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "PASS" : "FAIL"}</span></div>
-                      <div className="lc-screen-row"><span className="lc-dim">kelly_enabled</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "yes" : "no"}</span></div>
-                      <div className="lc-screen-row"><span className="lc-dim">sizing</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span></div>
-                      <div className="lc-screen-row"><span className="lc-dim">candidati</span><span className="sev-data">{premarketShortlistCount}</span></div>
-                      <div className="lc-screen-row"><span className="lc-dim">exit_urgenti</span><span className={urgentExits.length > 0 ? "sev-warn" : "sev-ok"}>{urgentExits.length}</span></div>
-                      <div className="lc-screen-row"><span className="lc-dim">trades_chiusi</span><span className="sev-data">{sysStatus?.n_closed_trades ?? 0}</span></div>
-                      {goGate && !goGate.pass && goGate.reasons.length > 0 && (
-                        <div className="lc-screen-section">
-                          <div style={{color:"var(--amber)", fontSize:"0.6rem", marginBottom:4}}>motivi no-go:</div>
-                          {goGate.reasons.map((r, i) => <div key={i} style={{fontSize:"0.6rem", color:"var(--dim)"}}>· {r}</div>)}
+
+                  {dumpOpen && (
+                    <div className="lc-screen-body" style={{padding:0}}>
+
+                      {/* ─── Sezione 1: execution_window.log ─── */}
+                      <div style={{borderBottom:"1px solid var(--border)"}}>
+                        <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
+                          onClick={() => setExecWindowOpen(o => !o)}>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{execWindowOpen ? "▾" : "▸"}</span>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>execution_window.log</span>
                         </div>
-                      )}
-                      <div className="lc-action-bar">
-                        <button className="btn btn-ghost" onClick={refreshAll} disabled={busy}>⟳ refresh</button>
+                        {execWindowOpen && (
+                          <div style={{padding:"6px 12px 10px"}}>
+                            <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE 🛑" : "off"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">go_nogo_gate</span><span className={goGate?.pass ? "sev-ok" : "sev-error"}>{goGate?.pass ? "PASS" : "FAIL"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">kelly_enabled</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "yes" : "no"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">sizing</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">candidati</span><span className="sev-data">{premarketShortlistCount}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">exit_urgenti</span><span className={urgentExits.length > 0 ? "sev-warn" : "sev-ok"}>{urgentExits.length}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">trades_chiusi</span><span className="sev-data">{sysStatus?.n_closed_trades ?? 0}</span></div>
+                            {goGate && !goGate.pass && goGate.reasons.length > 0 && (
+                              <div className="lc-screen-section">
+                                <div style={{color:"var(--amber)", fontSize:"0.6rem", marginBottom:4}}>motivi no-go:</div>
+                                {goGate.reasons.map((r, i) => <div key={i} style={{fontSize:"0.6rem", color:"var(--dim)"}}>· {r}</div>)}
+                              </div>
+                            )}
+                            <div style={{marginTop:8}}>
+                              <button className="btn btn-ghost" style={{fontSize:"0.6rem"}} onClick={refreshAll} disabled={busy}>⟳ refresh</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
+
+                      {/* ─── Sezione 2: ESECUZIONE ORDINE ─── */}
+                      <div>
+                        <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
+                          onClick={() => setOpExecOpen(o => !o)}>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{opExecOpen ? "▾" : "▸"}</span>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>esecuzione_ordine</span>
+                          {!opExecOpen && symbol && (
+                            <span style={{fontSize:"0.6rem", color:"var(--muted)", marginLeft:4}}>{symbol} · {strategy}</span>
+                          )}
+                        </div>
+                        {opExecOpen && (
+                          <div style={{padding:"6px 12px 10px"}}>
+                            {!blk("order_preview").interactive && blk("order_preview").reason && (
+                              <div className="notice error" style={{marginBottom:6, fontSize:"0.7rem"}}>
+                                🛑 {blk("order_preview").reason}
+                              </div>
+                            )}
+                            <div className="form-grid" style={{fontSize:"0.72rem"}}>
+                              <label>Symbol</label>
+                              <input value={symbol} onChange={e => setSymbol(e.target.value)} disabled={!blk("order_preview").interactive} />
+                              <label>Strategia</label>
+                              <select value={strategy} onChange={e => setStrategy(e.target.value)} disabled={!blk("order_preview").interactive}
+                                style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
+                                <option value="BULL_PUT">BULL_PUT</option>
+                                {(tierInfo?.features_available?.iron_condor ?? true) && <option value="IRON_CONDOR">IRON_CONDOR</option>}
+                                {(tierInfo?.features_available?.wheel ?? true) && <option value="WHEEL">WHEEL</option>}
+                                {(tierInfo?.features_available?.pmcc_calendar ?? false) && <option value="PMCC_CALENDAR">PMCC_CALENDAR</option>}
+                                {(tierInfo?.features_available?.hedge_active ?? false) && <option value="HEDGE_ACTIVE">HEDGE_ACTIVE</option>}
+                                {!["BULL_PUT","IRON_CONDOR","WHEEL","PMCC_CALENDAR","HEDGE_ACTIVE"].includes(strategy) && <option value={strategy}>{strategy}</option>}
+                              </select>
+                              <label>Payload JSON</label>
+                              <textarea rows={4} value={payload} onChange={e => setPayload(e.target.value)} disabled={!blk("order_preview").interactive}
+                                style={{fontSize:"0.68rem", fontFamily:"monospace"}} />
+                            </div>
+                            {payloadJsonError && <div className="notice error" style={{fontSize:"0.7rem"}}>Payload JSON non valido.</div>}
+                            {previewDirty && <div className="notice error" style={{fontSize:"0.7rem"}}>Preview non allineata al payload.</div>}
+                            <div className="actions" style={{marginTop:6}}>
+                              <button className="btn btn-primary" onClick={() => void doPreview()}
+                                disabled={busy || payloadJsonError || !blk("order_preview").interactive}>
+                                {busy ? "..." : "▶ PREVIEW"}
+                              </button>
+                              <select value={confirmDecision} onChange={e => setConfirmDecision(e.target.value as "APPROVE" | "REJECT")}
+                                disabled={!blk("order_confirm").interactive}
+                                style={{background:"var(--panel)", color:"var(--text)", border:"1px solid var(--border)", padding:"2px 4px", fontSize:"0.72rem"}}>
+                                <option value="APPROVE">APPROVE</option>
+                                <option value="REJECT">REJECT</option>
+                              </select>
+                              <button
+                                className={`btn ${confirmArmed ? "btn-warning" : "btn-danger"}`}
+                                onClick={doConfirm}
+                                disabled={busy || !preview || payloadJsonError || previewDirty || !blk("order_confirm").interactive}
+                                title={confirmArmed ? "Clicca ancora per inviare" : "Prima conferma"}
+                              >{confirmArmed ? "⚠ CONFERMA?" : "CONFIRM"}</button>
+                            </div>
+                            {preview && <pre className="console" style={{fontSize:"0.62rem", marginTop:6}}>{JSON.stringify(preview, null, 2)}</pre>}
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                   )}
                 </div>
