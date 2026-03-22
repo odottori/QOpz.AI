@@ -821,6 +821,7 @@ export default function App() {
   const [opExecOpen, setOpExecOpen] = useState<boolean>(false);
   const [execWindowOpen, setExecWindowOpen] = useState<boolean>(false);  // collassato di default
   const [dumpOpen, setDumpOpen] = useState<boolean>(false);              // DUMP block collassato di default
+  const [scoreFilter, setScoreFilter] = useState<"all"|"high"|"mid"|"low">("all"); // filtro segnali per soglia score
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [leftKellyOpen, setLeftKellyOpen] = useState<boolean>(false);
   const [leftPhaseOpen, setLeftPhaseOpen] = useState<boolean>(false);
@@ -2894,24 +2895,71 @@ export default function App() {
               <div className="lc-body">
                 <div className="lc-panel" style={{overflowY:"auto"}}>
                   {/* ── Segnali candidati ── */}
-                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+                  {/* Header segnali + tasti filtro score */}
+                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
                     <span className="lc-panel-title" style={{margin:0}}>
                       SEGNALI — filtri duri + score
-                      <span className="sev-data" style={{fontWeight:400, marginLeft:6}}>({premarketRows.length})</span>
                     </span>
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}} onClick={refreshAll} disabled={busy}>⟳</button>
                   </div>
-                  {/* Legenda score e dati incompleti */}
-                  <div style={{fontSize:"0.6rem", color:"var(--dim)", marginBottom:6, display:"flex", gap:12, flexWrap:"wrap"}}>
-                    <span>Score su 100 · <span style={{color:"#4ade80"}}>≥65 ottimo</span> · <span style={{color:"#fbbf24"}}>50–64 borderline</span> · <span style={{color:"#f87171"}}>&lt;50 basso</span></span>
-                    <span title="Spread% e IVR% vuoti = dati di mercato non ancora acquisiti. Il segnale è preliminare.">⚠ celle vuote = dati incompleti · esecuzione non consigliata</span>
+                  {/* Filtri score — legenda cliccabile */}
+                  <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap", alignItems:"center"}}>
+                    {(["all","high","mid","low"] as const).map(f => {
+                      const labels: Record<typeof f, string> = {
+                        all:  "TUTTO",
+                        high: "≥65 ottimo",
+                        mid:  "50–64 borderline",
+                        low:  "<50 basso",
+                      };
+                      const colors: Record<typeof f, string> = {
+                        all:  "#888",
+                        high: "#4ade80",
+                        mid:  "#fbbf24",
+                        low:  "#f87171",
+                      };
+                      const active = scoreFilter === f;
+                      const count = f === "all" ? premarketRows.length
+                        : f === "high" ? premarketRows.filter(c => (c.scorePct ?? 0) >= 65).length
+                        : f === "mid"  ? premarketRows.filter(c => (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65).length
+                        : premarketRows.filter(c => (c.scorePct ?? 0) < 50).length;
+                      return (
+                        <button key={f}
+                          onClick={() => setScoreFilter(f)}
+                          style={{
+                            fontSize:"0.6rem", padding:"2px 7px", borderRadius:3, cursor:"pointer",
+                            border: `1px solid ${active ? colors[f] : "#333"}`,
+                            background: active ? `${colors[f]}18` : "transparent",
+                            color: active ? colors[f] : "#555",
+                            fontWeight: active ? 600 : 400,
+                            transition:"all 0.15s",
+                          }}>
+                          {labels[f]} <span style={{opacity:0.7}}>({count})</span>
+                        </button>
+                      );
+                    })}
+                    <span style={{fontSize:"0.58rem", color:"var(--dim)", marginLeft:4}}
+                      title="Spread% e IVR% vuoti = mercati chiusi o scan non aggiornato. Score su 100.">
+                      ⚠ celle vuote = dati non acquisiti
+                    </span>
                   </div>
                   {premarketRows.length === 0 ? (
                     <div style={{color:"var(--dim)", fontSize:"0.7rem", padding:"8px 0"}}>
                       Nessun segnale. Esegui scan dalla tab ANALISI.
                     </div>
-                  ) : (
-                    <div style={{overflowX:"auto", maxHeight:200, overflowY:"auto"}}>
+                  ) : (() => {
+                    const filtered = premarketRows.filter(c =>
+                      scoreFilter === "all" ? true :
+                      scoreFilter === "high" ? (c.scorePct ?? 0) >= 65 :
+                      scoreFilter === "mid"  ? (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65 :
+                      (c.scorePct ?? 0) < 50
+                    );
+                    return (
+                    <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
+                      {filtered.length === 0 ? (
+                        <div style={{color:"var(--dim)", fontSize:"0.7rem", padding:"8px 0"}}>
+                          Nessun segnale in questa fascia.
+                        </div>
+                      ) : (
                       <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                         <thead>
                           <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
@@ -2919,14 +2967,14 @@ export default function App() {
                             <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
                             <th style={{textAlign:"left", padding:"2px 4px"}} title="Tipo di struttura operativa. Passa il mouse sulla cella per i dettagli.">Strategia</th>
                             <th style={{textAlign:"right", padding:"2px 4px"}} title="Punteggio composito 0–100 (4 pilastri: volatilità, liquidità, rischio/rendimento, regime). Soglia minima operativa: 50.">Score/100</th>
-                            <th style={{textAlign:"right", padding:"2px 4px"}} title="Spread bid-ask in % del mid. Soglia dura: ≤10%. Vuoto = dato non acquisito.">Spread%</th>
-                            <th style={{textAlign:"right", padding:"2px 4px"}} title="IV Rank in percentile. Soglia dura: ≥20. Vuoto = dato non acquisito.">IVR%</th>
+                            <th style={{textAlign:"right", padding:"2px 4px"}} title="Spread bid-ask in % del mid. Soglia dura: ≤10%. Vuoto = dati non acquisiti (mercati chiusi?).">Spread%</th>
+                            <th style={{textAlign:"right", padding:"2px 4px"}} title="IV Rank in percentile. Soglia dura: ≥20. Vuoto = dati non acquisiti.">IVR%</th>
                             <th style={{textAlign:"left", padding:"2px 4px"}}>Fonte</th>
                             <th style={{padding:"2px 4px"}}></th>
                           </tr>
                         </thead>
                         <tbody>
-                          {premarketRows.map((c, i) => {
+                          {filtered.map((c, i) => {
                             const isSelected = selectedItemId != null && (c as any).item_id != null && selectedItemId === (c as any).item_id;
                             return (
                             <tr key={i} style={{borderBottom:"1px solid #222", background: isSelected ? "rgba(74,222,128,0.08)" : undefined}}>
@@ -2978,8 +3026,10 @@ export default function App() {
                           })}
                         </tbody>
                       </table>
+                      )}
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ── Exit urgenti ── */}
                   {urgentExits.length > 0 && (
