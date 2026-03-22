@@ -3466,39 +3466,6 @@ export default function App() {
 
                 {/* ── Colonna destra — stesso pattern strutturale di SEGNALI ── */}
                 <div className="lc-panel" style={{overflowY:"auto"}}>
-                  {/* blocchi pinnati — strip compatta */}
-                  {pinnedKpis.length > 0 && (() => {
-                    const pinnedData: Record<string, {label:string, value:React.ReactNode, sub:string, accent:string}> = {
-                      gate:     { label:"Gate Go/No-Go", value: goGate?.pass ? "GO ✓" : "NO-GO",   sub:"accesso mercato",  accent: goGate?.pass ? "#4ade80" : "#f87171" },
-                      regime:   { label:"Regime · Sizing", value: premarketRegime ?? "—",          sub: premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : premarketRegime === "SHOCK" ? "0%" : "—",  accent: premarketRegime === "NORMAL" ? "#4ade80" : premarketRegime === "CAUTION" ? "#fbbf24" : "#f87171" },
-                      exits:    { label:"Exit urgenti",  value: urgentExits.length,                sub: urgentExits.length > 0 ? "⚠ attenzione" : "ok",  accent: urgentExits.length > 0 ? "#fbbf24" : "#4ade80" },
-                      trades:   { label:"Trades chiusi", value: sysStatus?.n_closed_trades ?? 0,  sub:"paper journal",    accent:"#60a5fa" },
-                      finestra: { label:"Finestra",      value:"10:00–11:30",                      sub:"evita 09:30–09:45", accent:"#a78bfa" },
-                    };
-                    return (
-                      <div style={{display:"flex", flexDirection:"column", gap:4, marginBottom:10, paddingBottom:10, borderBottom:"1px solid var(--border)"}}>
-                        {pinnedKpis.map(id => {
-                          const d = pinnedData[id];
-                          if (!d) return null;
-                          return (
-                            <div key={id} style={{background:"var(--p2)", border:`1px solid ${d.accent}22`,
-                              borderRadius:3, padding:"5px 8px", display:"flex", alignItems:"center", gap:8}}>
-                              <div style={{flex:1, minWidth:0}}>
-                                <div style={{fontSize:"0.55rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.05em"}}>{d.label}</div>
-                                <div style={{fontSize:"0.9rem", fontWeight:700, color:d.accent, lineHeight:1.1}}>{d.value}</div>
-                                <div style={{fontSize:"0.55rem", color:"#888"}}>{d.sub}</div>
-                              </div>
-                              <span onClick={() => setPinnedKpis(v => v.filter(x => x !== id))}
-                                title="Rimuovi"
-                                style={{fontSize:"0.65rem", color:"#777", cursor:"pointer", padding:"2px 4px", userSelect:"none"}}
-                                onMouseEnter={e => (e.currentTarget.style.color = "#888")}
-                                onMouseLeave={e => (e.currentTarget.style.color = "#555")}>✕</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
 
                   {/* ── Titolo ── */}
                   <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6}}>
@@ -4417,6 +4384,42 @@ export default function App() {
         </section>
 
         <aside className="rightpanel">
+          {/* ── KPI pinnati dalle card OP/TRADING ── */}
+          {pinnedKpis.length > 0 && (() => {
+            const pinnedData: Record<string, {label:string, value:React.ReactNode, sub:string, accent:string}> = {
+              gate:     { label:"Gate Go/No-Go", value: goGate?.pass ? "GO ✓" : "NO-GO",   sub:"accesso mercato",  accent: goGate?.pass ? "#4ade80" : "#f87171" },
+              regime:   { label:"Regime · Sizing", value: premarketRegime ?? "—",          sub: premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : premarketRegime === "SHOCK" ? "0%" : "—",  accent: premarketRegime === "NORMAL" ? "#4ade80" : premarketRegime === "CAUTION" ? "#fbbf24" : "#f87171" },
+              exits:    { label:"Exit urgenti",  value: urgentExits.length,                sub: urgentExits.length > 0 ? "⚠ attenzione" : "ok",  accent: urgentExits.length > 0 ? "#fbbf24" : "#4ade80" },
+              trades:   { label:"Trades chiusi", value: sysStatus?.n_closed_trades ?? 0,  sub:"paper journal",    accent:"#60a5fa" },
+              finestra: { label:"Finestra",      value:"10:00–11:30",                      sub:"evita 09:30–09:45", accent:"#a78bfa" },
+            };
+            return (
+              <section className="rp-section" style={{borderBottom:"1px solid var(--border)", paddingBottom:8, marginBottom:4}}>
+                <div className="rp-title">IN EVIDENZA</div>
+                <div style={{display:"flex", flexDirection:"column", gap:4}}>
+                  {pinnedKpis.map(id => {
+                    const d = pinnedData[id];
+                    if (!d) return null;
+                    return (
+                      <div key={id} style={{background:"var(--p2)", border:`1px solid ${d.accent}22`,
+                        borderRadius:3, padding:"5px 8px", display:"flex", alignItems:"center", gap:8}}>
+                        <div style={{flex:1, minWidth:0}}>
+                          <div style={{fontSize:"0.55rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.05em"}}>{d.label}</div>
+                          <div style={{fontSize:"0.9rem", fontWeight:700, color:d.accent, lineHeight:1.1}}>{d.value}</div>
+                          <div style={{fontSize:"0.55rem", color:"#888"}}>{d.sub}</div>
+                        </div>
+                        <span onClick={() => setPinnedKpis(v => v.filter(x => x !== id))}
+                          title="Rimuovi da In evidenza"
+                          style={{fontSize:"0.65rem", color:"#777", cursor:"pointer", padding:"2px 4px", userSelect:"none"}}
+                          onMouseEnter={e => (e.currentTarget.style.color = "#f87171")}
+                          onMouseLeave={e => (e.currentTarget.style.color = "#777")}>✕</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })()}
           <section className="rp-section">
             <div className="rp-title">KPI MONITOR</div>
             <div className="checklist-item"><span className="ci-label">trades</span><span className="sev-data">{paperSummary?.trades ?? "-"}</span></div>
