@@ -2938,8 +2938,8 @@ export default function App() {
                       );
                     })}
                     <span style={{fontSize:"0.58rem", color:"var(--dim)", marginLeft:4}}
-                      title="Spread% e IVR% vuoti = mercati chiusi o scan non aggiornato. Score su 100.">
-                      ⚠ celle vuote = dati non acquisiti
+                      title="Spread% e IVR% vuoti = mercati chiusi o scan non ancora aggiornato.">
+                      ⚠ dati parziali = mercati chiusi o scan vecchio
                     </span>
                   </div>
                   {premarketRows.length === 0 ? (
