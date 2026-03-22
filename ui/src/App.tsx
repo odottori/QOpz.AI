@@ -1779,6 +1779,8 @@ export default function App() {
       scorePct: c.score,
       spreadPct: c.spread_pct * 100,
       ivRankPct: null as number | null,
+      dte: c.dte as number | null,
+      openInterest: c.open_interest as number | null,
       source: c.source ?? premarketSource,
     }))
     : universeItems.map((u) => ({
@@ -1788,6 +1790,8 @@ export default function App() {
       scorePct: u.score * 100,
       spreadPct: u.spread_pct * 100,
       ivRankPct: u.iv_rank * 100,
+      dte: null as number | null,
+      openInterest: u.open_interest as number | null,
       source: premarketSource,
     }));
   const premarketPrimary =
@@ -3333,13 +3337,13 @@ export default function App() {
                       );
                     };
                     const csvSegnali = () => {
-                      const cols = ["#","Simbolo","Strategia","Score","Spread%","IVR%","Stato","Prima vista"];
+                      const cols = ["#","Simbolo","Strategia","Score","Spread%","IVR%","DTE","OI","Stato","Prima vista"];
                       const body = [
                         ...liveRows.map((c, i) => {
                           const lc = lcMap.get(`${c.symbol}|${c.strategy}`);
-                          return [i+1, c.symbol, c.strategy, c.scorePct?.toFixed(0)??"", c.spreadPct?.toFixed(1)??"", c.ivRankPct?.toFixed(0)??"", lc?.state??"", lc?.first_seen??""].join(",");
+                          return [i+1, c.symbol, c.strategy, c.scorePct?.toFixed(0)??"", c.spreadPct?.toFixed(1)??"", c.ivRankPct?.toFixed(0)??"", c.dte??'', c.openInterest??'', lc?.state??"", lc?.first_seen??""].join(",");
                         }),
-                        ...deadRows.map(d => ["—",d.symbol,d.strategy,d.score.toFixed(0),d.spread_pct?.toFixed(1)??"","","DEAD",d.first_seen].join(",")),
+                        ...deadRows.map(d => ["—",d.symbol,d.strategy,d.score.toFixed(0),d.spread_pct?.toFixed(1)??"","","","","DEAD",d.first_seen].join(",")),
                       ];
                       const blob = new Blob([[cols.join(","), ...body].join("\n")], {type:"text/csv"});
                       const url = URL.createObjectURL(blob);
@@ -3356,20 +3360,24 @@ export default function App() {
                               <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
                               <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
                               <th style={{textAlign:"left", padding:"2px 4px"}}
-                                title="Struttura operativa — passa il mouse sulla riga per i dettagli">Str</th>
+                                title="Struttura operativa">Str</th>
                               <th style={{textAlign:"right", padding:"2px 4px"}}
-                                title="Score composito 0–100 (volatilità · liquidità · R/R · regime). Min operativo: 50">Score</th>
+                                title="Score composito 0–100. Min operativo: 50">Score</th>
                               <th style={{textAlign:"right", padding:"2px 4px"}}
-                                title="Spread bid-ask % del mid. Soglia dura ≤10%">Spr%</th>
+                                title="Spread bid-ask % del mid. 🟢≤5% 🟡5–10% 🔴>10%">Spr%</th>
                               <th style={{textAlign:"right", padding:"2px 4px"}}
-                                title="IV Rank percentile. Soglia dura ≥20">IVR%</th>
+                                title="IV Rank percentile. 🔴<20 🟡20–30 🟢≥30">IVR%</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                                title="Giorni alla scadenza. 🔴<14 o >60 🟡14–20 🟢20–55">DTE</th>
+                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                                title="Open Interest. 🔴<100 🟡100–500 🟢≥500">OI</th>
                               <th style={{textAlign:"left", padding:"2px 4px"}}>Stato</th>
                               <th style={{padding:"2px 4px"}}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {totalRows === 0 ? (
-                              <tr><td colSpan={8} style={{padding:"8px 4px", color:"#888", fontSize:"0.7rem"}}>
+                              <tr><td colSpan={10} style={{padding:"8px 4px", color:"#888", fontSize:"0.7rem"}}>
                                 {emptyMsg}
                               </td></tr>
                             ) : (<>
@@ -3399,17 +3407,37 @@ export default function App() {
                                         </span>
                                       ) : "—"}
                                     </td>
-                                    <td style={{padding:"2px 4px", textAlign:"right",
-                                      color:c.spreadPct == null || c.spreadPct === 0 ? "var(--dim)" : "#888"}}>
-                                      {c.spreadPct != null && c.spreadPct > 0
-                                        ? c.spreadPct.toFixed(1)
-                                        : <span title="Dato non acquisito">—</span>}
+                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                      {c.spreadPct != null && c.spreadPct > 0 ? (
+                                        <span style={{color: c.spreadPct > 10 ? "#f87171" : c.spreadPct > 5 ? "#fbbf24" : "#4ade80"}}
+                                          title={`Spread ${c.spreadPct.toFixed(1)}% — soglia hard ≤10%`}>
+                                          {c.spreadPct.toFixed(1)}
+                                        </span>
+                                      ) : <span style={{color:"var(--dim)"}} title="Dato non acquisito">—</span>}
                                     </td>
-                                    <td style={{padding:"2px 4px", textAlign:"right",
-                                      color:c.ivRankPct == null || c.ivRankPct === 0 ? "var(--dim)" : "#888"}}>
-                                      {c.ivRankPct != null && c.ivRankPct > 0
-                                        ? c.ivRankPct.toFixed(0)
-                                        : <span title="Dato non acquisito">—</span>}
+                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                      {c.ivRankPct != null && c.ivRankPct > 0 ? (
+                                        <span style={{color: c.ivRankPct < 20 ? "#f87171" : c.ivRankPct < 30 ? "#fbbf24" : "#4ade80"}}
+                                          title={`IVR ${c.ivRankPct.toFixed(0)} — soglia hard ≥20`}>
+                                          {c.ivRankPct.toFixed(0)}
+                                        </span>
+                                      ) : <span style={{color:"var(--dim)"}} title="Dato non disponibile">—</span>}
+                                    </td>
+                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                      {c.dte != null ? (
+                                        <span style={{color: c.dte < 14 || c.dte > 60 ? "#f87171" : c.dte < 20 || c.dte > 55 ? "#fbbf24" : "#4ade80"}}
+                                          title={`DTE ${c.dte} — range valido 14–60`}>
+                                          {c.dte}
+                                        </span>
+                                      ) : <span style={{color:"var(--dim)"}}>—</span>}
+                                    </td>
+                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                      {c.openInterest != null ? (
+                                        <span style={{color: c.openInterest < 100 ? "#f87171" : c.openInterest < 500 ? "#fbbf24" : "#4ade80"}}
+                                          title={`OI ${c.openInterest.toLocaleString()} — soglia hard ≥100`}>
+                                          {c.openInterest >= 1000 ? `${(c.openInterest/1000).toFixed(1)}k` : c.openInterest}
+                                        </span>
+                                      ) : <span style={{color:"var(--dim)"}}>—</span>}
                                     </td>
                                     <td style={{padding:"2px 4px"}}>{lcBadge(c.symbol ?? "", c.strategy ?? "")}</td>
                                     <td style={{padding:"2px 2px"}}>
@@ -3442,7 +3470,9 @@ export default function App() {
                                   <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
                                     {d.spread_pct != null ? d.spread_pct.toFixed(1) : "—"}
                                   </td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>—</td>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"var(--dim)"}}>—</td>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"var(--dim)"}}>—</td>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"var(--dim)"}}>—</td>
                                   <td style={{padding:"2px 4px"}}>
                                     <span style={{fontSize:"0.5rem", color:"#f87171", border:"1px solid #f8717130",
                                       borderRadius:2, padding:"0 3px"}}
