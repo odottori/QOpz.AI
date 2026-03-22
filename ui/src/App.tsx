@@ -2938,10 +2938,6 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 6–15 — TRADING</span>
-                <span className="lc-step-title">Execution e Monitoraggio</span>
-                <span className={`lc-step-sub ${goGate?.pass ? "sev-ok" : "sev-warn"}`}>
-                  Go/No-Go: {goGate?.pass ? "✓ GO" : "✗ NO-GO"} · Kill switch: {sysStatus?.kill_switch_active ? "🛑 ON" : "off"}
-                </span>
               </div>
               {/* ══ KPI BAR — blocchi operativi, cliccabili + pinnabili ══ */}
               {(() => {
@@ -2991,15 +2987,15 @@ export default function App() {
                       {compact && (
                         <span onClick={e => kpiPin(id, e)}
                           title="Rimuovi dalla colonna destra"
-                          style={{float:"right", fontSize:"0.6rem", cursor:"pointer", color:"#444", userSelect:"none"}}>
+                          style={{float:"right", fontSize:"0.6rem", cursor:"pointer", color:"#888", userSelect:"none"}}>
                           ✕
                         </span>
                       )}
-                      <div style={{fontSize: compact ? "0.55rem" : "0.58rem", color:"#555", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2}}>{label}</div>
+                      <div style={{fontSize: compact ? "0.55rem" : "0.58rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2}}>{label}</div>
                       <div style={{fontSize: compact ? "0.85rem" : "1rem", fontWeight:700, color: accent, lineHeight:1.1, marginBottom:2}}>{value}</div>
-                      <div style={{fontSize:"0.58rem", color:"#555"}} title={subTooltip}>
+                      <div style={{fontSize:"0.58rem", color:"#777"}} title={subTooltip}>
                         {sub}
-                        {!compact && detail ? <span style={{marginLeft:4, color:"#333"}}>{open ? "▲" : "▼"}</span> : null}
+                        {!compact && detail ? <span style={{marginLeft:4, color:"#777"}}>{open ? "▲" : "▼"}</span> : null}
                       </div>
                       {open && detail && (
                         <div onClick={e => e.stopPropagation()}
@@ -3096,11 +3092,11 @@ export default function App() {
                       SEGNALI — filtri duri + score
                       <span style={{fontWeight:400, marginLeft:8, fontSize:"0.68rem"}}>
                         <span style={{color:"#888"}} title="Totale candidati">({premarketRows.length}</span>
-                        <span style={{color:"#555", margin:"0 2px"}}>·</span>
+                        <span style={{color:"#777", margin:"0 2px"}}>·</span>
                         <span style={{color:"#4ade80"}} title="Score ≥65 — ottimi">{premarketRows.filter(c => (c.scorePct ?? 0) >= 65).length}</span>
-                        <span style={{color:"#555", margin:"0 2px"}}>·</span>
+                        <span style={{color:"#777", margin:"0 2px"}}>·</span>
                         <span style={{color:"#fbbf24"}} title="Score 50–64 — usabili">{premarketRows.filter(c => (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65).length}</span>
-                        <span style={{color:"#555", margin:"0 2px"}}>·</span>
+                        <span style={{color:"#777", margin:"0 2px"}}>·</span>
                         <span style={{color:"#f87171"}} title="Score <50 — insufficienti">{premarketRows.filter(c => (c.scorePct ?? 0) < 50).length}</span>
                         <span style={{color:"#888"}}>)</span>
                       </span>
@@ -3144,21 +3140,21 @@ export default function App() {
                           display:"flex", alignItems:"center", gap:5, cursor:"pointer",
                           padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: segnaliFiltersOpen ? 6 : 0,
                         }} onClick={() => setSegnaliFiltersOpen(v => !v)}>
-                          <span style={{fontSize:"0.62rem", color:"#444"}}>🔍</span>
+                          <span style={{fontSize:"0.62rem", color:"#888"}}>🔍</span>
                           <span style={{
                             fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", flex:1,
-                            color: activeCount > 0 ? "#60a5fa" : "#3a3a3a",
+                            color: activeCount > 0 ? "#60a5fa" : "#555",
                             fontWeight: activeCount > 0 ? 600 : 400,
                           }}>
                             FILTRI{activeCount > 0 ? ` · ${activeCount} attiv${activeCount === 1 ? "o" : "i"}` : ""}
                           </span>
-                          <span style={{fontSize:"0.5rem", color:"#333"}}>{segnaliFiltersOpen ? "▾" : "▸"}</span>
+                          <span style={{fontSize:"0.5rem", color:"#777"}}>{segnaliFiltersOpen ? "▾" : "▸"}</span>
                         </div>
 
                         {segnaliFiltersOpen && (<>
                           {/* stato lifecycle */}
                           <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
                               letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>stato:</span>
                             {([
                               {id:"all" as const,       label:"TUTTI",     color:"#888"},
@@ -3176,7 +3172,7 @@ export default function App() {
                             })}
                             {lifecycleLoading && <span style={{fontSize:"0.5rem", color:"var(--dim)", marginLeft:4}}>…</span>}
                             {signalLifecycle?.scan_dates?.length && (
-                              <span style={{fontSize:"0.48rem", color:"#2a2a2a", marginLeft:"auto"}}
+                              <span style={{fontSize:"0.48rem", color:"#888", marginLeft:"auto"}}
                                 title={`Batch: ${signalLifecycle.scan_dates.join(", ")}`}>
                                 {signalLifecycle.scan_dates.length} scan
                               </span>
@@ -3185,7 +3181,7 @@ export default function App() {
 
                           {/* score */}
                           <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
                               letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>score:</span>
                             {(["all","high","mid","low"] as const).map(f => {
                               const label = {all:"TUTTO", high:"≥65", mid:"50–64", low:"<50"}[f];
@@ -3205,7 +3201,7 @@ export default function App() {
 
                           {/* strategia */}
                           <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
                               letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>str:</span>
                             {strategies.map(s => {
                               const n = stratCount(s);
@@ -3222,7 +3218,7 @@ export default function App() {
 
                           {/* data scan (freschezza batch) */}
                           <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
                               letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>scan:</span>
                             <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
                             <input type="date" value={segnaliFrom} onChange={e => setSegnaliFrom(e.target.value)}
@@ -3238,6 +3234,38 @@ export default function App() {
                             )}
                           </div>
                         </>)}
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Metrics strip SEGNALI ── */}
+                  {(() => {
+                    const total = premarketRows.length;
+                    const avgScore = total > 0
+                      ? premarketRows.reduce((s, c) => s + (c.scorePct ?? 0), 0) / total
+                      : null;
+                    const lc = signalLifecycle?.signals ?? [];
+                    const nNew  = lc.filter(s => s.state === "NEW").length;
+                    const nConf = lc.filter(s => s.state === "CONFIRMED").length;
+                    const nDead = lc.filter(s => s.state === "DEAD").length;
+                    const mc = (label: string, val: string, col: string, tip?: string) => (
+                      <div key={label} title={tip} style={{
+                        flex:"1 1 0", minWidth:44, height:44, background:"var(--p2)",
+                        border:`1px solid ${col}28`, borderRadius:3,
+                        display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2,
+                      }}>
+                        <div style={{fontSize:"0.46rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.05em", lineHeight:1, whiteSpace:"nowrap"}}>{label}</div>
+                        <div style={{fontSize:"0.76rem", fontWeight:700, color:col, lineHeight:1}}>{val}</div>
+                      </div>
+                    );
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8}}>
+                        {mc("totali", total > 0 ? String(total) : "—", "#888", "Segnali nell'ultimo scan")}
+                        {mc("score medio", avgScore != null ? `${avgScore.toFixed(0)}%` : "—", avgScore != null && avgScore >= 65 ? "#4ade80" : avgScore != null && avgScore >= 50 ? "#fbbf24" : "#f87171", "Score medio dei segnali filtrati")}
+                        {mc("NEW", nNew > 0 ? String(nNew) : "—", "#4ade80", "Segnali nuovi (solo nell'ultimo scan)")}
+                        {mc("CONF.", nConf > 0 ? String(nConf) : "—", "#60a5fa", "Segnali confermati (≥2 scan consecutivi)")}
+                        {mc("DEAD", nDead > 0 ? String(nDead) : "—", "#f87171", "Segnali scomparsi dall'ultimo scan")}
+                        {[0,1,2].map(i => <div key={`ph${i}`} style={{flex:"1 1 0", minWidth:44, height:44, border:"1px dashed #252525", borderRadius:3}} />)}
                       </div>
                     );
                   })()}
@@ -3315,7 +3343,7 @@ export default function App() {
                       <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
                         <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                           <thead>
-                            <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                            <tr style={{color:"#888", borderBottom:"1px solid #444"}}>
                               <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
                               <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
                               <th style={{textAlign:"left", padding:"2px 4px"}}
@@ -3332,7 +3360,7 @@ export default function App() {
                           </thead>
                           <tbody>
                             {totalRows === 0 ? (
-                              <tr><td colSpan={8} style={{padding:"8px 4px", color:"#2a2a2a", fontSize:"0.7rem"}}>
+                              <tr><td colSpan={8} style={{padding:"8px 4px", color:"#888", fontSize:"0.7rem"}}>
                                 {emptyMsg}
                               </td></tr>
                             ) : (<>
@@ -3350,7 +3378,7 @@ export default function App() {
                                 return (
                                   <tr key={i} style={{borderBottom:"1px solid #222",
                                     background: isSelected ? "rgba(74,222,128,0.08)" : undefined}}>
-                                    <td style={{padding:"2px 4px", color:"#666"}}>#{i+1}</td>
+                                    <td style={{padding:"2px 4px", color:"#888"}}>#{i+1}</td>
                                     <td style={{padding:"2px 4px", fontWeight:600}}>{c.symbol}</td>
                                     <td style={{padding:"2px 4px", color:"#888"}}
                                       title={stratTip[c.strategy ?? ""] ?? c.strategy ?? ""}>{c.strategy}</td>
@@ -3396,16 +3424,16 @@ export default function App() {
                               })}
                               {deadRows.map((d, i) => (
                                 <tr key={`dead-${i}`} style={{borderBottom:"1px solid #1a1a1a", opacity:0.45}}>
-                                  <td style={{padding:"2px 4px", color:"#555"}}>—</td>
-                                  <td style={{padding:"2px 4px", color:"#555", fontWeight:600}}>{d.symbol}</td>
-                                  <td style={{padding:"2px 4px", color:"#444"}}>{d.strategy}</td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#444"}}>
+                                  <td style={{padding:"2px 4px", color:"#777"}}>—</td>
+                                  <td style={{padding:"2px 4px", color:"#777", fontWeight:600}}>{d.symbol}</td>
+                                  <td style={{padding:"2px 4px", color:"#888"}}>{d.strategy}</td>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
                                     {d.score > 0 ? d.score.toFixed(0) : "—"}
                                   </td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#444"}}>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
                                     {d.spread_pct != null ? d.spread_pct.toFixed(1) : "—"}
                                   </td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#444"}}>—</td>
+                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>—</td>
                                   <td style={{padding:"2px 4px"}}>
                                     <span style={{fontSize:"0.5rem", color:"#f87171", border:"1px solid #f8717130",
                                       borderRadius:2, padding:"0 3px"}}
@@ -3456,15 +3484,15 @@ export default function App() {
                             <div key={id} style={{background:"var(--p2)", border:`1px solid ${d.accent}22`,
                               borderRadius:3, padding:"5px 8px", display:"flex", alignItems:"center", gap:8}}>
                               <div style={{flex:1, minWidth:0}}>
-                                <div style={{fontSize:"0.55rem", color:"#555", textTransform:"uppercase", letterSpacing:"0.05em"}}>{d.label}</div>
+                                <div style={{fontSize:"0.55rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.05em"}}>{d.label}</div>
                                 <div style={{fontSize:"0.9rem", fontWeight:700, color:d.accent, lineHeight:1.1}}>{d.value}</div>
-                                <div style={{fontSize:"0.55rem", color:"#444"}}>{d.sub}</div>
+                                <div style={{fontSize:"0.55rem", color:"#888"}}>{d.sub}</div>
                               </div>
                               <span onClick={() => setPinnedKpis(v => v.filter(x => x !== id))}
                                 title="Rimuovi"
-                                style={{fontSize:"0.65rem", color:"#333", cursor:"pointer", padding:"2px 4px", userSelect:"none"}}
+                                style={{fontSize:"0.65rem", color:"#777", cursor:"pointer", padding:"2px 4px", userSelect:"none"}}
                                 onMouseEnter={e => (e.currentTarget.style.color = "#888")}
-                                onMouseLeave={e => (e.currentTarget.style.color = "#333")}>✕</span>
+                                onMouseLeave={e => (e.currentTarget.style.color = "#555")}>✕</span>
                             </div>
                           );
                         })}
@@ -3487,54 +3515,20 @@ export default function App() {
                           const live = ibkrAccount?.positions.length ?? 0;
                           return (
                             <span style={{fontWeight:400, marginLeft:6, fontSize:"0.65rem"}}>
-                              <span style={{color:"#555"}}>(</span>
-                              <span style={{color:"#888"}} title="Totale trades chiusi (lifetime)">{tot}</span>
-                              <span style={{color:"#444"}}>/</span>
+                              <span style={{color:"#777"}}>(</span>
+                              <span style={{color:"#999"}} title="Totale trades chiusi (lifetime)">{tot}</span>
+                              <span style={{color:"#777"}}>/</span>
                               <span style={{color:"#4ade80"}} title="Trades chiusi positivi (lifetime)">{pos}</span>
-                              <span style={{color:"#444"}}>/</span>
+                              <span style={{color:"#777"}}>/</span>
                               <span style={{color:"#f87171"}} title="Trades chiusi negativi (lifetime)">{neg}</span>
-                              <span style={{color:"#444"}}>/</span>
+                              <span style={{color:"#777"}}>/</span>
                               <span style={{color:"#fbbf24"}} title="Trades ancora aperti nel journal">{ape}</span>
-                              <span style={{color:"#555"}}>)</span>
+                              <span style={{color:"#777"}}>)</span>
                             </span>
                           );
                         })()}
                       </span>
                     </div>
-                    {/* metrics strip */}
-                    {(() => {
-                      const chiusi = storicoTrades.filter(t => !!t.exit_ts_utc);
-                      const nPos = chiusi.filter(t => (t.pnl ?? 0) >= 0).length;
-                      const maxWin  = chiusi.length ? Math.max(...chiusi.map(t => t.pnl ?? 0)) : null;
-                      const maxLoss = chiusi.length ? Math.min(...chiusi.map(t => t.pnl ?? 0)) : null;
-                      const winPct  = chiusi.length > 0 ? nPos / chiusi.length * 100 : null;
-                      const roi     = storicoSummary?.roi_pct ?? null;
-                      const dd      = storicoSummary?.max_drawdown_pct ?? null;
-                      const cassa   = ibkrAccount?.net_liquidation ?? null;
-                      const brokerStatus = ibkrAccount
-                        ? (ibkrAccount.connected ? "broker ON" : "broker OFF")
-                        : null;
-                      const mc = (label: string, val: string, col: string, tip?: string) => (
-                        <div key={label} title={tip} style={{
-                          flex:"1 1 0", minWidth:44, height:44, background:"var(--p2)",
-                          border:`1px solid ${col}28`, borderRadius:3,
-                          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2,
-                        }}>
-                          <div style={{fontSize:"0.46rem", color:"#666", textTransform:"uppercase", letterSpacing:"0.05em", lineHeight:1}}>{label}</div>
-                          <div style={{fontSize:"0.76rem", fontWeight:700, color:col, lineHeight:1}}>{val}</div>
-                        </div>
-                      );
-                      return (
-                        <div style={{display:"flex", gap:4, marginTop:5, marginBottom:8}}>
-                          {mc("cassa", cassa != null ? `€${cassa.toLocaleString("it-IT",{maximumFractionDigits:0})}` : "—", "#888", brokerStatus ?? "Patrimonio netto broker")}
-                          {mc("ROI", roi != null ? `${roi>=0?"+":""}${Number(roi).toFixed(1)}%` : "—", (roi??0)>=0?"#4ade80":"#f87171", "Rendimento totale journal")}
-                          {mc("▼ maxDown", dd != null ? `${Number(dd).toFixed(1)}%` : "—", "#f87171", "Drawdown massimo dal picco")}
-                          {mc("▲ maxWin", maxWin != null ? `+${maxWin.toFixed(0)}` : "—", "#4ade80", "Trade migliore (€)")}
-                          {mc("▼ maxLoss", maxLoss != null ? `${maxLoss.toFixed(0)}` : "—", "#f87171", "Trade peggiore (€)")}
-                          {mc("win%", winPct != null ? `${winPct.toFixed(0)}%` : "—", winPct != null && winPct>=50?"#4ade80":"#f87171", "Percentuale trade chiusi positivi")}
-                        </div>
-                      );
-                    })()}
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px", marginTop:2}}
                       disabled={storicoLoading || ibkrAccountLoading}
                       onClick={() => { void doFetchStorico(); void doFetchIbkrAccount(); }}>
@@ -3582,21 +3576,21 @@ export default function App() {
                           display:"flex", alignItems:"center", gap:5, cursor:"pointer",
                           padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: posFiltersOpen ? 6 : 0,
                         }} onClick={() => setPosFiltersOpen(v => !v)}>
-                          <span style={{fontSize:"0.62rem", color:"#444"}}>🔍</span>
+                          <span style={{fontSize:"0.62rem", color:"#888"}}>🔍</span>
                           <span style={{
                             fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", flex:1,
-                            color: activeCount > 0 ? "#60a5fa" : "#3a3a3a",
+                            color: activeCount > 0 ? "#60a5fa" : "#555",
                             fontWeight: activeCount > 0 ? 600 : 400,
                           }}>
                             FILTRI{activeCount > 0 ? ` · ${activeCount} attiv${activeCount===1?"o":"i"}` : ""}
                           </span>
-                          <span style={{fontSize:"0.5rem", color:"#333"}}>{posFiltersOpen ? "▾" : "▸"}</span>
+                          <span style={{fontSize:"0.5rem", color:"#777"}}>{posFiltersOpen ? "▾" : "▸"}</span>
                         </div>
 
                         {posFiltersOpen && (<>
                           {/* esito */}
                           <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
                               letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>esito:</span>
                             {(["tutti","positivi","negativi","aperti"] as const).map(f => (
                               <button key={f} onClick={() => setPosOutcomeFilter(f)}
@@ -3609,7 +3603,7 @@ export default function App() {
 
                           {/* data */}
                           <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
                               letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>data:</span>
                             <span style={{fontSize:"0.55rem", color:"var(--dim)"}}>dal</span>
                             <input type="date" value={storicoFrom} onChange={e => setStoricoFrom(e.target.value)}
@@ -3627,7 +3621,7 @@ export default function App() {
 
                           {/* strategia */}
                           <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:4, flexWrap:"wrap"}}>
-                            <span style={{fontSize:"0.5rem", color:"#444", textTransform:"uppercase",
+                            <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
                               letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>str:</span>
                             {strategies.map(s => {
                               const n = s === "tutte" ? byDateBase.length : byDateBase.filter(t => t.strategy === s).length;
@@ -3642,6 +3636,42 @@ export default function App() {
                             })}
                           </div>
                         </>)}
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Metrics strip ── */}
+                  {(() => {
+                    const chiusi = storicoTrades.filter(t => !!t.exit_ts_utc);
+                    const nPos = chiusi.filter(t => (t.pnl ?? 0) >= 0).length;
+                    const maxWin  = chiusi.length ? Math.max(...chiusi.map(t => t.pnl ?? 0)) : null;
+                    const maxLoss = chiusi.length ? Math.min(...chiusi.map(t => t.pnl ?? 0)) : null;
+                    const winPct  = chiusi.length > 0 ? nPos / chiusi.length * 100 : null;
+                    const roi     = storicoSummary?.roi_pct ?? null;
+                    const dd      = storicoSummary?.max_drawdown_pct ?? null;
+                    const cassa   = ibkrAccount?.net_liquidation ?? null;
+                    const brokerStatus = ibkrAccount
+                      ? (ibkrAccount.connected ? "broker ON" : "broker OFF")
+                      : null;
+                    const mc = (label: string, val: string, col: string, tip?: string) => (
+                      <div key={label} title={tip} style={{
+                        flex:"1 1 0", minWidth:44, height:44, background:"var(--p2)",
+                        border:`1px solid ${col}28`, borderRadius:3,
+                        display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2,
+                      }}>
+                        <div style={{fontSize:"0.46rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.05em", lineHeight:1, whiteSpace:"nowrap"}}>{label}</div>
+                        <div style={{fontSize:"0.76rem", fontWeight:700, color:col, lineHeight:1}}>{val}</div>
+                      </div>
+                    );
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8}}>
+                        {mc("cassa", cassa != null ? `€${cassa.toLocaleString("it-IT",{maximumFractionDigits:0})}` : "—", "#888", brokerStatus ?? "Patrimonio netto broker")}
+                        {mc("ROI", roi != null ? `${roi>=0?"+":""}${Number(roi).toFixed(1)}%` : "—", (roi??0)>=0?"#4ade80":"#f87171", "Rendimento totale journal")}
+                        {mc("▼ maxDown", dd != null ? `${Number(dd).toFixed(1)}%` : "—", "#f87171", "Drawdown massimo dal picco")}
+                        {mc("▲ maxWin", maxWin != null ? `+${maxWin.toFixed(0)}` : "—", "#4ade80", "Trade migliore (€)")}
+                        {mc("▼ maxLoss", maxLoss != null ? `${maxLoss.toFixed(0)}` : "—", "#f87171", "Trade peggiore (€)")}
+                        {mc("win%", winPct != null ? `${winPct.toFixed(0)}%` : "—", winPct != null && winPct>=50?"#4ade80":"#f87171", "Percentuale trade chiusi positivi")}
+                        {[0,1].map(i => <div key={`ph${i}`} style={{flex:"1 1 0", minWidth:44, height:44, border:"1px dashed #252525", borderRadius:3}} />)}
                       </div>
                     );
                   })()}
@@ -3677,7 +3707,7 @@ export default function App() {
                         background:"var(--p2)", border:`1px solid ${accent}22`,
                         borderRadius:3, padding:"4px 6px",
                       }}>
-                        <div style={{fontSize:"0.5rem", color:"#555", textTransform:"uppercase",
+                        <div style={{fontSize:"0.5rem", color:"#777", textTransform:"uppercase",
                           letterSpacing:"0.05em", lineHeight:1}}>{label}</div>
                         <div style={{fontSize:"0.8rem", fontWeight:700, color:accent, lineHeight:1.2}}>{value}</div>
                       </div>
@@ -3698,7 +3728,7 @@ export default function App() {
                         <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
                           <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
                             <thead>
-                              <tr style={{color:"#666", borderBottom:"1px solid #333"}}>
+                              <tr style={{color:"#888", borderBottom:"1px solid #444"}}>
                                 <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
                                 <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
                                 <th style={{textAlign:"left", padding:"2px 4px"}}>Str</th>
@@ -3715,7 +3745,7 @@ export default function App() {
                                   Caricamento…
                                 </td></tr>
                               ) : filtered.length === 0 ? (
-                                <tr><td colSpan={6} style={{padding:"8px 4px", color:"#2a2a2a", fontSize:"0.7rem"}}>
+                                <tr><td colSpan={6} style={{padding:"8px 4px", color:"#888", fontSize:"0.7rem"}}>
                                   {storicoTrades.length === 0
                                     ? "nessun trade nel journal — premi ⟳ per caricare"
                                     : "nessun trade per i filtri selezionati"}
@@ -3730,7 +3760,7 @@ export default function App() {
                                     : (t.exit_ts_utc?.slice(0,10)  ?? "—");
                                   return (
                                     <tr key={i} style={{borderBottom:"1px solid #222"}}>
-                                      <td style={{padding:"2px 4px", color:"#666"}}>#{i+1}</td>
+                                      <td style={{padding:"2px 4px", color:"#888"}}>#{i+1}</td>
                                       <td style={{padding:"2px 4px", fontWeight:600}}>{t.symbol||"—"}</td>
                                       <td style={{padding:"2px 4px", color:"#888", fontSize:"0.62rem"}}>{t.strategy||"—"}</td>
                                       <td style={{padding:"2px 4px", textAlign:"right", color:pnlCol}}>
@@ -3739,7 +3769,7 @@ export default function App() {
                                       <td style={{padding:"2px 4px", textAlign:"right", color:pnlCol, fontSize:"0.62rem"}}>
                                         {pnlPct != null ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%` : "—"}
                                       </td>
-                                      <td style={{padding:"2px 4px", color:"#555", fontSize:"0.62rem"}}>{dateVal}</td>
+                                      <td style={{padding:"2px 4px", color:"#777", fontSize:"0.62rem"}}>{dateVal}</td>
                                     </tr>
                                   );
                                 })
@@ -3785,8 +3815,8 @@ export default function App() {
                     <span style={{width:7, height:7, borderRadius:"50%", background:"#ef4444", display:"inline-block"}}/>
                     <span style={{width:7, height:7, borderRadius:"50%", background:"#eab308", display:"inline-block"}}/>
                     <span style={{width:7, height:7, borderRadius:"50%", background:"#22c55e", display:"inline-block"}}/>
-                    <span style={{fontSize:"0.63rem", color:"#555", fontFamily:"monospace", marginLeft:4, letterSpacing:"0.05em"}}>DUMP</span>
-                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"#444"}}>{dumpOpen ? "▲" : "▼"}</span>
+                    <span style={{fontSize:"0.63rem", color:"#777", fontFamily:"monospace", marginLeft:4, letterSpacing:"0.05em"}}>DUMP</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"#888"}}>{dumpOpen ? "▲" : "▼"}</span>
                   </div>
                   {dumpOpen && (
                     <div style={{padding:0}}>

@@ -12,8 +12,8 @@
   --red: #ff3030;
   --blue: #00aaff;
   --text: #b8ddc8;
-  --dim: #4a7a5a;
-  --muted: #1e4030;
+  --dim: #7aaa90;
+  --muted: #2a5040;
   --right-col-width: 270px;
   --sev-ok: var(--g1);
   --sev-warn: var(--amber);
@@ -902,7 +902,7 @@ select:focus {
 
 .narrator-player-label {
   font-size: 0.62rem;
-  color: #6b7280;
+  color: #8b9280;
   letter-spacing: 0.5px;
   white-space: nowrap;
   overflow: hidden;
@@ -1680,6 +1680,7 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  max-width: 1400px;
 }
 
 /* ── Header step ── */
