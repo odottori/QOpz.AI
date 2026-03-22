@@ -3030,14 +3030,18 @@ export default function App() {
                 for (let row = 0; row < nRows; row++) {
                   for (let g = 0; g < GROUPS; g++) {
                     const base = row * PER_ROW + g * SLOTS;
+                    const isLastGroup = g === GROUPS - 1;
                     kpiGroups.push(
-                      <div key={`g${row}-${g}`} style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:6}}>
+                      <div key={`g${row}-${g}`} style={{
+                        display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:6,
+                        borderRight: isLastGroup ? "none" : "1px solid var(--border)",
+                      }}>
                         {Array.from({length: SLOTS}).map((_, s) => {
                           const k = kpiDefs[base + s];
                           if (k) return kpiCard(k.id, k.label, k.value, k.sub, k.subTooltip, k.accent, k.detail);
                           return <div key={`ph${base+s}`} style={{
-                            background:"var(--p2)", border:"1px dashed #1c1c1c",
-                            borderRadius:4, minHeight:52, opacity:0.15,
+                            border:"1px dashed #2a2a2a",
+                            borderRadius:4, minHeight:52,
                           }} />;
                         })}
                       </div>
