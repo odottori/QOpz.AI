@@ -2569,36 +2569,38 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 1–2 — DATI</span>
-                <span className="lc-step-title">Ingest e Consolidamento</span>
                 {premarketScanAt && <span className="lc-step-sub">Aggiornato: {fmtTs(premarketScanAt)}</span>}
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
-                  <div className="lc-panel-title">Stato pipeline</div>
-                  <div className="lc-kpi-grid">
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Pipeline</div>
-                      <div className={`lc-kpi-value ${healthToSevClass(pipelineStateHealth)}`}>{pipelineStateLabel}</div>
-                      <div className="lc-kpi-sub">ingest + regime</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Data Mode</div>
-                      <div className={`lc-kpi-value ${hasRealData ? "sev-ok" : "sev-neutral"}`} style={{fontSize:"0.75rem"}}>{dataModeUpper || "N/D"}</div>
-                      <div className="lc-kpi-sub">fonte dati</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Record locali</div>
-                      <div className={`lc-kpi-value ${healthToSevClass(localDbHealth)}`}>{localRecords.toLocaleString("it-IT")}</div>
-                      <div className="lc-kpi-sub">DuckDB + journal</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">History</div>
-                      <div className={`lc-kpi-value ${historyReadiness?.ready ? "sev-ok" : "sev-warn"}`}>
-                        {historyReadiness ? `${historyReadiness.score_pct.toFixed(0)}%` : "N/D"}
+                  {/* ── micro-card strip ── */}
+                  {(() => {
+                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
                       </div>
-                      <div className="lc-kpi-sub">{historyReadiness ? `${historyReadiness.days_observed}/${historyReadiness.target_days}g` : "—"}</div>
-                    </div>
-                  </div>
+                    );
+                    const pipeCol = pipelineStateHealth === "ok" ? "#4ade80" : pipelineStateHealth === "warn" ? "#fbbf24" : "#f87171";
+                    const histPct = historyReadiness ? historyReadiness.score_pct : null;
+                    const histCol = histPct != null ? (histPct >= 100 ? "#4ade80" : histPct >= 50 ? "#fbbf24" : "#888") : "#888";
+                    const tradeN = paperSummary?.trades ?? 0;
+                    const kellyOn = sysStatus?.kelly_enabled;
+                    const pnl = paperSummary?.pnl_cumulative;
+                    const viols = paperSummary?.compliance_violations ?? 0;
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("pipeline", pipelineStateLabel, pipeCol, "Stato pipeline ingest+regime")}
+                        {mc("data mode", dataModeUpper || "N/D", hasRealData ? "#4ade80" : "#888", "Fonte dati attiva")}
+                        {mc("record loc.", localRecords.toLocaleString("it-IT"), healthToSevClass(localDbHealth) === "sev-ok" ? "#4ade80" : "#fbbf24", "Record DuckDB + journal")}
+                        {mc("history%", histPct != null ? `${histPct.toFixed(0)}%` : "—", histCol, `${historyReadiness?.days_observed ?? 0}/${historyReadiness?.target_days ?? 50}g osservati`)}
+                        {mc("trade chiusi", String(tradeN), tradeN >= 50 ? "#4ade80" : tradeN >= 20 ? "#fbbf24" : "#888", "Trade chiusi su 50 per Kelly gate")}
+                        {mc("kelly gate", kellyOn ? "ON" : "LOCK", kellyOn ? "#4ade80" : "#888", kellyOn ? "Kelly sizing attivo" : `Mancano ${Math.max(0,50-(sysStatus?.n_closed_trades??0))} trade`)}
+                        {mc("P&L cum.", pnl != null ? `€${pnl.toFixed(0)}` : "—", pnl != null && pnl >= 0 ? "#4ade80" : "#f87171", "P&L cumulato da inizio paper")}
+                        {mc("violations", String(viols), viols > 0 ? "#fbbf24" : "#4ade80", "Compliance violations")}
+                      </div>
+                    );
+                  })()}
                   {historyReadiness && (
                     <div className="lc-progress-wrap">
                       <div className="lc-panel-title" style={{marginTop:12}}>Readiness → Kelly gate (50 trade / 50 giorni)</div>
@@ -2615,34 +2617,6 @@ export default function App() {
                       ))}
                     </div>
                   )}
-                  <div className="lc-kpi-grid" style={{marginTop:12}}>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Trade chiusi</div>
-                      <div className="lc-kpi-value sev-data">{paperSummary?.trades ?? 0}</div>
-                      <div className="lc-kpi-sub">su 50 per Kelly</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Kelly gate</div>
-                      <div className={`lc-kpi-value ${sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}`} style={{fontSize:"0.7rem"}}>
-                        {sysStatus?.kelly_enabled ? "ABILITATO" : "DISABILITATO"}
-                      </div>
-                      <div className="lc-kpi-sub">{sysStatus?.kelly_enabled ? "sizing attivo" : `mancano ${Math.max(0, 50 - (sysStatus?.n_closed_trades ?? 0))} trade`}</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">P&L cumulato</div>
-                      <div className={`lc-kpi-value ${(paperSummary?.pnl_cumulative ?? 0) >= 0 ? "sev-ok" : "sev-error"}`}>
-                        {paperSummary?.pnl_cumulative != null ? `€${paperSummary.pnl_cumulative.toFixed(0)}` : "N/D"}
-                      </div>
-                      <div className="lc-kpi-sub">da inizio paper</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Violations</div>
-                      <div className={`lc-kpi-value ${(paperSummary?.compliance_violations ?? 0) > 0 ? "sev-warn" : "sev-ok"}`}>
-                        {paperSummary?.compliance_violations ?? 0}
-                      </div>
-                      <div className="lc-kpi-sub">compliance</div>
-                    </div>
-                  </div>
                 </div>
                 <div className="lc-screen">
                   <div className="lc-screen-bar">
@@ -2679,51 +2653,40 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 3–4 — ANALISI</span>
-                <span className="lc-step-title">Regime e Scoring Pre-Market</span>
                 {premarketScanAt && <span className="lc-step-sub">{fmtTs(premarketScanAt)} · {premarketShortlistCount} segnali</span>}
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
+                  {/* ── micro-card strip ── */}
+                  {(() => {
+                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+                      </div>
+                    );
+                    const regCol = premarketRegime === "NORMAL" ? "#4ade80" : premarketRegime === "CAUTION" ? "#fbbf24" : premarketRegime === "SHOCK" ? "#f87171" : "#888";
+                    const sizing = premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : premarketRegime === "SHOCK" ? "0%" : "—";
+                    const topSc = premarketTopScorePct;
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("regime", premarketRegime || "—", regCol, "Regime di mercato attuale")}
+                        {mc("sizing", sizing, regCol, "Sizing % applicato al regime")}
+                        {mc("shortlist", String(premarketShortlistCount), premarketShortlistCount > 0 ? "#4ade80" : "#888", "Candidati in shortlist")}
+                        {mc("pronti", String(premarketReadyCount), premarketReadyCount > 0 ? "#4ade80" : "#888", "Candidati pronti da presentare")}
+                        {mc("top score", topSc != null ? `${topSc.toFixed(0)}/100` : "—", topSc != null && topSc >= 65 ? "#4ade80" : topSc != null && topSc >= 50 ? "#fbbf24" : "#888", "Score candidato #1")}
+                        {mc("P1 vol", preP1 != null ? preP1.toFixed(1) : "—", preP1 != null && preP1 >= 6.5 ? "#4ade80" : "#fbbf24", "Pilastro 1: IVR/premium")}
+                        {mc("P2 liq", preP2 != null ? preP2.toFixed(1) : "—", preP2 != null && preP2 >= 6.5 ? "#4ade80" : "#fbbf24", "Pilastro 2: OI/spread")}
+                        {mc("P3 rr", preP3 != null ? preP3.toFixed(1) : "—", preP3 != null && preP3 >= 6.5 ? "#4ade80" : "#fbbf24", "Pilastro 3: Risk/reward")}
+                      </div>
+                    );
+                  })()}
                   <div className="lc-panel-title">Regime di mercato</div>
                   <div className={`lc-regime-big ${premarketRegime.toLowerCase() === "normal" ? "normal" : premarketRegime.toLowerCase() === "caution" ? "caution" : premarketRegime.toLowerCase() === "shock" ? "shock" : "unknown"}`}>
                     {premarketRegime}
                   </div>
                   <div style={{fontSize:"0.62rem", color:"var(--dim)", marginBottom:12}}>
                     {regimeCurrent?.n_recent ?? 0} sessioni analizzate · sizing {premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : premarketRegime === "SHOCK" ? "0%" : "—"}
-                  </div>
-                  <div className="lc-kpi-grid">
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Shortlist</div>
-                      <div className="lc-kpi-value sev-data">{premarketShortlistCount}</div>
-                      <div className="lc-kpi-sub">pronti: {premarketReadyCount}</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Top score</div>
-                      <div className={`lc-kpi-value ${premarketTopScorePct !== null && premarketTopScorePct >= 65 ? "sev-ok" : "sev-warn"}`}>
-                        {premarketTopScorePct !== null ? `${premarketTopScorePct.toFixed(0)}/100` : "N/D"}
-                      </div>
-                      <div className="lc-kpi-sub">candidato #1</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">P1 Vol edge</div>
-                      <div className={`lc-kpi-value ${preP1 !== null && preP1 >= 6.5 ? "sev-ok" : "sev-warn"}`}>{preP1 !== null ? preP1.toFixed(1) : "—"}</div>
-                      <div className="lc-kpi-sub">IVR / premium</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">P2 Liquidità</div>
-                      <div className={`lc-kpi-value ${preP2 !== null && preP2 >= 6.5 ? "sev-ok" : "sev-warn"}`}>{preP2 !== null ? preP2.toFixed(1) : "—"}</div>
-                      <div className="lc-kpi-sub">OI / spread</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">P3 Risk/reward</div>
-                      <div className={`lc-kpi-value ${preP3 !== null && preP3 >= 6.5 ? "sev-ok" : "sev-warn"}`}>{preP3 !== null ? preP3.toFixed(1) : "—"}</div>
-                      <div className="lc-kpi-sub">payoff struttura</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">P4 Regime align</div>
-                      <div className={`lc-kpi-value ${preP4 !== null && preP4 >= 6.5 ? "sev-ok" : "sev-warn"}`}>{preP4 !== null ? preP4.toFixed(1) : "—"}</div>
-                      <div className="lc-kpi-sub">coerenza regime</div>
-                    </div>
                   </div>
                   {premarketRows.length > 0 && (
                     <div style={{marginTop:14}}>
@@ -2829,11 +2792,33 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 5 — BRIEFING</span>
-                <span className="lc-step-title">Operatore pronto all'apertura</span>
                 <span className="lc-step-sub">10 min prima del mercato</span>
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
+                  {/* ── micro-card strip ── */}
+                  {(() => {
+                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+                      </div>
+                    );
+                    const regCol = premarketRegime === "NORMAL" ? "#4ade80" : premarketRegime === "CAUTION" ? "#fbbf24" : "#f87171";
+                    const netliq = ibkrAccount?.net_liquidation;
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("scheduler", sessionStatus?.enabled ? "ON" : "OFF", sessionStatus?.enabled ? "#4ade80" : "#888", "Scheduler sessioni attivo")}
+                        {mc("IBKR", ibkrStatus?.connected ? "LIVE" : "OFF", ibkrStatus?.connected ? "#4ade80" : "#f87171", "Connessione IBKR")}
+                        {mc("regime", premarketRegime || "—", regCol, "Regime di mercato")}
+                        {mc("segnali", String(premarketReadyCount), premarketReadyCount > 0 ? "#4ade80" : "#888", "Segnali pronti da presentare")}
+                        {mc("exit urg.", String(urgentExits.length), urgentExits.length > 0 ? "#fbbf24" : "#4ade80", "Exit urgenti (score ≥5)")}
+                        {mc("wheel pos", String(wheelPositions?.positions?.length ?? 0), (wheelPositions?.positions?.length ?? 0) > 0 ? "#60a5fa" : "#888", "Posizioni wheel attive")}
+                        {mc("net liq", netliq != null ? `€${netliq.toLocaleString("it-IT",{maximumFractionDigits:0})}` : "—", "#4ade80", "Net liquidation conto IBKR")}
+                        {mc("kill sw.", sysStatus?.kill_switch_active ? "ATTIVO" : "off", sysStatus?.kill_switch_active ? "#f87171" : "#4ade80", "Kill switch stato")}
+                      </div>
+                    );
+                  })()}
                   <div className="lc-panel-title">Checklist apertura</div>
                   <ul className="lc-checklist">
                     <li className={`lc-check-item ${sessionStatus?.enabled ? "pass" : "fail"}`}>
@@ -2872,33 +2857,6 @@ export default function App() {
                       <span className="lc-check-val">{sysStatus?.kill_switch_active ? "ATTIVO — blocca ordini" : "OFF"}</span>
                     </li>
                   </ul>
-                  <div style={{marginTop:14}}>
-                    <div className="lc-panel-title">Posizioni aperte</div>
-                    <div className="lc-kpi-grid">
-                      <div className="lc-kpi-item">
-                        <div className="lc-kpi-label">Exit urgenti</div>
-                        <div className={`lc-kpi-value ${urgentExits.length > 0 ? "sev-warn" : "sev-ok"}`}>{urgentExits.length}</div>
-                        <div className="lc-kpi-sub">score ≥ 5</div>
-                      </div>
-                      <div className="lc-kpi-item">
-                        <div className="lc-kpi-label">Wheel posizioni</div>
-                        <div className="lc-kpi-value sev-data">{wheelPositions?.positions?.length ?? 0}</div>
-                        <div className="lc-kpi-sub">attive</div>
-                      </div>
-                      <div className="lc-kpi-item">
-                        <div className="lc-kpi-label">Net Liq</div>
-                        <div className="lc-kpi-value sev-ok">
-                          {ibkrAccount?.net_liquidation != null ? `€${ibkrAccount.net_liquidation.toLocaleString("it-IT", {maximumFractionDigits:0})}` : "N/D"}
-                        </div>
-                        <div className="lc-kpi-sub">conto IBKR</div>
-                      </div>
-                      <div className="lc-kpi-item">
-                        <div className="lc-kpi-label">Segnali pronti</div>
-                        <div className={`lc-kpi-value ${premarketReadyCount > 0 ? "sev-ok" : "sev-neutral"}`}>{premarketReadyCount}</div>
-                        <div className="lc-kpi-sub">da presentare</div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
                 <div className="lc-screen">
                   <div className="lc-screen-bar">
@@ -3932,11 +3890,33 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 16–20 — WHEEL</span>
-                <span className="lc-step-title">Ciclo della Ruota</span>
                 <span className="lc-step-sub">{wheelAvailable ? (wheelWarning ? "⚠ " + wheelWarning : "✓ Disponibile") : "🔒 Richiede tier SMALL"}</span>
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
+                  {/* ── micro-card strip ── */}
+                  {(() => {
+                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+                      </div>
+                    );
+                    const nPos = wheelPositions?.positions?.length ?? 0;
+                    const totalCycles = (wheelPositions?.positions as any[] ?? []).reduce((s: number, p: any) => s + (p.cycle_count ?? 0), 0);
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("wheel", wheelAvailable ? "ON" : "LOCK", wheelAvailable ? "#4ade80" : "#888", "Wheel strategy disponibile")}
+                        {mc("posizioni", String(nPos), nPos > 0 ? "#60a5fa" : "#888", "Posizioni wheel attive")}
+                        {mc("tier", tierInfo?.active_mode ?? "—", "#888", "Tier attivo (richiede SMALL)")}
+                        {mc("kelly", sysStatus?.kelly_enabled ? "LIVE" : "LOCK", sysStatus?.kelly_enabled ? "#4ade80" : "#888", "Kelly sizing gate")}
+                        {mc("trades val.", String(paperSummary?.trades ?? 0), (paperSummary?.trades ?? 0) >= 50 ? "#4ade80" : "#fbbf24", "Trade validati paper")}
+                        {mc("sharpe", fmtNum(paperSummary?.sharpe_annualized ?? null), (paperSummary?.sharpe_annualized ?? 0) >= 0.6 ? "#4ade80" : "#fbbf24", "Sharpe annualizzato (soglia 0.6)")}
+                        {mc("win rate", fmtPct(paperSummary?.win_rate ?? null), (paperSummary?.win_rate ?? 0) >= 0.5 ? "#4ade80" : "#fbbf24", "Win rate paper")}
+                        {mc("cicli tot.", String(totalCycles), totalCycles > 0 ? "#60a5fa" : "#888", "Cicli wheel completati totali")}
+                      </div>
+                    );
+                  })()}
                   <div className="lc-panel-title">Stato macchina — 5 fasi</div>
                   <div className="lc-wheel-states">
                     {(["IDLE","OPEN_CSP","ASSIGNED","OPEN_CC","CLOSED"] as const).map(state => {
@@ -3968,30 +3948,7 @@ export default function App() {
                       ))}
                     </div>
                   ) : (
-                    <div style={{marginTop:14}}>
-                      <div className="lc-kpi-grid">
-                        <div className="lc-kpi-item">
-                          <div className="lc-kpi-label">Disponibilità</div>
-                          <div className={`lc-kpi-value ${wheelAvailable ? "sev-ok" : "sev-warn"}`}>{wheelAvailable ? "ON" : "LOCK"}</div>
-                          <div className="lc-kpi-sub">{tierInfo?.active_mode ?? "—"}</div>
-                        </div>
-                        <div className="lc-kpi-item">
-                          <div className="lc-kpi-label">Posizioni</div>
-                          <div className="lc-kpi-value sev-neutral">0</div>
-                          <div className="lc-kpi-sub">nessuna aperta</div>
-                        </div>
-                        <div className="lc-kpi-item">
-                          <div className="lc-kpi-label">Tier</div>
-                          <div className="lc-kpi-value sev-data" style={{fontSize:"0.75rem"}}>{tierInfo?.active_mode ?? "N/D"}</div>
-                          <div className="lc-kpi-sub">richiede SMALL</div>
-                        </div>
-                        <div className="lc-kpi-item">
-                          <div className="lc-kpi-label">Kelly</div>
-                          <div className={`lc-kpi-value ${blk("kelly_sizing").visible ? "sev-ok" : "sev-neutral"}`}>{blk("kelly_sizing").visible ? "LIVE" : "LOCK"}</div>
-                          <div className="lc-kpi-sub">sizing gate</div>
-                        </div>
-                      </div>
-                    </div>
+                    <div style={{marginTop:8, fontSize:"0.65rem", color:"var(--dim)"}}>Nessuna posizione wheel attiva.</div>
                   )}
                 </div>
                 <div className="lc-screen">
@@ -4022,55 +3979,36 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 21–22 — METRICHE</span>
-                <span className="lc-step-title">Portfolio e Tier Roadmap</span>
                 {paperSummary?.as_of_date && <span className="lc-step-sub">as of {paperSummary.as_of_date}</span>}
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
-                  <div className="lc-panel-title">Portfolio — snapshot operativo</div>
-                  <div className="lc-kpi-grid">
-                    <div className="lc-kpi-item full">
-                      <div className="lc-kpi-label">Net Liquidation</div>
-                      <div className="lc-kpi-value big sev-ok">
-                        {ibkrAccount?.net_liquidation != null ? `€${ibkrAccount.net_liquidation.toLocaleString("it-IT", {maximumFractionDigits:0})}` : "N/D"}
+                  {/* ── micro-card strip (no overlap con KPI MONITOR) ── */}
+                  {(() => {
+                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
                       </div>
-                      <div className="lc-kpi-sub">conto IBKR · {_agoLabel(ibkrAccountFetchedAt)}</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Win rate</div>
-                      <div className="lc-kpi-value sev-data">{fmtPct(paperSummary?.win_rate ?? null)}</div>
-                      <div className="lc-kpi-sub">{paperSummary?.trades ?? 0} trade</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Sharpe ann.</div>
-                      <div className={`lc-kpi-value ${(paperSummary?.sharpe_annualized ?? 0) >= 0.6 ? "sev-ok" : "sev-warn"}`}>
-                        {fmtNum(paperSummary?.sharpe_annualized ?? null)}
+                    );
+                    const pnl = paperSummary?.pnl_cumulative;
+                    const eqPts = paperSummary?.equity_points ?? 0;
+                    const j = f6t2Gate ? (f6t2Gate.completeness_ratio * 100) : null;
+                    const slip = paperSummary?.avg_slippage_ticks;
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("P&L cum.", pnl != null ? `€${pnl.toFixed(0)}` : "—", pnl != null && pnl >= 0 ? "#4ade80" : "#f87171", "P&L cumulato paper")}
+                        {mc("equity pts", String(eqPts), eqPts > 10 ? "#4ade80" : "#fbbf24", "Punti equity snapshot registrati")}
+                        {mc("journal%", j != null ? `${j.toFixed(0)}%` : "—", j != null && j >= 95 ? "#4ade80" : "#fbbf24", "Completezza journal F6-T2")}
+                        {mc("go/no-go", goGate?.pass ? "GO ✓" : "NO-GO", goGate?.pass ? "#4ade80" : "#f87171", "Gate Go/No-Go")}
+                        {mc("data mode", dataModeUpper || "N/D", hasRealData ? "#4ade80" : "#888", "DATA_MODE watermark")}
+                        {mc("slippage", slip != null ? `${slip.toFixed(1)}t` : "—", slip != null && slip <= 2 ? "#4ade80" : "#fbbf24", "Slippage medio (tick, soglia ≤2)")}
+                        {mc("net liq", ibkrAccount?.net_liquidation != null ? `€${ibkrAccount.net_liquidation.toLocaleString("it-IT",{maximumFractionDigits:0})}` : "—", "#4ade80", "Net liquidation IBKR")}
+                        {mc("tier", tierInfo?.active_mode ?? "—", "#888", "Tier operativo attivo")}
                       </div>
-                      <div className="lc-kpi-sub">soglia 0.6</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Max drawdown</div>
-                      <div className={`lc-kpi-value ${ddHealth === "alert" ? "sev-error" : ddHealth === "warn" ? "sev-warn" : "sev-ok"}`}>
-                        {fmtPct(paperSummary?.max_drawdown ?? null)}
-                      </div>
-                      <div className="lc-kpi-sub">limite 15%</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Profit factor</div>
-                      <div className={`lc-kpi-value ${(paperSummary?.profit_factor ?? 0) >= 1.5 ? "sev-ok" : "sev-warn"}`}>
-                        {fmtNum(paperSummary?.profit_factor ?? null)}
-                      </div>
-                      <div className="lc-kpi-sub">soglia 1.5</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Avg slippage</div>
-                      <div className={`lc-kpi-value ${(paperSummary?.avg_slippage_ticks ?? 0) <= 2 ? "sev-ok" : "sev-warn"}`}>
-                        {fmtNum(paperSummary?.avg_slippage_ticks ?? null)}
-                      </div>
-                      <div className="lc-kpi-sub">ticks</div>
-                    </div>
-                  </div>
-                  <div style={{marginTop:14}}>
+                    );
+                  })()}
+                  <div style={{marginTop:8}}>
                     <div className="lc-panel-title">Tier roadmap</div>
                     {([
                       {name:"MICRO", range:"€1k–2k", req:"R0+R1+R1B+R2", active: tierInfo?.active_mode === "MICRO"},
@@ -4119,37 +4057,38 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">BACKTEST — STORICO</span>
-                <span className="lc-step-title">Paper Closed Trades e WFA</span>
                 {paperSummary?.as_of_date && <span className="lc-step-sub">as of {paperSummary.as_of_date}</span>}
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
+                  {/* ── micro-card strip ── */}
+                  {(() => {
+                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+                      </div>
+                    );
+                    const rdy = historyReadiness;
+                    const rdyPct = rdy ? rdy.score_pct : null;
+                    const viols = paperSummary?.compliance_violations ?? 0;
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("readiness%", rdyPct != null ? `${rdyPct.toFixed(0)}%` : "—", rdyPct != null && rdyPct >= 100 ? "#4ade80" : rdyPct != null && rdyPct >= 50 ? "#fbbf24" : "#888", "Score history readiness")}
+                        {mc("giorni", rdy ? `${rdy.days_observed}/${rdy.target_days}` : "—", rdy && rdy.days_observed >= rdy.target_days ? "#4ade80" : "#fbbf24", "Giorni osservati su target")}
+                        {mc("trade chiusi", String(paperSummary?.trades ?? 0), (paperSummary?.trades ?? 0) >= 50 ? "#4ade80" : "#fbbf24", "Trade chiusi su 50 per Kelly")}
+                        {mc("qualità", dataQualityPct != null ? `${dataQualityPct}%` : "—", (dataQualityPct ?? 0) >= 95 ? "#4ade80" : "#fbbf24", "Qualità dati (soglia 95%)")}
+                        {mc("sharpe", fmtNum(paperSummary?.sharpe_annualized ?? null), (paperSummary?.sharpe_annualized ?? 0) >= 0.6 ? "#4ade80" : "#fbbf24", "Sharpe annualizzato (soglia 0.6)")}
+                        {mc("max DD", fmtPct(paperSummary?.max_drawdown ?? null), ddHealth === "alert" ? "#f87171" : ddHealth === "warn" ? "#fbbf24" : "#4ade80", "Max drawdown (limite 15%)")}
+                        {mc("profit f.", fmtNum(paperSummary?.profit_factor ?? null), (paperSummary?.profit_factor ?? 0) >= 1.5 ? "#4ade80" : "#fbbf24", "Profit factor (soglia 1.5)")}
+                        {mc("violations", String(viols), viols > 0 ? "#fbbf24" : "#4ade80", "Compliance violations")}
+                      </div>
+                    );
+                  })()}
                   <div className="lc-panel-title">History readiness — Kelly gate progress</div>
                   {historyReadiness ? (
                     <>
-                      <div className="lc-kpi-grid">
-                        <div className="lc-kpi-item">
-                          <div className="lc-kpi-label">Score readiness</div>
-                          <div className={`lc-kpi-value ${historyReadiness.ready ? "sev-ok" : "sev-warn"}`}>{historyReadiness.score_pct.toFixed(1)}%</div>
-                          <div className="lc-kpi-sub">{historyReadiness.ready ? "PRONTO" : historyEtaLabel}</div>
-                        </div>
-                        <div className="lc-kpi-item">
-                          <div className="lc-kpi-label">Giorni osservati</div>
-                          <div className="lc-kpi-value sev-data">{historyReadiness.days_observed}</div>
-                          <div className="lc-kpi-sub">su {historyReadiness.target_days} target</div>
-                        </div>
-                        <div className="lc-kpi-item">
-                          <div className="lc-kpi-label">Trade chiusi</div>
-                          <div className="lc-kpi-value sev-data">{paperSummary?.trades ?? 0}</div>
-                          <div className="lc-kpi-sub">su 50 per Kelly</div>
-                        </div>
-                        <div className="lc-kpi-item">
-                          <div className="lc-kpi-label">Qualità dati</div>
-                          <div className={`lc-kpi-value ${(dataQualityPct ?? 0) >= 95 ? "sev-ok" : "sev-warn"}`}>{dataQualityPct !== null ? `${dataQualityPct}%` : "N/D"}</div>
-                          <div className="lc-kpi-sub">soglia 95%</div>
-                        </div>
-                      </div>
-                      <div className="lc-progress-wrap" style={{marginTop:12}}>
+                      <div className="lc-progress-wrap" style={{marginTop:8}}>
                         <div className="lc-panel-title">Completamento</div>
                         <div className="lc-progress-track">
                           <div className={`lc-progress-fill ${historyReadiness.ready ? "ok" : "warn"}`} style={{width:`${Math.min(100, historyReadiness.score_pct)}%`}}/>
@@ -4169,31 +4108,6 @@ export default function App() {
                   ) : (
                     <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>History readiness non disponibile</div>
                   )}
-                  <div style={{marginTop:14}}>
-                    <div className="lc-panel-title">Metriche paper closed</div>
-                    <div className="lc-kpi-grid">
-                      <div className="lc-kpi-item">
-                        <div className="lc-kpi-label">Sharpe ann.</div>
-                        <div className={`lc-kpi-value ${(paperSummary?.sharpe_annualized ?? 0) >= 0.6 ? "sev-ok" : "sev-warn"}`}>{fmtNum(paperSummary?.sharpe_annualized ?? null)}</div>
-                        <div className="lc-kpi-sub">soglia 0.6</div>
-                      </div>
-                      <div className="lc-kpi-item">
-                        <div className="lc-kpi-label">Max drawdown</div>
-                        <div className={`lc-kpi-value ${ddHealth === "alert" ? "sev-error" : ddHealth === "warn" ? "sev-warn" : "sev-ok"}`}>{fmtPct(paperSummary?.max_drawdown ?? null)}</div>
-                        <div className="lc-kpi-sub">limite 15%</div>
-                      </div>
-                      <div className="lc-kpi-item">
-                        <div className="lc-kpi-label">Profit factor</div>
-                        <div className={`lc-kpi-value ${(paperSummary?.profit_factor ?? 0) >= 1.5 ? "sev-ok" : "sev-warn"}`}>{fmtNum(paperSummary?.profit_factor ?? null)}</div>
-                        <div className="lc-kpi-sub">soglia 1.5</div>
-                      </div>
-                      <div className="lc-kpi-item">
-                        <div className="lc-kpi-label">Violations</div>
-                        <div className={`lc-kpi-value ${(paperSummary?.compliance_violations ?? 0) > 0 ? "sev-warn" : "sev-ok"}`}>{paperSummary?.compliance_violations ?? 0}</div>
-                        <div className="lc-kpi-sub">compliance</div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
                 <div className="lc-screen">
                   <div className="lc-screen-bar">
@@ -4231,11 +4145,35 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 23 — CHIUSURA</span>
-                <span className="lc-step-title">Sessione EOD</span>
                 <span className="lc-step-sub">{sessionStatus?.running ? "⟳ SESSIONE IN CORSO" : sessionStatus?.last_eod ? `Ultima EOD: ${sessionStatus.last_eod.slice(0,16).replace("T"," ")}` : "Nessuna EOD registrata"}</span>
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
+                  {/* ── micro-card strip ── */}
+                  {(() => {
+                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+                      </div>
+                    );
+                    const eqSnap = paperSummary?.gates.data_points.equity_snapshots ?? 0;
+                    const jComp = f6t2Gate ? (f6t2Gate.completeness_ratio * 100) : null;
+                    const nextMorn = sessionStatus?.next_morning ? sessionStatus.next_morning.slice(11,16) : "—";
+                    const nextEod = sessionStatus?.next_eod ? sessionStatus.next_eod.slice(11,16) : "—";
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("scheduler", sessionStatus?.enabled ? "ON" : "OFF", sessionStatus?.enabled ? "#4ade80" : "#888", "Scheduler sessioni")}
+                        {mc("running", sessionStatus?.running ? "YES" : "NO", sessionStatus?.running ? "#fbbf24" : "#4ade80", "Sessione in esecuzione")}
+                        {mc("compliance", String(paperSummary?.compliance_violations ?? 0), (paperSummary?.compliance_violations ?? 0) > 0 ? "#fbbf24" : "#4ade80", "Compliance violations")}
+                        {mc("journal%", jComp != null ? `${jComp.toFixed(0)}%` : "—", jComp != null && jComp >= 95 ? "#4ade80" : "#fbbf24", "Completezza journal")}
+                        {mc("eq snap.", String(eqSnap), eqSnap > 0 ? "#4ade80" : "#888", "Equity snapshots registrati")}
+                        {mc("next morn.", nextMorn, "#888", "Prossima sessione morning (UTC ora)")}
+                        {mc("next EOD", nextEod, "#888", "Prossima sessione EOD (UTC ora)")}
+                        {mc("kill sw.", sysStatus?.kill_switch_active ? "ATTIVO" : "off", sysStatus?.kill_switch_active ? "#f87171" : "#4ade80", "Kill switch stato")}
+                      </div>
+                    );
+                  })()}
                   <div className="lc-panel-title">Checklist EOD</div>
                   <ul className="lc-checklist">
                     <li className={`lc-check-item ${sessionStatus?.enabled ? "pass" : "warn"}`}>
@@ -4264,28 +4202,6 @@ export default function App() {
                       <span className="lc-check-val">{sysStatus?.kill_switch_active ? "ATTIVO" : "off"}</span>
                     </li>
                   </ul>
-                  <div className="lc-kpi-grid" style={{marginTop:14}}>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Scheduler</div>
-                      <div className={`lc-kpi-value ${sessionStatus?.enabled ? "sev-ok" : "sev-neutral"}`}>{sessionStatus?.enabled ? "ON" : "OFF"}</div>
-                      <div className="lc-kpi-sub">session engine</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Running</div>
-                      <div className={`lc-kpi-value ${sessionStatus?.running ? "sev-warn" : "sev-ok"}`}>{sessionStatus?.running ? "YES" : "NO"}</div>
-                      <div className="lc-kpi-sub">stato attuale</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Prossima morning</div>
-                      <div className="lc-kpi-value sev-meta" style={{fontSize:"0.65rem"}}>{sessionStatus?.next_morning ? sessionStatus.next_morning.slice(0,16).replace("T"," ") : "N/D"}</div>
-                      <div className="lc-kpi-sub">UTC</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Prossima EOD</div>
-                      <div className="lc-kpi-value sev-meta" style={{fontSize:"0.65rem"}}>{sessionStatus?.next_eod ? sessionStatus.next_eod.slice(0,16).replace("T"," ") : "N/D"}</div>
-                      <div className="lc-kpi-sub">UTC</div>
-                    </div>
-                  </div>
                 </div>
                 <div className="lc-screen">
                   <div className="lc-screen-bar">
@@ -4319,11 +4235,33 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 24 — REPORT</span>
-                <span className="lc-step-title">Consolidamento e Stato Release</span>
                 {paperSummary?.as_of_date && <span className="lc-step-sub">as of {paperSummary.as_of_date} · window {paperSummary.window_days}g</span>}
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
+                  {/* ── micro-card strip ── */}
+                  {(() => {
+                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+                      </div>
+                    );
+                    const pnl = paperSummary?.pnl_cumulative;
+                    const jComp = f6t2Gate ? (f6t2Gate.completeness_ratio * 100) : null;
+                    return (
+                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
+                        {mc("P&L cum.", pnl != null ? `€${pnl.toFixed(0)}` : "—", pnl != null && pnl >= 0 ? "#4ade80" : "#f87171", "P&L cumulato paper")}
+                        {mc("win rate", fmtPct(paperSummary?.win_rate ?? null), (paperSummary?.win_rate ?? 0) >= 0.5 ? "#4ade80" : "#fbbf24", "Win rate paper")}
+                        {mc("sharpe", fmtNum(paperSummary?.sharpe_annualized ?? null), (paperSummary?.sharpe_annualized ?? 0) >= 0.6 ? "#4ade80" : "#fbbf24", "Sharpe annualizzato")}
+                        {mc("max DD", fmtPct(paperSummary?.max_drawdown ?? null), ddHealth === "alert" ? "#f87171" : ddHealth === "warn" ? "#fbbf24" : "#4ade80", "Max drawdown (limite 15%)")}
+                        {mc("profit f.", fmtNum(paperSummary?.profit_factor ?? null), (paperSummary?.profit_factor ?? 0) >= 1.5 ? "#4ade80" : "#fbbf24", "Profit factor (soglia 1.5)")}
+                        {mc("go/no-go", goGate?.pass ? "GO ✓" : "NO-GO", goGate?.pass ? "#4ade80" : "#f87171", "Gate Go/No-Go")}
+                        {mc("data mode", dataModeUpper || "N/D", hasRealData ? "#4ade80" : "#888", "DATA_MODE watermark")}
+                        {mc("journal%", jComp != null ? `${jComp.toFixed(0)}%` : "—", jComp != null && jComp >= 95 ? "#4ade80" : "#fbbf24", "Completezza journal F6-T2")}
+                      </div>
+                    );
+                  })()}
                   <div className="lc-panel-title">Gate di sistema</div>
                   <ul className="lc-checklist">
                     <li className={`lc-check-item ${goGate?.pass ? "pass" : "fail"}`}>
@@ -4347,35 +4285,6 @@ export default function App() {
                       <span className="lc-check-val">{historyReadiness ? `${historyReadiness.score_pct.toFixed(0)}% · ${historyEtaLabel}` : "N/D"}</span>
                     </li>
                   </ul>
-                  <div className="lc-kpi-grid" style={{marginTop:14}}>
-                    <div className="lc-kpi-item full">
-                      <div className="lc-kpi-label">P&L cumulato</div>
-                      <div className={`lc-kpi-value big ${(paperSummary?.pnl_cumulative ?? 0) >= 0 ? "sev-ok" : "sev-error"}`}>
-                        {paperSummary?.pnl_cumulative != null ? `€${paperSummary.pnl_cumulative.toFixed(0)}` : "N/D"}
-                      </div>
-                      <div className="lc-kpi-sub">paper · {paperSummary?.trades ?? 0} trade · win rate {fmtPct(paperSummary?.win_rate ?? null)}</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Sharpe ann.</div>
-                      <div className={`lc-kpi-value ${(paperSummary?.sharpe_annualized ?? 0) >= 0.6 ? "sev-ok" : "sev-warn"}`}>{fmtNum(paperSummary?.sharpe_annualized ?? null)}</div>
-                      <div className="lc-kpi-sub">soglia 0.6</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Max DD</div>
-                      <div className={`lc-kpi-value ${ddHealth === "alert" ? "sev-error" : ddHealth === "warn" ? "sev-warn" : "sev-ok"}`}>{fmtPct(paperSummary?.max_drawdown ?? null)}</div>
-                      <div className="lc-kpi-sub">limite 15%</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Release note</div>
-                      <div className={`lc-kpi-value ${releaseMd ? "sev-ok" : "sev-neutral"}`} style={{fontSize:"0.7rem"}}>{releaseMd ? "PRESENTE" : "N/D"}</div>
-                      <div className="lc-kpi-sub">status doc</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">DATA_MODE</div>
-                      <div className={`lc-kpi-value ${hasRealData ? "sev-ok" : "sev-neutral"}`} style={{fontSize:"0.68rem"}}>{dataModeUpper || "N/D"}</div>
-                      <div className="lc-kpi-sub">watermark</div>
-                    </div>
-                  </div>
                   {f6t2Gate && Object.keys(f6t2Gate.required_missing ?? {}).length > 0 && (
                     <div style={{marginTop:12}}>
                       <div className="lc-panel-title" style={{color:"var(--amber)"}}>Campi journal mancanti</div>
