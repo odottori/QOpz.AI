@@ -822,6 +822,7 @@ export default function App() {
   const [execWindowOpen, setExecWindowOpen] = useState<boolean>(false);  // collassato di default
   const [dumpOpen, setDumpOpen] = useState<boolean>(false);              // DUMP block collassato di default
   const [scoreFilter, setScoreFilter] = useState<"all"|"high"|"mid"|"low">("all"); // filtro segnali per soglia score
+  const [kpiExpanded, setKpiExpanded] = useState<string|null>(null); // blocco KPI espanso nel tab TRADING
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [leftKellyOpen, setLeftKellyOpen] = useState<boolean>(false);
   const [leftPhaseOpen, setLeftPhaseOpen] = useState<boolean>(false);
@@ -2892,6 +2893,89 @@ export default function App() {
                   Go/No-Go: {goGate?.pass ? "✓ GO" : "✗ NO-GO"} · Kill switch: {sysStatus?.kill_switch_active ? "🛑 ON" : "off"}
                 </span>
               </div>
+              {/* ══ KPI BAR — blocchi operativi, cliccabili ══ */}
+              {(() => {
+                const kpiToggle = (id: string) => setKpiExpanded(v => v === id ? null : id);
+                const kpiCard = (
+                  id: string,
+                  label: string,
+                  value: React.ReactNode,
+                  sub: string,
+                  subTooltip: string,
+                  accent: string,
+                  detail: React.ReactNode | null,
+                ) => {
+                  const open = kpiExpanded === id;
+                  return (
+                    <div key={id} onClick={() => detail && kpiToggle(id)}
+                      style={{
+                        background:"var(--p2)", border:`1px solid ${open ? accent + "55" : "var(--border)"}`,
+                        borderRadius:4, padding:"7px 10px", minWidth:100, flex:"1 1 auto",
+                        cursor: detail ? "pointer" : "default",
+                        transition:"border-color 0.15s",
+                        position:"relative",
+                      }}>
+                      <div style={{fontSize:"0.58rem", color:"#555", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2}}>{label}</div>
+                      <div style={{fontSize:"1rem", fontWeight:700, color: accent, lineHeight:1.1, marginBottom:2}}>{value}</div>
+                      <div style={{fontSize:"0.58rem", color:"#555"}} title={subTooltip}>{sub}{detail ? <span style={{marginLeft:4, color:"#333"}}>{open ? "▲" : "▼"}</span> : null}</div>
+                      {open && detail && (
+                        <div onClick={e => e.stopPropagation()}
+                          style={{marginTop:8, paddingTop:8, borderTop:"1px solid #222", fontSize:"0.65rem", color:"var(--dim)"}}>
+                          {detail}
+                        </div>
+                      )}
+                    </div>
+                  );
+                };
+                return (
+                  <div style={{display:"flex", gap:6, padding:"8px 12px 6px", flexWrap:"wrap", borderBottom:"1px solid var(--border)"}}>
+                    {kpiCard(
+                      "gate", "Gate Go/No-Go",
+                      goGate?.pass ? "GO ✓" : "NO-GO",
+                      "accesso mercato", "Autorizzazione sistema ad operare. FAIL blocca nuovi ordini.",
+                      goGate?.pass ? "#4ade80" : "#f87171",
+                      goGate && !goGate.pass && goGate.reasons.length > 0
+                        ? <>{goGate.reasons.map((r,i) => <div key={i}>· {r}</div>)}</>
+                        : goGate?.pass ? <div style={{color:"#4ade80"}}>Tutti i controlli superati</div> : null,
+                    )}
+                    {kpiCard(
+                      "regime", "Regime · Sizing",
+                      premarketRegime ?? "—",
+                      premarketRegime === "NORMAL" ? "sizing 100%" : premarketRegime === "CAUTION" ? "sizing 50%" : premarketRegime === "SHOCK" ? "sizing 0%" : "—",
+                      "Stato di mercato rilevato dal classificatore HMM. CAUTION dimezza il sizing. SHOCK blocca tutto.",
+                      premarketRegime === "NORMAL" ? "#4ade80" : premarketRegime === "CAUTION" ? "#fbbf24" : "#f87171",
+                      <><div>NORMAL → sizing 100%, tutte le strategie</div><div>CAUTION → sizing 50%, solo spread stretti</div><div>SHOCK → sizing 0%, nessun nuovo trade</div></>,
+                    )}
+                    {kpiCard(
+                      "exits", "Exit urgenti",
+                      urgentExits.length,
+                      urgentExits.length > 0 ? "attenzione richiesta" : "nessuna azione",
+                      "Posizioni che superano la soglia di score di uscita (≥5). Richiedono revisione immediata.",
+                      urgentExits.length > 0 ? "#fbbf24" : "#4ade80",
+                      urgentExits.length > 0
+                        ? <>{urgentExits.map((c,i) => <div key={i}>{c.symbol} {c.right ?? ""} {c.strike ?? ""} — score {c.exit_score}</div>)}</>
+                        : null,
+                    )}
+                    {kpiCard(
+                      "trades", "Trades chiusi",
+                      sysStatus?.n_closed_trades ?? 0,
+                      "paper journal",
+                      "Numero di operazioni chiuse nel journal di paper trading. Soglia Kelly: 50 trade.",
+                      "#60a5fa",
+                      <><div>Kelly gate: {(sysStatus?.n_closed_trades ?? 0) >= 50 ? "✓ sbloccato" : `✗ servono ancora ${50 - (sysStatus?.n_closed_trades ?? 0)} trade`}</div><div style={{marginTop:4}}>Per dettagli → tab METRICHE</div></>,
+                    )}
+                    {kpiCard(
+                      "finestra", "Finestra operativa",
+                      "10:00–11:30",
+                      "evita 09:30–09:45",
+                      "Fascia oraria ottimale per l'esecuzione (EST). Evitare i primi 15 min di apertura per spread più ampi.",
+                      "#a78bfa",
+                      <><div>Fascia ottimale: 10:00–11:30 EST</div><div>Evitare: 09:30–09:45 (apertura)</div><div>Seconda finestra: 14:00–15:00 EST</div></>,
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="lc-body">
                 <div className="lc-panel" style={{overflowY:"auto"}}>
                   {/* ── Segnali candidati ── */}
@@ -3040,43 +3124,6 @@ export default function App() {
                     </div>
                     );
                   })()}
-
-                  {/* ── Exit urgenti ── */}
-                  {urgentExits.length > 0 && (
-                    <div style={{marginTop:10}}>
-                      <div className="lc-panel-title" style={{color:"var(--amber)"}}>Exit urgenti 🚨 ({urgentExits.length})</div>
-                      {urgentExits.map((c, i) => (
-                        <div key={i} className="lc-candidate-row">
-                          <span className="lc-candidate-rank" style={{color:"var(--red)"}}>!</span>
-                          <span className="lc-candidate-sym" style={{flex:1}}>{c.symbol} <span style={{color:"var(--dim)", fontSize:"0.6rem"}}>{c.right ?? ""} {c.strike ?? ""}</span></span>
-                          <span className="lc-badge warn">exit {c.exit_score}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="lc-kpi-grid" style={{marginTop:10}}>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Gate Go/No-Go</div>
-                      <div className={`lc-kpi-value ${goGate?.pass ? "sev-ok" : "sev-error"}`}>{goGate?.pass ? "GO ✓" : "NO-GO"}</div>
-                      <div className="lc-kpi-sub">accesso mercato</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Trades chiusi</div>
-                      <div className="lc-kpi-value sev-data">{sysStatus?.n_closed_trades ?? 0}</div>
-                      <div className="lc-kpi-sub">paper journal</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Exit urgenti</div>
-                      <div className={`lc-kpi-value ${urgentExits.length > 0 ? "sev-warn" : "sev-ok"}`}>{urgentExits.length}</div>
-                      <div className="lc-kpi-sub">score ≥ 5</div>
-                    </div>
-                    <div className="lc-kpi-item">
-                      <div className="lc-kpi-label">Finestra</div>
-                      <div className="lc-kpi-value sev-meta" style={{fontSize:"0.68rem"}}>10:00–11:30</div>
-                      <div className="lc-kpi-sub">evita 09:30–45</div>
-                    </div>
-                  </div>
 
                   {/* ── DUMP — tecnico/dev, collassato di default ── */}
                   <div style={{borderTop:"1px solid var(--border)", marginTop:12, paddingTop:8}}>
