@@ -2899,6 +2899,16 @@ export default function App() {
                   <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
                     <span className="lc-panel-title" style={{margin:0}}>
                       SEGNALI — filtri duri + score
+                      <span style={{fontWeight:400, marginLeft:8, fontSize:"0.68rem"}}>
+                        <span style={{color:"#888"}} title="Totale candidati">({premarketRows.length}</span>
+                        <span style={{color:"#555", margin:"0 2px"}}>·</span>
+                        <span style={{color:"#4ade80"}} title="Score ≥65 — ottimi">{premarketRows.filter(c => (c.scorePct ?? 0) >= 65).length}</span>
+                        <span style={{color:"#555", margin:"0 2px"}}>·</span>
+                        <span style={{color:"#fbbf24"}} title="Score 50–64 — usabili">{premarketRows.filter(c => (c.scorePct ?? 0) >= 50 && (c.scorePct ?? 0) < 65).length}</span>
+                        <span style={{color:"#555", margin:"0 2px"}}>·</span>
+                        <span style={{color:"#f87171"}} title="Score <50 — insufficienti">{premarketRows.filter(c => (c.scorePct ?? 0) < 50).length}</span>
+                        <span style={{color:"#888"}}>)</span>
+                      </span>
                     </span>
                     <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}} onClick={refreshAll} disabled={busy}>⟳</button>
                   </div>
