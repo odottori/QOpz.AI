@@ -3244,29 +3244,72 @@ export default function App() {
                     );
                   })()}
 
-                  {/* ── Titolo (identico SEGNALI) ── */}
-                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
-                    <span className="lc-panel-title" style={{margin:0}}>
-                      POSIZIONI — live + storico
-                      <span style={{fontWeight:400, marginLeft:8, fontSize:"0.68rem"}}>
-                        {posTab === "live" ? (
-                          <span style={{color:"#888"}}>({ibkrAccount?.positions.length ?? 0})</span>
-                        ) : (() => {
-                          const filt = storicoTrades.filter(t => {
+                  {/* ── Titolo ── */}
+                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6}}>
+                    <div style={{display:"flex", flexDirection:"column", gap:2, minWidth:0}}>
+                      <span className="lc-panel-title" style={{margin:0}}>
+                        POSIZIONI
+                        {/* contatori (tot/pos/neg/aperti) sempre visibili */}
+                        {(() => {
+                          const byDate = storicoTrades.filter(t => {
                             const d = t.exit_ts_utc?.slice(0,10);
                             return d && (!storicoFrom || d >= storicoFrom) && (!storicoTo || d <= storicoTo);
                           });
-                          return <>
-                            <span style={{color:"#888"}} title="Totale trades chiusi nel periodo">{filt.length}</span>
-                            <span style={{color:"#555", margin:"0 2px"}}>·</span>
-                            <span style={{color:"#4ade80"}} title="PnL ≥ 0">{filt.filter(t=>(t.pnl??0)>=0).length}</span>
-                            <span style={{color:"#555", margin:"0 2px"}}>·</span>
-                            <span style={{color:"#f87171"}} title="PnL < 0">{filt.filter(t=>(t.pnl??0)<0).length}</span>
-                          </>;
+                          const tot  = byDate.length;
+                          const pos  = byDate.filter(t => (t.pnl ?? 0) >= 0).length;
+                          const neg  = byDate.filter(t => (t.pnl ?? 0) <  0).length;
+                          const ape  = storicoTrades.filter(t => !t.exit_ts_utc).length;
+                          const live = ibkrAccount?.positions.length ?? 0;
+                          return (
+                            <span style={{fontWeight:400, marginLeft:6, fontSize:"0.65rem"}}>
+                              <span style={{color:"#555"}}>(</span>
+                              <span style={{color:"#888"}} title="Trades chiusi nel periodo">{tot}</span>
+                              <span style={{color:"#444"}}>/</span>
+                              <span style={{color:"#4ade80"}} title="PnL ≥ 0">{pos}</span>
+                              <span style={{color:"#444"}}>/</span>
+                              <span style={{color:"#f87171"}} title="PnL < 0">{neg}</span>
+                              <span style={{color:"#444"}}>/</span>
+                              <span style={{color:"#fbbf24"}} title="Aperti">{ape}</span>
+                              <span style={{color:"#555"}}>)</span>
+                              {posTab === "live" && live > 0 && (
+                                <span style={{color:"#555"}}> · live({live})</span>
+                              )}
+                            </span>
+                          );
                         })()}
                       </span>
-                    </span>
-                    <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px"}}
+                      {/* sub-line: date range + live status */}
+                      <span style={{fontSize:"0.58rem", color:"var(--dim)", lineHeight:1.3}}>
+                        {(storicoFrom || storicoTo) && (
+                          <span style={{color:"#555", marginRight:6}}>
+                            dal {storicoFrom||"—"} al {storicoTo||"—"}
+                          </span>
+                        )}
+                        {ibkrAccount && (
+                          <span style={{color: ibkrAccount.connected ? "var(--g1)" : "#555"}}>
+                            {ibkrAccount.connected ? "LIVE" : "OFFLINE"}
+                            {ibkrAccount.net_liquidation != null && (
+                              <span style={{color:"#888"}}> · €{ibkrAccount.net_liquidation.toLocaleString("it-IT",{maximumFractionDigits:0})}
+                                {ibkrAccount.positions.length > 0 && ` (${ibkrAccount.positions.length})`}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {storicoSummary && (
+                          <span style={{marginLeft:6, color:"#555"}}>
+                            ROI <span style={{color:(storicoSummary.roi_pct??0)>=0?"#4ade80":"#f87171"}}>
+                              {storicoSummary.roi_pct!=null?`${storicoSummary.roi_pct>=0?"+":""}${Number(storicoSummary.roi_pct).toFixed(1)}%`:"—"}
+                            </span>
+                            {storicoSummary.max_drawdown_pct != null && (
+                              <span style={{color:"#f87171", marginLeft:4}}>
+                                maxDown {Number(storicoSummary.max_drawdown_pct).toFixed(1)}%
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <button className="btn btn-ghost" style={{fontSize:"0.6rem", padding:"1px 6px", marginTop:2}}
                       disabled={posTab === "live" ? ibkrAccountLoading : storicoLoading}
                       onClick={() => posTab === "live" ? void doFetchIbkrAccount() : void doFetchStorico()}>
                       {(posTab === "live" ? ibkrAccountLoading : storicoLoading) ? "…" : "⟳"}
@@ -3427,20 +3470,27 @@ export default function App() {
                     const fmtPnl = (v: number | null) => v == null ? "—" : `${v>=0?"+":""}${v.toFixed(0)}`;
                     return (
                       <div>
-                        {/* strip metriche */}
-                        <div style={{display:"flex", gap:6, marginBottom:8, flexWrap:"wrap", paddingBottom:8, borderBottom:"1px solid #1e1e1e"}}>
-                          <span style={{fontSize:"0.6rem", color:"#555"}} title="Totale · positivi · negativi">
-                            <span style={{color:"#888"}}>{nTot}</span>
-                            <span style={{color:"#333"}}> · </span>
-                            <span style={{color:"#4ade80"}}>✓{nPos}</span>
-                            <span style={{color:"#333"}}> · </span>
-                            <span style={{color:"#f87171"}}>✗{nNeg}</span>
-                          </span>
-                          <span style={{fontSize:"0.6rem", color:sumPnl>=0?"#4ade80":"#f87171"}} title="PnL cumulato">P&L {fmtPnl(sumPnl)}</span>
-                          <span style={{fontSize:"0.6rem", color:"#888"}} title="Win rate">win {winRate!=null?winRate.toFixed(0)+"%":"—"}</span>
-                          <span style={{fontSize:"0.6rem", color:"#4ade80"}} title="Trade migliore">▲{fmtPnl(maxWin)}</span>
-                          <span style={{fontSize:"0.6rem", color:"#f87171"}} title="Trade peggiore">▼{fmtPnl(maxLoss)}</span>
-                        </div>
+                        {/* strip metriche — pill cards compatte */}
+                        {nTot > 0 && (() => {
+                          const pill = (label: string, value: React.ReactNode, accent: string, tip?: string) => (
+                            <div key={label} title={tip} style={{
+                              flex:"1 1 auto", minWidth:54,
+                              background:"var(--p2)", border:`1px solid ${accent}22`,
+                              borderRadius:3, padding:"4px 6px",
+                            }}>
+                              <div style={{fontSize:"0.5rem", color:"#555", textTransform:"uppercase", letterSpacing:"0.05em", lineHeight:1}}>{label}</div>
+                              <div style={{fontSize:"0.8rem", fontWeight:700, color:accent, lineHeight:1.2}}>{value}</div>
+                            </div>
+                          );
+                          return (
+                            <div style={{display:"flex", gap:5, marginBottom:8, flexWrap:"wrap", paddingBottom:8, borderBottom:"1px solid #1e1e1e"}}>
+                              {pill("P&L", fmtPnl(sumPnl), sumPnl >= 0 ? "#4ade80" : "#f87171", "PnL cumulato del periodo")}
+                              {pill("win%", winRate != null ? winRate.toFixed(0)+"%" : "—", winRate != null && winRate >= 50 ? "#4ade80" : "#fbbf24", "Percentuale trade in profitto")}
+                              {pill("▲ best", fmtPnl(maxWin), "#4ade80", "Trade migliore")}
+                              {pill("▼ worst", fmtPnl(maxLoss), "#f87171", "Trade peggiore")}
+                            </div>
+                          );
+                        })()}
                         {storicoLoading && <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>Caricamento…</div>}
                         {!storicoLoading && filtered.length === 0 && (
                           <div style={{color:"var(--dim)", fontSize:"0.7rem"}}>
