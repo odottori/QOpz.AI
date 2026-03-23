@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
@@ -31,6 +32,20 @@ try:
     import yfinance as yf
 except ImportError:  # pragma: no cover
     yf = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
+
+# Simboli ETF/ETP noti che non hanno quoteSummary/earnings su yfinance.
+# Per questi si usa ticker.info["exDividendDate"] per i dividendi
+# e si salta del tutto il check earnings (non applicabile).
+_ETF_SYMBOLS: frozenset[str] = frozenset({
+    "SPY", "QQQ", "IWM", "DIA", "TLT", "IEF", "SHY", "LQD", "HYG",
+    "GLD", "SLV", "USO", "UNG", "VXX", "UVXY", "SVXY",
+    "XLF", "XLE", "XLK", "XLV", "XLI", "XLP", "XLU", "XLB", "XLY", "XLRE",
+    "SMH", "SOXX", "EEM", "EFA", "EWJ", "FXI",
+    "TQQQ", "SQQQ", "SPXL", "SPXS", "SOXL", "SOXS", "TNA", "TZA",
+    "RSP", "MDY", "IJR", "VTI", "VOO", "VEA", "VWO",
+})
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Costanti
@@ -65,29 +80,48 @@ class EventCheckResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _fetch_calendar(symbol: str) -> dict:
-    """Fetch raw calendar dict da yfinance. Ritorna {} in caso di errore."""
+    """Fetch raw calendar dict da yfinance (solo per titoli azionari, non ETF).
+
+    Gli ETF non hanno earnings/calendarEvents nel quoteSummary yfinance —
+    chiamare ticker.calendar su SPY/TLT genera HTTP 404. Per questi simboli
+    restituiamo {} e usiamo _fetch_etf_exdiv per i dividendi.
+    """
     if yf is None:
         return {}
-    import logging as _logging
+    if symbol.upper() in _ETF_SYMBOLS:
+        return {}  # ETF: nessun earnings calendar; dividendi via _fetch_etf_exdiv
     try:
-        # ETF/indici non hanno quoteSummary — silenziamo il logger yfinance
-        # per evitare flood di ERROR 404 nel system log (l'eccezione è già gestita)
-        _yf_log = _logging.getLogger("yfinance")
-        _prev = _yf_log.level
-        _yf_log.setLevel(_logging.CRITICAL)
-        try:
-            ticker = yf.Ticker(symbol)
-            cal = ticker.calendar
-        finally:
-            _yf_log.setLevel(_prev)
+        ticker = yf.Ticker(symbol)
+        cal = ticker.calendar
         if cal is None:
             return {}
-        # yfinance può ritornare DataFrame o dict a seconda della versione
         if hasattr(cal, "to_dict"):
             cal = cal.to_dict()
         return cal if isinstance(cal, dict) else {}
-    except Exception:
+    except Exception as exc:
+        logger.warning("_fetch_calendar(%s): %s", symbol, exc)
         return {}
+
+
+def _fetch_etf_exdiv(symbol: str) -> Optional[date]:
+    """Recupera l'ex-dividend date da ticker.info per ETF/ETP.
+
+    ticker.info usa il modulo summaryDetail disponibile anche per ETF,
+    a differenza di calendarEvents/earnings che generano 404.
+    Restituisce None se il dato non è disponibile o è già nel passato.
+    """
+    if yf is None:
+        return None
+    try:
+        info = yf.Ticker(symbol).info
+        ex_div = info.get("exDividendDate")
+        if not ex_div:
+            return None
+        d = _parse_date_value(ex_div)
+        return d if (d is not None and d >= date.today()) else None
+    except Exception as exc:
+        logger.debug("_fetch_etf_exdiv(%s): %s", symbol, exc)
+        return None
 
 
 def _parse_date_value(val) -> Optional[date]:
@@ -143,7 +177,15 @@ def fetch_earnings_date(symbol: str) -> Optional[date]:
 
 
 def fetch_dividend_date(symbol: str) -> Optional[date]:
-    """Ritorna la prossima ex-dividend date da yfinance, o None."""
+    """Ritorna la prossima ex-dividend date da yfinance, o None.
+
+    Per ETF (SPY, TLT, ecc.): usa ticker.info["exDividendDate"] via _fetch_etf_exdiv
+    perché ticker.calendar non è disponibile per ETF.
+    Per azioni: usa ticker.calendar (path standard).
+    """
+    if symbol.upper() in _ETF_SYMBOLS:
+        return _fetch_etf_exdiv(symbol)
+
     cal = _fetch_calendar(symbol)
     today = date.today()
 
