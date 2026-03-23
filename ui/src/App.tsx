@@ -839,6 +839,7 @@ export default function App() {
   const [opExecOpen, setOpExecOpen] = useState<boolean>(false);
   const [execWindowOpen, setExecWindowOpen] = useState<boolean>(false);  // collassato di default
   const [dumpOpen, setDumpOpen] = useState<boolean>(false);              // DUMP block collassato di default
+  const [screenOpen, setScreenOpen] = useState<boolean>(false);          // terminale tecnico collassato di default
   const [scoreFilter, setScoreFilter] = useState<"all"|"high"|"mid"|"low">("all"); // filtro segnali per soglia score
   const [segnaliStrategyFilter, setSegnaliStrategyFilter] = useState<string>("tutte");
   const [segnaliFrom, setSegnaliFrom] = useState<string>("");
@@ -899,7 +900,7 @@ export default function App() {
     quality_pct: number | null; symbols_count: number | null; error_msg: string | null;
   };
   const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
-  const [feedLogLoading, setFeedLogLoading] = useState(false);
+  const [feedLogLoading, setFeedLogLoading] = useState(true);
   const [datiFilterFeed, setDatiFilterFeed] = useState<string>("tutte");
   const [datiFilterStatus, setDatiFilterStatus] = useState<string>("tutti");
   const [datiFilterDays, setDatiFilterDays] = useState<number>(30);
@@ -2688,6 +2689,24 @@ export default function App() {
                       nFeedsOk === 4 ? "#4ade80" : nFeedsOk >= 2 ? "#fbbf24" : "#f87171",
                       null
                     )}
+                    {kCard("pipe_sessione", "Ultima sessione",
+                      sessionStatus?.running ? "⟳ IN CORSO" :
+                        sessionStatus?.last_morning
+                          ? sessionStatus.last_morning.slice(0,16).replace("T"," ")
+                          : "N/D",
+                      sessionStatus?.running ? "sessione mattutina attiva" :
+                        sessionStatus?.last_eod
+                          ? `EOD: ${sessionStatus.last_eod.slice(0,16).replace("T"," ")}`
+                          : "nessuna sessione registrata",
+                      sessionStatus?.running ? "#fbbf24" : sessionStatus?.last_morning ? "#4ade80" : "#888",
+                      sessionStatus ? (
+                        <div style={{fontSize:"0.62rem", color:"var(--dim)", display:"flex", flexDirection:"column", gap:2}}>
+                          <span>morning: <span style={{color: sessionStatus.last_morning ? "#4ade80" : "#888"}}>{sessionStatus.last_morning ? sessionStatus.last_morning.slice(0,19).replace("T"," ") : "—"}</span></span>
+                          <span>EOD: <span style={{color: sessionStatus.last_eod ? "#4ade80" : "#888"}}>{sessionStatus.last_eod ? sessionStatus.last_eod.slice(0,19).replace("T"," ") : "—"}</span></span>
+                          <span>scheduler: <span style={{color: sessionStatus.enabled ? "#4ade80" : "#888"}}>{sessionStatus.enabled ? "ON" : "OFF"}</span></span>
+                        </div>
+                      ) : null
+                    )}
                   </div>
                 );
               })()}
@@ -2766,7 +2785,21 @@ export default function App() {
                   (datiFilterStatus === "tutti" || r.status === datiFilterStatus)
                 );
 
-                if (feedLog.length === 0 && !feedLogLoading) {
+                if (feedLogLoading) {
+                  return (
+                    <div style={{padding:"24px 16px"}}>
+                      <div style={{fontSize:"0.6rem", color:"var(--dim)", textAlign:"center", marginBottom:8, letterSpacing:"0.05em"}}>
+                        attendere prego — caricamento in corso...
+                      </div>
+                      <div style={{height:3, background:"var(--border)", borderRadius:2, overflow:"hidden"}}>
+                        <div style={{height:"100%", background:"var(--g2)", borderRadius:2,
+                          animation:"feedLogProgress 2.5s ease-out forwards"}} />
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (feedLog.length === 0) {
                   return (
                     <div style={{padding:"20px 12px", textAlign:"center", color:"var(--dim)", fontSize:"0.65rem"}}>
                       Nessun dato di ingestione registrato. Avvia la pipeline dati per iniziare la raccolta.
@@ -2917,11 +2950,12 @@ export default function App() {
                   )}
                 </div>
                 <div className="lc-screen">
-                  <div className="lc-screen-bar">
+                  <div className="lc-screen-bar" onClick={() => setScreenOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
                     <span className="lc-screen-title">regime_engine + scoring_engine</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"var(--dim)"}}>{screenOpen ? "▲" : "▼"}</span>
                   </div>
-                  <div className="lc-screen-body">
+                  <div className="lc-screen-body" style={{display: screenOpen ? "" : "none"}}>
                     <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">n_sessioni</span><span className="sev-data">{regimeCurrent?.n_recent ?? "N/D"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">source</span><span className="sev-meta">{premarketSource}</span></div>
@@ -3074,11 +3108,12 @@ export default function App() {
                   </ul>
                 </div>
                 <div className="lc-screen">
-                  <div className="lc-screen-bar">
+                  <div className="lc-screen-bar" onClick={() => setScreenOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
                     <span className="lc-screen-title">WAR ROOM — apertura sessione</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"var(--dim)"}}>{screenOpen ? "▲" : "▼"}</span>
                   </div>
-                  <div className="lc-screen-body">
+                  <div className="lc-screen-body" style={{display: screenOpen ? "" : "none"}}>
                     <div className="lc-screen-row"><span className="lc-dim">scheduler</span><span className={sessionStatus?.enabled ? "sev-ok" : "sev-warn"}>{sessionStatus?.enabled ? "ON" : "OFF"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">ibkr</span><span className={ibkrStatus?.connected ? "sev-ok" : "sev-warn"}>{ibkrStatus?.connected ? "LIVE" : "OFFLINE"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
@@ -4167,11 +4202,12 @@ export default function App() {
                   )}
                 </div>
                 <div className="lc-screen">
-                  <div className="lc-screen-bar">
+                  <div className="lc-screen-bar" onClick={() => setScreenOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
                     <span className="lc-screen-title">wheel_state_machine.log</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"var(--dim)"}}>{screenOpen ? "▲" : "▼"}</span>
                   </div>
-                  <div className="lc-screen-body">
+                  <div className="lc-screen-body" style={{display: screenOpen ? "" : "none"}}>
                     <div className="lc-screen-row"><span className="lc-dim">tier</span><span className="sev-data">{tierInfo?.active_mode ?? "N/D"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">wheel_enabled</span><span className={wheelAvailable ? "sev-ok" : "sev-warn"}>{wheelAvailable ? "yes" : "no"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">active_positions</span><span className="sev-data">{wheelPositions?.positions?.length ?? 0}</span></div>
@@ -4239,11 +4275,12 @@ export default function App() {
                   </div>
                 </div>
                 <div className="lc-screen">
-                  <div className="lc-screen-bar">
+                  <div className="lc-screen-bar" onClick={() => setScreenOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
                     <span className="lc-screen-title">portfolio_agg.log</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"var(--dim)"}}>{screenOpen ? "▲" : "▼"}</span>
                   </div>
-                  <div className="lc-screen-body">
+                  <div className="lc-screen-body" style={{display: screenOpen ? "" : "none"}}>
                     <EqSparkline points={equityHistory?.points ?? []} w={220} h={52} />
                     <div style={{height:8}}/>
                     <div className="lc-screen-row"><span className="lc-dim">trades</span><span className="sev-data">{paperSummary?.trades ?? 0}</span></div>
@@ -4325,11 +4362,12 @@ export default function App() {
                   )}
                 </div>
                 <div className="lc-screen">
-                  <div className="lc-screen-bar">
+                  <div className="lc-screen-bar" onClick={() => setScreenOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
                     <span className="lc-screen-title">backtest_audit.log</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"var(--dim)"}}>{screenOpen ? "▲" : "▼"}</span>
                   </div>
-                  <div className="lc-screen-body">
+                  <div className="lc-screen-body" style={{display: screenOpen ? "" : "none"}}>
                     <div className="lc-screen-row"><span className="lc-dim">history_ready</span><span className={historyReadiness?.ready ? "sev-ok" : "sev-warn"}>{historyReadiness?.ready ? "yes" : "no"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">score_pct</span><span className={historyReadiness?.ready ? "sev-ok" : "sev-warn"}>{historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "N/D"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">days_observed</span><span className="sev-data">{historyReadiness?.days_observed ?? "N/D"}</span></div>
@@ -4419,11 +4457,12 @@ export default function App() {
                   </ul>
                 </div>
                 <div className="lc-screen">
-                  <div className="lc-screen-bar">
+                  <div className="lc-screen-bar" onClick={() => setScreenOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
                     <span className="lc-screen-title">session_logs.eod</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"var(--dim)"}}>{screenOpen ? "▲" : "▼"}</span>
                   </div>
-                  <div className="lc-screen-body">
+                  <div className="lc-screen-body" style={{display: screenOpen ? "" : "none"}}>
                     <div className="lc-screen-row"><span className="lc-dim">scheduler</span><span className={sessionStatus?.enabled ? "sev-ok" : "sev-warn"}>{sessionStatus?.enabled ? "on" : "off"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">running</span><span className={sessionStatus?.running ? "sev-warn" : "sev-ok"}>{sessionStatus?.running ? "yes" : "no"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">last_morning</span><span className="sev-meta">{sessionStatus?.last_morning ? sessionStatus.last_morning.slice(0,19).replace("T"," ") : "N/D"}</span></div>
@@ -4510,11 +4549,12 @@ export default function App() {
                   )}
                 </div>
                 <div className="lc-screen">
-                  <div className="lc-screen-bar">
+                  <div className="lc-screen-bar" onClick={() => setScreenOpen(o => !o)}>
                     <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
                     <span className="lc-screen-title">report_eod.log</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"var(--dim)"}}>{screenOpen ? "▲" : "▼"}</span>
                   </div>
-                  <div className="lc-screen-body">
+                  <div className="lc-screen-body" style={{display: screenOpen ? "" : "none"}}>
                     <div className="lc-screen-row"><span className="lc-dim">profile</span><span className="sev-meta">{paperSummary?.profile ?? ACTIVE_PROFILE}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">as_of_date</span><span className="sev-meta">{paperSummary?.as_of_date ?? "N/D"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">window_days</span><span className="sev-meta">{paperSummary?.window_days ?? "N/D"}</span></div>
