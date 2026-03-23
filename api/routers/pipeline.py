@@ -102,7 +102,7 @@ def opz_data_refresh(
     if not symbols:
         symbols = ["SPY", "QQQ", "AAPL", "MSFT", "AMZN", "TSLA", "NVDA", "META"]
 
-    # ── 2. IV history (yfinance) ──────────────────────────────────────────────
+    # ── 2. yfinance — IV history ATM ─────────────────────────────────────────
     t0 = datetime.now(timezone.utc)
     iv_ok = 0
     iv_err: list[str] = []
@@ -118,12 +118,12 @@ def opz_data_refresh(
     except ImportError as exc:
         iv_err.append(f"import: {exc}")
     t1 = datetime.now(timezone.utc)
-    status_yf = "ok" if iv_ok == len(symbols) else ("partial" if iv_ok > 0 else "error")
-    _rec("yfinance", t0, t1, len(symbols), iv_ok, status_yf,
+    status_yf_iv = "ok" if iv_ok == len(symbols) else ("partial" if iv_ok > 0 else "error")
+    _rec("yfinance_iv_history", t0, t1, len(symbols), iv_ok, status_yf_iv,
          "; ".join(iv_err[:3]) if iv_err else None)
-    results["yfinance"] = {"ok": iv_ok, "total": len(symbols), "errors": len(iv_err)}
+    results["yfinance_iv_history"] = {"ok": iv_ok, "total": len(symbols), "errors": len(iv_err)}
 
-    # ── 3. Events calendar (yfinance) ─────────────────────────────────────────
+    # ── 3. yfinance — events calendar ─────────────────────────────────────────
     t0 = datetime.now(timezone.utc)
     ev_ok = 0
     ev_err: list[str] = []
@@ -139,53 +139,122 @@ def opz_data_refresh(
         ev_err.append(f"import: {exc}")
     t1 = datetime.now(timezone.utc)
     status_ev = "ok" if ev_ok == len(symbols) else ("partial" if ev_ok > 0 else "error")
-    _rec("events_calendar", t0, t1, len(symbols), ev_ok, status_ev,
+    _rec("yfinance_events", t0, t1, len(symbols), ev_ok, status_ev,
          "; ".join(ev_err[:3]) if ev_err else None)
-    results["events_calendar"] = {"ok": ev_ok, "total": len(symbols), "errors": len(ev_err)}
+    results["yfinance_events"] = {"ok": ev_ok, "total": len(symbols), "errors": len(ev_err)}
 
-    # ── 4. Macro indicators (VIX, VIX3M, yield 10Y/30Y via yfinance) ─────────
+    # ── 4. yfinance — macro indicators (VIX, VIX3M, 10Y/30Y) ────────────────
     t0 = datetime.now(timezone.utc)
-    fred_n_in, fred_n_out, fred_status, fred_err = 0, 0, "error", None
+    macro_n_in, macro_n_out, macro_status, macro_err = 0, 0, "error", None
     try:
         from scripts.fetch_macro import fetch_macro_indicators
         res_macro = fetch_macro_indicators(lookback_days=1, profile=profile)
-        fred_n_in  = res_macro.get("n_series", 0)
-        fred_n_out = res_macro.get("n_saved", 0)
-        if res_macro.get("n_errors", 0) == fred_n_in:
-            fred_status = "error"
-            fred_err = "Tutti i ticker macro in errore"
+        macro_n_in = int(res_macro.get("n_series", 0) or 0)
+        macro_n_out = int(res_macro.get("n_saved", 0) or 0)
+        if res_macro.get("n_errors", 0) == macro_n_in:
+            macro_status = "error"
+            macro_err = "Tutti i ticker macro in errore"
         elif res_macro.get("n_errors", 0) > 0:
-            fred_status = "partial"
+            macro_status = "partial"
         else:
-            fred_status = "ok"
+            macro_status = "ok"
     except Exception as exc:
-        fred_err = str(exc)
+        macro_err = str(exc)
     t1 = datetime.now(timezone.utc)
-    _rec("fred", t0, t1, fred_n_in, fred_n_out, fred_status, fred_err)
-    results["fred"] = {"ok": fred_n_out, "total": fred_n_in, "status": fred_status}
+    _rec("yfinance_macro", t0, t1, macro_n_in, macro_n_out, macro_status, macro_err)
+    results["yfinance_macro"] = {"ok": macro_n_out, "total": macro_n_in, "status": macro_status}
 
-    # ── 5. IBKR (health check IBG via TCP — porta 4001 TWS wire protocol) ───────
-    # IBG espone la TWS API su porta 4001 (paper) / 4002 (live) — protocollo
-    # binario, non HTTP. Il check corretto è un TCP connect test.
-    t0 = datetime.now(timezone.utc)
-    ibkr_status, ibkr_err = "error", None
+    # Compat rows for older UI / reports
+    results["yfinance"] = results["yfinance_iv_history"]
+    results["events_calendar"] = results["yfinance_events"]
+    results["fred"] = results["yfinance_macro"]
+
+    # ── 5. IBKR — ingest reale (prezzi, chain, greeks, IV history, account) ─
     try:
-        import socket as _sock
-        for _port in (4004, 4002, 4001):
-            try:
-                with _sock.create_connection(("ibg", _port), timeout=3):
-                    ibkr_status = "ok"
-                    ibkr_err = None
-                    break
-            except OSError:
-                continue
-        else:
-            ibkr_err = "IBG non raggiungibile su 4004/4002/4001"
+        from api.opz_api import opz_ibkr_account
+        from scripts.fetch_iv_history_ibkr import capture_ibkr_symbol_snapshot, merge_today_iv_point
     except Exception as exc:
-        ibkr_err = f"IBG check fallito: {exc}"
-    t1 = datetime.now(timezone.utc)
-    _rec("ibkr_demo", t0, t1, 0, 0, ibkr_status, ibkr_err)
-    results["ibkr"] = {"status": ibkr_status, "error": ibkr_err}
+        t0 = datetime.now(timezone.utc)
+        t1 = datetime.now(timezone.utc)
+        msg = f"Import IBKR fallito: {exc}"
+        for _feed in ("ibkr_prices", "ibkr_chain", "ibkr_greeks", "ibkr_iv_history", "ibkr_account", "ibkr_positions"):
+            _rec(_feed, t0, t1, len(symbols) if _feed != "ibkr_account" else 1, 0, "error", msg)
+        results["ibkr"] = {"status": "error", "error": msg}
+    else:
+        snapshots: list[dict[str, Any]] = []
+        ibkr_errs: list[str] = []
+
+        t0 = datetime.now(timezone.utc)
+        for sym in symbols:
+            try:
+                snap = capture_ibkr_symbol_snapshot(sym, profile=profile)
+                snapshots.append(snap)
+            except Exception as exc:
+                ibkr_errs.append(f"{sym}: {exc}")
+        t1 = datetime.now(timezone.utc)
+
+        symbols_ok = len(snapshots)
+        total_contracts = sum(int(s.get("contracts_count", 0) or 0) for s in snapshots)
+        greeks_complete = sum(int(s.get("greeks_complete", 0) or 0) for s in snapshots)
+        with_price = sum(1 for s in snapshots if float(s.get("underlying_price") or 0.0) > 0)
+        with_chain = sum(1 for s in snapshots if int(s.get("contracts_count", 0) or 0) > 0)
+        chain_status = "ok" if symbols_ok == len(symbols) and len(symbols) > 0 else ("partial" if symbols_ok > 0 else "error")
+        chain_err_msg = "; ".join(ibkr_errs[:3]) if ibkr_errs else None
+
+        _rec("ibkr_prices", t0, t1, len(symbols), with_price, chain_status, chain_err_msg)
+        _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status, chain_err_msg)
+        greek_status = "ok" if greeks_complete > 0 and greeks_complete == total_contracts else ("partial" if greeks_complete > 0 else ("error" if with_chain == 0 else "partial"))
+        _rec("ibkr_greeks", t0, t1, total_contracts, greeks_complete, greek_status, chain_err_msg)
+
+        t2 = datetime.now(timezone.utc)
+        iv_ok_ibkr = 0
+        iv_err_ibkr: list[str] = []
+        for snap in snapshots:
+            try:
+                atm_iv = snap.get("atm_iv")
+                sym = str(snap.get("symbol") or "")
+                if sym and atm_iv is not None:
+                    merge_today_iv_point(sym, float(atm_iv))
+                    iv_ok_ibkr += 1
+            except Exception as exc:
+                iv_err_ibkr.append(f"{snap.get('symbol')}: {exc}")
+        t3 = datetime.now(timezone.utc)
+        iv_status_ibkr = "ok" if iv_ok_ibkr == symbols_ok and symbols_ok > 0 else ("partial" if iv_ok_ibkr > 0 else "error")
+        _rec("ibkr_iv_history", t2, t3, symbols_ok, iv_ok_ibkr, iv_status_ibkr,
+             "; ".join((iv_err_ibkr or ibkr_errs)[:3]) if (iv_err_ibkr or ibkr_errs) else None)
+
+        t4 = datetime.now(timezone.utc)
+        account_err = None
+        account_status = "error"
+        positions_out = 0
+        try:
+            acc = opz_ibkr_account()
+            if acc.get("connected"):
+                account_status = "ok"
+                positions_out = len(acc.get("positions") or [])
+            else:
+                account_status = "error"
+                account_err = acc.get("message") or "IBKR non connesso"
+        except Exception as exc:
+            account_err = str(exc)
+            acc = {"connected": False, "positions": []}
+        t5 = datetime.now(timezone.utc)
+        _rec("ibkr_account", t4, t5, 1, 1 if account_status == "ok" else 0, account_status, account_err)
+        _rec("ibkr_positions", t4, t5, 1 if account_status == "ok" else 0, positions_out,
+             "ok" if account_status == "ok" else "error", account_err)
+
+        # Compat row per vecchia UI: health+ingest aggregato IBKR
+        compat_status = "ok" if with_chain > 0 else ("partial" if snapshots else "error")
+        _rec("ibkr_demo", t0, t5, len(symbols), with_chain, compat_status, chain_err_msg or account_err)
+        results["ibkr"] = {
+            "status": compat_status,
+            "error": chain_err_msg or account_err,
+            "symbols_ok": symbols_ok,
+            "contracts": total_contracts,
+            "greeks_complete": greeks_complete,
+            "iv_history_ok": iv_ok_ibkr,
+            "positions": positions_out,
+        }
 
     # ── Totale runs registrate oggi ───────────────────────────────────────────
     total_runs = list_ingestion_runs(profile=profile, days_back=1)

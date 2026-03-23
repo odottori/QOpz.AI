@@ -904,6 +904,7 @@ export default function App() {
   const [datiFilterDays, setDatiFilterDays] = useState<number>(1);
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
   const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({});
+  const [datiDayOpen, setDatiDayOpen] = useState<Record<string,boolean>>({});
   const [datiSysOpen, setDatiSysOpen] = useState(false);
 
   const parsedPayload = useMemo(() => {
@@ -2761,15 +2762,40 @@ export default function App() {
                 </div>
               )}
 
-              {/* ══ 4 Blocchi fonte ══ */}
+              {/* ══ 2 Blocchi fonte ══ */}
               {!feedLogLoading && (() => {
-                const sources: Array<{feed:string, label:string, note:string}> = [
-                  { feed:"yfinance",        label:"Prezzi & Volatilità",  note:"Storico prezzi e volatilità implicita · yfinance" },
-                  { feed:"events_calendar", label:"Calendario eventi",    note:"Utili, dividendi, scadenze opzioni · yfinance" },
-                  { feed:"fred",            label:"Dati macro",           note:"Indicatori macroeconomici · FRED / St. Louis Fed" },
-                  { feed:"ibkr",            label:"Dati IBKR",            note:"Catene opzioni e margini · Interactive Brokers" },
+                const sources: Array<{feed:string, label:string, note:string, feeds:string[]}> = [
+                  {
+                    feed:"ibkr",
+                    label:"IBKR primaria",
+                    note:"Fonte primaria operativa: prezzi, catene opzioni, greche, IV history, conto e posizioni.",
+                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_iv_history","ibkr_account","ibkr_positions","ibkr_demo","ibkr_capture","ibkr_extract","ibkr_dataset"],
+                  },
+                  {
+                    feed:"yfinance",
+                    label:"yfinance integrativa",
+                    note:"Fonte integrativa: IV history di fallback, calendario eventi, VIX/VIX3M e rendimenti 10Y/30Y.",
+                    feeds:["yfinance_iv_history","yfinance_events","yfinance_macro","yfinance","events_calendar","fred"],
+                  },
                 ];
-                const ibkrFeeds = ["ibkr_demo","ibkr_capture","ibkr_extract","ibkr_dataset"];
+                const feedStepLabel: Record<string,string> = {
+                  ibkr_prices: "Prezzi sottostante",
+                  ibkr_chain: "Catene opzioni",
+                  ibkr_greeks: "Greche complete",
+                  ibkr_iv_history: "IV history ATM",
+                  ibkr_account: "Conto",
+                  ibkr_positions: "Posizioni",
+                  ibkr_demo: "Compat legacy IBKR",
+                  ibkr_capture: "Capture legacy",
+                  ibkr_extract: "Extract legacy",
+                  ibkr_dataset: "Dataset legacy",
+                  yfinance_iv_history: "IV history fallback",
+                  yfinance_events: "Calendario eventi",
+                  yfinance_macro: "Macro mercati",
+                  yfinance: "IV history legacy",
+                  events_calendar: "Eventi legacy",
+                  fred: "Macro legacy",
+                };
                 const fBtnSt = (active: boolean, col: string) => ({
                   fontSize:"0.55rem" as const, padding:"1px 4px", borderRadius:3, cursor:"pointer" as const,
                   border:`1px solid ${active ? col : "#3d3d3d"}`,
@@ -2780,10 +2806,9 @@ export default function App() {
                 });
                 return (
                   <div style={{padding:"8px 12px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14}}>
-                    {sources.map(({ feed, label, note }) => {
-                      const isIbkr = feed === "ibkr";
+                    {sources.map(({ feed, label, note, feeds }) => {
                       const srcRows = feedLog
-                        .filter(r => isIbkr ? ibkrFeeds.includes(r.feed) : r.feed === feed)
+                        .filter(r => feeds.includes(r.feed))
                         .sort((a,b) => (b.run_date+b.started_at).localeCompare(a.run_date+a.started_at));
                       const blockSt = datiBlockStatus[feed] ?? "tutti";
                       const rows = srcRows.filter(r => blockSt === "tutti" || r.status === blockSt);
@@ -2798,12 +2823,16 @@ export default function App() {
                       const stLabel = lastSt === "ok" ? "✓ OK" : lastSt === "error" ? "✗ ERRORE" : lastSt === "partial" ? "~ PARZIALE" : "—";
                       const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
                       const activeFilters = blockSt !== "tutti" ? 1 : 0;
+                      const grouped = Object.entries(rows.reduce((acc, r) => {
+                        (acc[r.run_date] ??= []).push(r);
+                        return acc;
+                      }, {} as Record<string, FeedRun[]>)).sort((a,b) => b[0].localeCompare(a[0]));
 
                       const csvDownload = () => {
                         if (!rows.length) return;
-                        const cols = "data,ora,durata_ms,ricevuti,salvati,qualita_pct,simboli,stato,errore";
+                        const cols = "data,attivita,ora,durata_ms,ricevuti,salvati,qualita_pct,simboli,stato,errore";
                         const body = rows.map(r => [
-                          r.run_date, r.started_at?.slice(11,19)??"",
+                          r.run_date, feedStepLabel[r.feed] ?? r.feed, r.started_at?.slice(11,19)??"",
                           r.duration_ms??"", r.records_in??"", r.records_out??"",
                           r.quality_pct??"", r.symbols_count??"", r.status,
                           `"${(r.error_msg??"").replace(/"/g,'""')}"`,
@@ -2817,7 +2846,6 @@ export default function App() {
 
                       return (
                         <div key={feed} style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
-                          {/* ── Big header card ── */}
                           <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
                             padding:"10px 14px", background:"rgba(0,255,106,0.04)", borderBottom:"1px solid var(--border)"}}>
                             <div>
@@ -2830,126 +2858,131 @@ export default function App() {
                             </div>
                             <div style={{textAlign:"right"}}>
                               <div style={{fontSize:"1.15rem", fontWeight:700, color:mainCol, letterSpacing:"0.02em"}}>{stLabel}</div>
-                              <div style={{fontSize:"0.55rem", color:"#666", marginTop:1}}>{tot} esecuzioni · {nOk} ok</div>
+                              <div style={{fontSize:"0.55rem", color:"#666", marginTop:1}}>{tot} attività · {nOk} ok</div>
                             </div>
                           </div>
 
-                          {/* ── Metric cards strip ── */}
                           <div style={{display:"flex", gap:6, padding:"8px 12px", flexWrap:"wrap"}}>
                             {([
-                              {lbl:"Esecuzioni", val:String(tot),  col:tot>0?"#e2f0e8":"#555"},
+                              {lbl:"Attività", val:String(tot),  col:tot>0?"#e2f0e8":"#555"},
                               {lbl:"Completate",  val:String(nOk),  col:nOk===tot&&tot>0?"#4ade80":nOk>0?"#fbbf24":"#f87171"},
                               {lbl:"Errori",      val:String(nErr), col:nErr===0?"#4ade80":"#f87171"},
                               {lbl:"Parziali",    val:String(nPar), col:nPar>0?"#fbbf24":"#e2f0e8"},
                               {lbl:"Qualità media",val:avgQ!=null?`${avgQ.toFixed(1)}%`:"—", col:avgQ!=null?(avgQ>=95?"#4ade80":avgQ>=80?"#fbbf24":"#f87171"):"#555"},
                             ] as Array<{lbl:string,val:string,col:string}>).map(({lbl,val,col}) => (
-                              <div key={lbl} style={{flex:"1 1 72px", background:"var(--p1)", border:"1px solid var(--border)",
-                                borderRadius:4, padding:"5px 8px", minWidth:68}}>
+                              <div key={lbl} style={{flex:"1 1 72px", background:"var(--p1)", border:"1px solid var(--border)", borderRadius:4, padding:"5px 8px", minWidth:68}}>
                                 <div style={{fontSize:"0.5rem", color:"#7aaa90", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:2}}>{lbl}</div>
                                 <div style={{fontSize:"0.85rem", fontWeight:700, color:col}}>{val}</div>
                               </div>
                             ))}
                           </div>
 
-                          {/* ── Filtri collassabili ── */}
                           <div style={{padding:"0 12px 4px"}}>
-                            <div style={{display:"flex", alignItems:"center", gap:5, cursor:"pointer",
-                              padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: filtersOpen ? 6 : 0}}
+                            <div style={{display:"flex", alignItems:"center", gap:5, cursor:"pointer", padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: filtersOpen ? 6 : 0}}
                               onClick={() => setDatiBlockFiltersOpen(v => ({...v, [feed]: !filtersOpen}))}>
                               <span style={{fontSize:"0.62rem", color:"#888"}}>🔍</span>
-                              <span style={{fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", flex:1,
-                                color: activeFilters > 0 ? "#60a5fa" : "#555",
-                                fontWeight: activeFilters > 0 ? 600 : 400}}>
+                              <span style={{fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", flex:1, color: activeFilters > 0 ? "#60a5fa" : "#555", fontWeight: activeFilters > 0 ? 600 : 400}}>
                                 FILTRI{activeFilters > 0 ? ` · ${activeFilters} attivo` : ""}
                               </span>
                               <span style={{fontSize:"0.5rem", color:"#777"}}>{filtersOpen ? "▾" : "▸"}</span>
                             </div>
                             {filtersOpen && (
                               <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:6, flexWrap:"wrap"}}>
-                                <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
-                                  letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>stato:</span>
+                                <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>stato:</span>
                                 {([
                                   {id:"tutti",   label:"TUTTI",    col:"#888"},
                                   {id:"ok",      label:"OK",       col:"#4ade80"},
                                   {id:"error",   label:"ERRORE",   col:"#f87171"},
                                   {id:"partial", label:"PARZIALE", col:"#fbbf24"},
                                 ] as Array<{id:string,label:string,col:string}>).map(({id,label,col}) => (
-                                  <button key={id}
-                                    onClick={() => setDatiBlockStatus(v => ({...v, [feed]: id}))}
-                                    style={fBtnSt(blockSt === id, col)}>
-                                    {label}
-                                  </button>
+                                  <button key={id} onClick={() => setDatiBlockStatus(v => ({...v, [feed]: id}))} style={fBtnSt(blockSt === id, col)}>{label}</button>
                                 ))}
                               </div>
                             )}
                           </div>
 
-                          {/* ── Tabella ── */}
                           {rows.length > 0 ? (
                             <div style={{padding:"0 12px 8px", overflowX:"auto"}}>
                               <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.62rem"}}>
                                 <thead>
                                   <tr style={{borderBottom:"2px solid var(--border)"}}>
                                     {([
-                                      {h:"Data",a:"left"},{h:"Ora",a:"left"},{h:"Durata",a:"left"},
+                                      {h:"Giorno / attività",a:"left"},{h:"Ora",a:"left"},{h:"Durata",a:"left"},
                                       {h:"Ricevuti",a:"right"},{h:"Salvati",a:"right"},{h:"Qualità",a:"right"},
                                       {h:"Simboli",a:"right"},{h:"Stato",a:"left"},{h:"Errore",a:"left"},
                                     ] as Array<{h:string,a:string}>).map(({h,a}) => (
-                                      <th key={h} style={{padding:"4px 8px", textAlign:a as "left"|"right",
-                                        color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap",
-                                        fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
+                                      <th key={h} style={{padding:"4px 8px", textAlign:a as "left"|"right", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
                                     ))}
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {rows.slice(0,50).map((r, i) => {
-                                    const stC = r.status==="ok"?"#4ade80":r.status==="error"?"#f87171":"#fbbf24";
-                                    const stL = r.status==="ok"?"✓ ok":r.status==="error"?"✗ errore":"~ parziale";
-                                    const rqC = r.quality_pct!=null?(r.quality_pct>=95?"#4ade80":r.quality_pct>=80?"#fbbf24":"#f87171"):"#888";
-                                    const dur = r.duration_ms!=null?(r.duration_ms>=1000?`${(r.duration_ms/1000).toFixed(1)}s`:`${r.duration_ms}ms`):"—";
-                                    return (
-                                      <tr key={r.run_id} style={{borderBottom:"1px solid var(--border)",
-                                        background:i%2===0?"transparent":"rgba(0,255,106,0.03)"}}>
-                                        <td style={{padding:"4px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.run_date}</td>
-                                        <td style={{padding:"4px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.started_at?.slice(11,16)??"—"}</td>
-                                        <td style={{padding:"4px 8px", color:"#e2f0e8"}}>{dur}</td>
-                                        <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_in?.toLocaleString("it-IT")??"—"}</td>
-                                        <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_out?.toLocaleString("it-IT")??"—"}</td>
-                                        <td style={{padding:"4px 8px", color:rqC, fontWeight:600, textAlign:"right"}}>{r.quality_pct!=null?`${r.quality_pct.toFixed(1)}%`:"—"}</td>
-                                        <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.symbols_count??"—"}</td>
-                                        <td style={{padding:"4px 8px"}}><span style={{color:stC, fontWeight:700}}>{stL}</span></td>
-                                        <td style={{padding:"4px 8px", color:"#f87171", maxWidth:160,
-                                          overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}
-                                          title={r.error_msg??""}>{r.error_msg??""}</td>
-                                      </tr>
-                                    );
+                                  {grouped.slice(0, 30).flatMap(([day, dayRows], i) => {
+                                    const dayKey = `${feed}|${day}`;
+                                    const dayOpen = datiDayOpen[dayKey] ?? i === 0;
+                                    const dayOk = dayRows.filter(r => r.status === "ok").length;
+                                    const dayErr = dayRows.filter(r => r.status === "error").length;
+                                    const dayPar = dayRows.filter(r => r.status === "partial").length;
+                                    const dayQVals = dayRows.map(r => r.quality_pct).filter((v): v is number => typeof v === "number");
+                                    const dayQ = dayQVals.length ? dayQVals.reduce((s, v) => s + v, 0) / dayQVals.length : null;
+                                    const dayStatus = dayErr > 0 ? (dayOk > 0 || dayPar > 0 ? "partial" : "error") : (dayPar > 0 ? "partial" : "ok");
+                                    const dayStatusColor = dayStatus === "ok" ? "#4ade80" : dayStatus === "error" ? "#f87171" : "#fbbf24";
+                                    const daySaved = dayRows.reduce((s, r) => s + (r.records_out ?? 0), 0);
+                                    const dayIn = dayRows.reduce((s, r) => s + (r.records_in ?? 0), 0);
+                                    const daySymbols = dayRows.reduce((s, r) => s + (r.symbols_count ?? 0), 0);
+                                    const firstErr = dayRows.find(r => r.error_msg)?.error_msg ?? "";
+                                    const detailRows = dayOpen ? dayRows.map((r, j) => {
+                                      const stC = r.status==="ok"?"#4ade80":r.status==="error"?"#f87171":"#fbbf24";
+                                      const stL = r.status==="ok"?"✓ ok":r.status==="error"?"✗ errore":"~ parziale";
+                                      const rqC = r.quality_pct!=null?(r.quality_pct>=95?"#4ade80":r.quality_pct>=80?"#fbbf24":"#f87171"):"#888";
+                                      const dur = r.duration_ms!=null?(r.duration_ms>=1000?`${(r.duration_ms/1000).toFixed(1)}s`:`${r.duration_ms}ms`):"—";
+                                      return (
+                                        <tr key={r.run_id} style={{borderBottom:"1px solid var(--border)", background:j%2===0?"rgba(0,255,106,0.02)":"rgba(0,255,106,0.04)"}}>
+                                          <td style={{padding:"4px 8px 4px 24px", color:"#cfe7d8", whiteSpace:"nowrap"}}>{feedStepLabel[r.feed] ?? r.feed}</td>
+                                          <td style={{padding:"4px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.started_at?.slice(11,16)??"—"}</td>
+                                          <td style={{padding:"4px 8px", color:"#e2f0e8"}}>{dur}</td>
+                                          <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_in?.toLocaleString("it-IT")??"—"}</td>
+                                          <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_out?.toLocaleString("it-IT")??"—"}</td>
+                                          <td style={{padding:"4px 8px", color:rqC, fontWeight:600, textAlign:"right"}}>{r.quality_pct!=null?`${r.quality_pct.toFixed(1)}%`:"—"}</td>
+                                          <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.symbols_count??"—"}</td>
+                                          <td style={{padding:"4px 8px"}}><span style={{color:stC, fontWeight:700}}>{stL}</span></td>
+                                          <td style={{padding:"4px 8px", color:"#f87171", maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.error_msg??""}>{r.error_msg??""}</td>
+                                        </tr>
+                                      );
+                                    }) : [];
+                                    return [
+                                      <tr key={dayKey} style={{borderBottom:"1px solid var(--border)", background:"rgba(255,255,255,0.02)", cursor:"pointer"}}
+                                        onClick={() => setDatiDayOpen(v => ({...v, [dayKey]: !dayOpen}))}>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", whiteSpace:"nowrap", fontWeight:700}}>{dayOpen ? "▾" : "▸"} {day}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dayRows[0]?.started_at?.slice(11,16) ?? "—"}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dayRows.length} attività</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{dayIn.toLocaleString("it-IT")}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{daySaved.toLocaleString("it-IT")}</td>
+                                        <td style={{padding:"5px 8px", color:dayQ!=null?(dayQ>=95?"#4ade80":dayQ>=80?"#fbbf24":"#f87171"):"#888", fontWeight:700, textAlign:"right"}}>{dayQ!=null?`${dayQ.toFixed(1)}%`:"—"}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{daySymbols}</td>
+                                        <td style={{padding:"5px 8px"}}><span style={{color:dayStatusColor, fontWeight:700}}>{dayStatus === "ok" ? "✓ ok" : dayStatus === "error" ? "✗ errore" : "~ parziale"}</span></td>
+                                        <td style={{padding:"5px 8px", color:firstErr ? "#f87171" : "#666", maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={firstErr}>{firstErr || `${dayOk} ok · ${dayPar} parziali · ${dayErr} errori`}</td>
+                                      </tr>,
+                                      ...detailRows,
+                                    ];
                                   })}
                                 </tbody>
                               </table>
                             </div>
                           ) : (
                             <div style={{padding:"14px 12px", textAlign:"center", color:"#555", fontSize:"0.65rem"}}>
-                              {feed === "fred"
-                                ? "Fonte non configurata — modulo FRED non attivo"
-                                : isIbkr
-                                  ? "Nessun dato IBKR — IBG deve essere attivo per raccogliere catene opzioni"
-                                  : "Nessun dato nel periodo selezionato"}
+                              {feed === "ibkr" ? "Nessun dato IBKR nel periodo selezionato" : "Nessun dato yfinance nel periodo selezionato"}
                             </div>
                           )}
 
-                          {/* ── Footer: note + CSV ── */}
-                          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center",
-                            padding:"6px 12px 8px", borderTop:"1px solid var(--border)"}}>
+                          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 12px 8px", borderTop:"1px solid var(--border)"}}>
                             <span style={{fontSize:"0.58rem", color:"#555"}}>{note}</span>
-                            <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 7px"}}
-                              onClick={csvDownload} disabled={rows.length===0} title="Scarica CSV esecuzioni">
+                            <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 7px"}} onClick={csvDownload} disabled={rows.length===0} title="Scarica CSV attività">
                               ⬇ CSV
                             </button>
                           </div>
                         </div>
                       );
                     })}
-
                     {/* ── Progress readiness ── */}
                     {historyReadiness && (
                       <div className="lc-progress-wrap" style={{marginTop:4}}>
