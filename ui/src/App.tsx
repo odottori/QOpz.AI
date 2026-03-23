@@ -1556,25 +1556,13 @@ export default function App() {
       const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
       const runs = r.runs ?? [];
       setFeedLog(runs);
-      // Lancia sempre la pipeline dati all'apertura (idempotente: il backend
-      // skippa la scrittura se i dati sono già freschi, aggiorna altrimenti).
+      // Aggiorna dati di mercato all'apertura (idempotente, una riga per fonte).
       if (autoRunIfEmpty) {
         try {
-          const universe = await apiJson<{ symbols: string[] }>(`${API_BASE}/opz/universe/latest?profile=${ACTIVE_PROFILE}`);
-          const symbols: string[] = universe.symbols ?? [];
-          await apiJson(`${API_BASE}/opz/demo_pipeline/auto`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              profile: ACTIVE_PROFILE,
-              symbols,
-              fetch_limit: Math.max(8, Math.min(40, symbols.length || 12)),
-            }),
-          });
-          // Ricarica il log dopo l'ingestione
+          await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
           const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
           setFeedLog(r2.runs ?? []);
-        } catch { /* pipeline auto fallita — non critico, mostra stato attuale */ }
+        } catch { /* non critico */ }
       }
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
