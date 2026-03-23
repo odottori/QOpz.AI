@@ -1556,9 +1556,9 @@ export default function App() {
       const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
       const runs = r.runs ?? [];
       setFeedLog(runs);
-      // Se il feed_log è vuoto (sessione mattutina non girata o non registrata),
-      // lancia automaticamente la pipeline dati e ricarica il log al termine.
-      if (autoRunIfEmpty && runs.length === 0) {
+      // Lancia sempre la pipeline dati all'apertura (idempotente: il backend
+      // skippa la scrittura se i dati sono già freschi, aggiorna altrimenti).
+      if (autoRunIfEmpty) {
         try {
           const universe = await apiJson<{ symbols: string[] }>(`${API_BASE}/opz/universe/latest?profile=${ACTIVE_PROFILE}`);
           const symbols: string[] = universe.symbols ?? [];
@@ -1574,7 +1574,7 @@ export default function App() {
           // Ricarica il log dopo l'ingestione
           const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
           setFeedLog(r2.runs ?? []);
-        } catch { /* pipeline auto fallita — non critico, mostra messaggio vuoto */ }
+        } catch { /* pipeline auto fallita — non critico, mostra stato attuale */ }
       }
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
@@ -2904,13 +2904,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* azione */}
-                    <div style={{display:"flex", gap:6, marginTop:4}}>
-                      <button className="btn btn-primary" onClick={() => void doAutoDemoPipeline()} disabled={busy || !apiOnline}>
-                        {busy ? "..." : "▶ Avvia pipeline dati"}
-                      </button>
-                      <button className="btn btn-ghost" onClick={() => { refreshAll(); void doFetchFeedLog(datiFilterDays); }} disabled={busy}>⟳</button>
-                    </div>
                   </div>
                 );
               })()}
