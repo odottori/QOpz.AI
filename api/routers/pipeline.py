@@ -164,18 +164,25 @@ def opz_data_refresh(
     _rec("fred", t0, t1, fred_n_in, fred_n_out, fred_status, fred_err)
     results["fred"] = {"ok": fred_n_out, "total": fred_n_in, "status": fred_status}
 
-    # ── 5. IBKR (health check IBG) ────────────────────────────────────────────
+    # ── 5. IBKR (health check IBG via TCP — porta 4001 TWS wire protocol) ───────
+    # IBG espone la TWS API su porta 4001 (paper) / 4002 (live) — protocollo
+    # binario, non HTTP. Il check corretto è un TCP connect test.
     t0 = datetime.now(timezone.utc)
     ibkr_status, ibkr_err = "error", None
     try:
-        import urllib.request as _ur
-        with _ur.urlopen("http://ibg:4001/v1/api/iserver/auth/status", timeout=3) as resp:
-            ibkr_status = "ok" if resp.status == 200 else "error"
-            if ibkr_status == "error":
-                ibkr_err = f"IBG HTTP {resp.status}"
+        import socket as _sock
+        for _port in (4004, 4002, 4001):
+            try:
+                with _sock.create_connection(("ibg", _port), timeout=3):
+                    ibkr_status = "ok"
+                    ibkr_err = None
+                    break
+            except OSError:
+                continue
+        else:
+            ibkr_err = "IBG non raggiungibile su 4004/4002/4001"
     except Exception as exc:
-        ibkr_status = "error"
-        ibkr_err = f"IBG non disponibile: {type(exc).__name__}"
+        ibkr_err = f"IBG check fallito: {exc}"
     t1 = datetime.now(timezone.utc)
     _rec("ibkr_demo", t0, t1, 0, 0, ibkr_status, ibkr_err)
     results["ibkr"] = {"status": ibkr_status, "error": ibkr_err}
