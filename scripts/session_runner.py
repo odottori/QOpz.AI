@@ -376,6 +376,32 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
         "steps": steps,
     })
 
+    # ── Registro ingestione: traccia la sessione mattutina nel feed_log ───────
+    try:
+        from execution.storage import record_ingestion_run
+        iv_res = steps.get("iv_history", {}).get("symbols", {})
+        n_ok = sum(1 for v in iv_res.values() if isinstance(v, dict) and v.get("ok")) if isinstance(iv_res, dict) else 0
+        n_tot = len(iv_res) if isinstance(iv_res, dict) else 0
+        dur_ms = int((datetime.fromisoformat(finished_at) - datetime.fromisoformat(started_at)).total_seconds() * 1000)
+        status = "ok" if len(errors) == 0 else ("partial" if n_ok > 0 else "error")
+        record_ingestion_run(
+            profile=profile,
+            feed="yfinance",
+            run_date=date.today().isoformat(),
+            started_at=started_at,
+            finished_at=finished_at,
+            duration_ms=dur_ms,
+            status=status,
+            records_in=n_tot,
+            records_out=n_ok,
+            symbols_count=n_tot,
+            error_msg=("; ".join(errors[:3]) if errors else None),
+            details={"source": "morning_session", "steps": list(steps.keys())},
+        )
+    except Exception as _exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("morning: record_ingestion_run failed: %s", _exc)
+
     return {
         "type": "morning",
         "profile": profile,
