@@ -143,6 +143,41 @@ def opz_data_refresh(
          "; ".join(ev_err[:3]) if ev_err else None)
     results["events_calendar"] = {"ok": ev_ok, "total": len(symbols), "errors": len(ev_err)}
 
+    # ── 4. FRED / macro (stub — modulo opzionale) ────────────────────────────
+    t0 = datetime.now(timezone.utc)
+    fred_n_in, fred_n_out = 0, 0
+    fred_status, fred_err = "error", "Fonte non configurata — modulo FRED non attivo"
+    try:
+        from scripts.fetch_fred import fetch_fred_indicators  # type: ignore
+        res_fred = fetch_fred_indicators()
+        fred_n_in = res_fred.get("n_series", 0)
+        fred_n_out = res_fred.get("n_saved", 0)
+        fred_status = "ok" if fred_n_out > 0 else "partial"
+        fred_err = None
+    except ImportError:
+        pass  # modulo non configurato — mantieni status=error
+    except Exception as exc:
+        fred_err = str(exc)
+    t1 = datetime.now(timezone.utc)
+    _rec("fred", t0, t1, fred_n_in, fred_n_out, fred_status, fred_err)
+    results["fred"] = {"ok": fred_n_out, "total": fred_n_in, "status": fred_status}
+
+    # ── 5. IBKR (health check IBG) ────────────────────────────────────────────
+    t0 = datetime.now(timezone.utc)
+    ibkr_status, ibkr_err = "error", None
+    try:
+        import urllib.request as _ur
+        with _ur.urlopen("http://ibg:4001/v1/api/iserver/auth/status", timeout=3) as resp:
+            ibkr_status = "ok" if resp.status == 200 else "error"
+            if ibkr_status == "error":
+                ibkr_err = f"IBG HTTP {resp.status}"
+    except Exception as exc:
+        ibkr_status = "error"
+        ibkr_err = f"IBG non disponibile: {type(exc).__name__}"
+    t1 = datetime.now(timezone.utc)
+    _rec("ibkr_demo", t0, t1, 0, 0, ibkr_status, ibkr_err)
+    results["ibkr"] = {"status": ibkr_status, "error": ibkr_err}
+
     # ── Totale runs registrate oggi ───────────────────────────────────────────
     total_runs = list_ingestion_runs(profile=profile, days_back=1)
     return {

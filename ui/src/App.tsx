@@ -901,10 +901,10 @@ export default function App() {
   };
   const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
   const [feedLogLoading, setFeedLogLoading] = useState(true);
-  const [datiFilterFeed, setDatiFilterFeed] = useState<string>("tutte");
-  const [datiFilterStatus, setDatiFilterStatus] = useState<string>("tutti");
-  const [datiFilterDays, setDatiFilterDays] = useState<number>(30);
-  const [datiFiltersOpen, setDatiFiltersOpen] = useState(false);
+  const [datiFilterDays, setDatiFilterDays] = useState<number>(1);
+  const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
+  const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({});
+  const [datiSysOpen, setDatiSysOpen] = useState(false);
 
   const parsedPayload = useMemo(() => {
     try {
@@ -2605,8 +2605,17 @@ export default function App() {
                 {premarketScanAt && <span className="lc-step-sub">Aggiornato: {fmtTs(premarketScanAt)}</span>}
               </div>
 
-              {/* ══ KPI BAR sistemica — stato globale pipeline ══ */}
-              {(() => {
+              {/* ══ KPI BAR sistemica — stato globale pipeline (collassabile) ══ */}
+              <div style={{borderBottom:"1px solid var(--border)"}}>
+                <div style={{display:"flex", alignItems:"center", gap:5, cursor:"pointer",
+                  padding:"5px 12px", userSelect:"none"}}
+                  onClick={() => setDatiSysOpen(v => !v)}>
+                  <span style={{fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em",
+                    color:"#555", flex:1}}>Sistema — stato pipeline</span>
+                  <span style={{fontSize:"0.5rem", color:"#555"}}>{datiSysOpen ? "▾" : "▸"}</span>
+                </div>
+              </div>
+              {datiSysOpen && (() => {
                 const kpiToggle = (id: string) => setKpiExpanded(v => v === id ? null : id);
                 const kpiPin = (id: string, e: React.MouseEvent) => {
                   e.stopPropagation();
@@ -2720,200 +2729,228 @@ export default function App() {
                 );
               })()}
 
-              {/* ══ Filtri ══ */}
-              <div style={{padding:"4px 12px 0"}}>
-                <div
-                  style={{display:"flex", justifyContent:"space-between", alignItems:"center",
-                    cursor:"pointer", fontSize:"0.62rem", color:"var(--dim)", userSelect:"none",
-                    borderTop:"1px solid var(--border)", paddingTop:6}}
-                  onClick={() => setDatiFiltersOpen(v => !v)}>
-                  <span>{datiFiltersOpen ? "▾" : "▸"} filtri</span>
-                  {!datiFiltersOpen && (
-                    <span style={{fontSize:"0.58rem", color:"#888"}}>
-                      fonte: {datiFilterFeed} · stato: {datiFilterStatus} · ultimi {datiFilterDays}g
-                    </span>
-                  )}
-                </div>
-                {datiFiltersOpen && (
-                  <div style={{display:"flex", gap:6, flexWrap:"wrap", marginTop:6, marginBottom:4}}>
-                    <div style={{display:"flex", gap:3, alignItems:"center"}}>
-                      <span style={{fontSize:"0.58rem", color:"#888"}}>fonte:</span>
-                      {["tutte","ibkr_demo","ibkr_capture","ibkr_extract","ibkr_dataset","yfinance","fred","orats"].map(f => (
-                        <button key={f}
-                          style={{fontSize:"0.55rem", padding:"1px 4px", borderRadius:3, border:"1px solid var(--border)",
-                            background: datiFilterFeed === f ? "var(--p1)" : "transparent",
-                            color: datiFilterFeed === f ? "var(--text)" : "var(--dim)", cursor:"pointer"}}
-                          onClick={() => setDatiFilterFeed(f)}>{f === "tutte" ? "tutte" : f}</button>
-                      ))}
-                    </div>
-                    <div style={{display:"flex", gap:3, alignItems:"center"}}>
-                      <span style={{fontSize:"0.58rem", color:"#888"}}>stato:</span>
-                      {["tutti","ok","error","partial"].map(s => (
-                        <button key={s}
-                          style={{fontSize:"0.55rem", padding:"1px 4px", borderRadius:3, border:"1px solid var(--border)",
-                            background: datiFilterStatus === s ? "var(--p1)" : "transparent",
-                            color: datiFilterStatus === s ? "var(--text)" : "var(--dim)", cursor:"pointer"}}
-                          onClick={() => setDatiFilterStatus(s)}>{s}</button>
-                      ))}
-                    </div>
-                    <div style={{display:"flex", gap:3, alignItems:"center"}}>
-                      <span style={{fontSize:"0.58rem", color:"#888"}}>periodo:</span>
-                      {[7,14,30,90].map(d => (
-                        <button key={d}
-                          style={{fontSize:"0.55rem", padding:"1px 4px", borderRadius:3, border:"1px solid var(--border)",
-                            background: datiFilterDays === d ? "var(--p1)" : "transparent",
-                            color: datiFilterDays === d ? "var(--text)" : "var(--dim)", cursor:"pointer"}}
-                          onClick={() => { setDatiFilterDays(d); void doFetchFeedLog(d); }}>{d}g</button>
-                      ))}
-                    </div>
-                    <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 6px"}}
-                      onClick={() => void doFetchFeedLog(datiFilterDays)} disabled={feedLogLoading}>
-                      {feedLogLoading ? "..." : "⟳"}
-                    </button>
-                  </div>
-                )}
+              {/* ══ Barra periodo ══ */}
+              <div style={{display:"flex", alignItems:"center", gap:6, padding:"6px 12px 4px",
+                borderTop:"1px solid var(--border)"}}>
+                <span style={{fontSize:"0.58rem", color:"#888"}}>periodo:</span>
+                {[1,7,14,30].map(d => (
+                  <button key={d}
+                    style={{fontSize:"0.55rem", padding:"1px 5px", borderRadius:3, border:"1px solid var(--border)",
+                      background: datiFilterDays === d ? "var(--p1)" : "transparent",
+                      color: datiFilterDays === d ? "var(--text)" : "var(--dim)", cursor:"pointer"}}
+                    onClick={() => { setDatiFilterDays(d); void doFetchFeedLog(d); }}>
+                    {d === 1 ? "oggi" : `${d}g`}
+                  </button>
+                ))}
+                <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 6px", marginLeft:4}}
+                  onClick={() => void doFetchFeedLog(datiFilterDays)} disabled={feedLogLoading}>
+                  {feedLogLoading ? "..." : "⟳"}
+                </button>
               </div>
 
-              {/* ══ Tabella ingestioni per fonte ══ */}
-              {(() => {
-                const mc = (lbl: string, val: string, col: string, tip?: string) => (
-                  <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)",
-                    border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px",
-                    display:"flex", flexDirection:"column", justifyContent:"center"}}>
-                    <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em",
-                      lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
-                    <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1,
-                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+              {/* ══ Loading bar ══ */}
+              {feedLogLoading && (
+                <div style={{padding:"24px 16px"}}>
+                  <div style={{fontSize:"0.6rem", color:"var(--dim)", textAlign:"center", marginBottom:8, letterSpacing:"0.05em"}}>
+                    attendere prego — caricamento in corso...
                   </div>
-                );
-                const allFeeds = datiFilterFeed === "tutte"
-                  ? [...new Set(feedLog.map(r => r.feed))].sort()
-                  : [datiFilterFeed];
-                const filtered = feedLog.filter(r =>
-                  (datiFilterFeed === "tutte" || r.feed === datiFilterFeed) &&
-                  (datiFilterStatus === "tutti" || r.status === datiFilterStatus)
-                );
+                  <div style={{height:3, background:"var(--border)", borderRadius:2, overflow:"hidden"}}>
+                    <div style={{height:"100%", background:"var(--g2)", borderRadius:2,
+                      animation:"feedLogProgress 2.5s ease-out forwards"}} />
+                  </div>
+                </div>
+              )}
 
-                if (feedLogLoading) {
-                  return (
-                    <div style={{padding:"24px 16px"}}>
-                      <div style={{fontSize:"0.6rem", color:"var(--dim)", textAlign:"center", marginBottom:8, letterSpacing:"0.05em"}}>
-                        attendere prego — caricamento in corso...
-                      </div>
-                      <div style={{height:3, background:"var(--border)", borderRadius:2, overflow:"hidden"}}>
-                        <div style={{height:"100%", background:"var(--g2)", borderRadius:2,
-                          animation:"feedLogProgress 2.5s ease-out forwards"}} />
-                      </div>
-                    </div>
-                  );
-                }
-
-                if (feedLog.length === 0) {
-                  return (
-                    <div style={{padding:"20px 12px", textAlign:"center", color:"var(--dim)", fontSize:"0.65rem"}}>
-                      Nessun dato di ingestione registrato. Avvia la pipeline dati per iniziare la raccolta.
-                    </div>
-                  );
-                }
-
-                const feedLabel = (f: string) => ({
-                  yfinance: "Prezzi & Volatilità",
-                  events_calendar: "Calendario eventi",
-                  fred: "Dati macro",
-                  ibkr_demo: "Dati IBKR",
-                  ibkr_capture: "Cattura IBKR",
-                  ibkr_extract: "Estrazione IBKR",
-                  ibkr_dataset: "Dataset IBKR",
-                  orats: "Catene opzioni",
-                } as Record<string,string>)[f] ?? f;
-
+              {/* ══ 4 Blocchi fonte ══ */}
+              {!feedLogLoading && (() => {
+                const sources: Array<{feed:string, label:string, note:string}> = [
+                  { feed:"yfinance",        label:"Prezzi & Volatilità",  note:"Storico prezzi e volatilità implicita · yfinance" },
+                  { feed:"events_calendar", label:"Calendario eventi",    note:"Utili, dividendi, scadenze opzioni · yfinance" },
+                  { feed:"fred",            label:"Dati macro",           note:"Indicatori macroeconomici · FRED / St. Louis Fed" },
+                  { feed:"ibkr",            label:"Dati IBKR",            note:"Catene opzioni e margini · Interactive Brokers" },
+                ];
+                const ibkrFeeds = ["ibkr_demo","ibkr_capture","ibkr_extract","ibkr_dataset"];
+                const fBtnSt = (active: boolean, col: string) => ({
+                  fontSize:"0.55rem" as const, padding:"1px 4px", borderRadius:3, cursor:"pointer" as const,
+                  border:`1px solid ${active ? col : "#3d3d3d"}`,
+                  background: active ? `${col}22` : "transparent",
+                  color: active ? col : "#888",
+                  fontWeight: active ? 600 : 400,
+                  transition:"all 0.15s",
+                });
                 return (
-                  <div style={{padding:"8px 12px", display:"flex", flexDirection:"column", gap:20}}>
-                    {(allFeeds.length > 0 ? allFeeds : ["(nessuna fonte)"]).map(feed => {
-                      const rows = filtered.filter(r => r.feed === feed);
-                      const tot = rows.length;
-                      const nOk = rows.filter(r => r.status === "ok").length;
-                      const nErr = rows.filter(r => r.status === "error").length;
-                      const avgQ = tot > 0
-                        ? rows.reduce((s,r) => s + (r.quality_pct ?? 0), 0) / tot
-                        : null;
-                      const lastRun = rows[0];
-                      const qCol = avgQ != null ? (avgQ >= 95 ? "#4ade80" : avgQ >= 80 ? "#fbbf24" : "#f87171") : "#888";
+                  <div style={{padding:"8px 12px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14}}>
+                    {sources.map(({ feed, label, note }) => {
+                      const isIbkr = feed === "ibkr";
+                      const srcRows = feedLog
+                        .filter(r => isIbkr ? ibkrFeeds.includes(r.feed) : r.feed === feed)
+                        .sort((a,b) => (b.run_date+b.started_at).localeCompare(a.run_date+a.started_at));
+                      const blockSt = datiBlockStatus[feed] ?? "tutti";
+                      const rows = srcRows.filter(r => blockSt === "tutti" || r.status === blockSt);
+                      const tot = srcRows.length;
+                      const nOk  = srcRows.filter(r => r.status === "ok").length;
+                      const nErr = srcRows.filter(r => r.status === "error").length;
+                      const nPar = srcRows.filter(r => r.status === "partial").length;
+                      const lastRun = srcRows[0];
+                      const avgQ = tot > 0 ? srcRows.reduce((s,r) => s + (r.quality_pct ?? 0), 0) / tot : null;
+                      const lastSt = lastRun?.status ?? null;
+                      const mainCol = lastSt === "ok" ? "#4ade80" : lastSt === "error" ? "#f87171" : lastSt === "partial" ? "#fbbf24" : "#555";
+                      const stLabel = lastSt === "ok" ? "✓ OK" : lastSt === "error" ? "✗ ERRORE" : lastSt === "partial" ? "~ PARZIALE" : "—";
+                      const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
+                      const activeFilters = blockSt !== "tutti" ? 1 : 0;
+
+                      const csvDownload = () => {
+                        if (!rows.length) return;
+                        const cols = "data,ora,durata_ms,ricevuti,salvati,qualita_pct,simboli,stato,errore";
+                        const body = rows.map(r => [
+                          r.run_date, r.started_at?.slice(11,19)??"",
+                          r.duration_ms??"", r.records_in??"", r.records_out??"",
+                          r.quality_pct??"", r.symbols_count??"", r.status,
+                          `"${(r.error_msg??"").replace(/"/g,'""')}"`,
+                        ].join(",")).join("\n");
+                        const blob = new Blob([cols+"\n"+body], {type:"text/csv"});
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a"); a.href=url;
+                        a.download=`${feed}_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+                        URL.revokeObjectURL(url);
+                      };
+
                       return (
-                        <div key={feed} style={{borderLeft:"2px solid var(--border)", paddingLeft:10}}>
-                          {/* intestazione fonte */}
-                          <div style={{fontSize:"0.75rem", fontWeight:700, color:"#e2f0e8", marginBottom:8, letterSpacing:"0.04em"}}>
-                            {feedLabel(feed)}
+                        <div key={feed} style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
+                          {/* ── Big header card ── */}
+                          <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
+                            padding:"10px 14px", background:"rgba(0,255,106,0.04)", borderBottom:"1px solid var(--border)"}}>
+                            <div>
+                              <div style={{fontSize:"0.78rem", fontWeight:700, color:"#e2f0e8", letterSpacing:"0.04em"}}>{label}</div>
+                              <div style={{fontSize:"0.58rem", color:"#7aaa90", marginTop:2}}>
+                                {lastRun
+                                  ? `ultima esecuzione: ${lastRun.run_date} · ${lastRun.started_at?.slice(11,16)??""}${lastRun.symbols_count != null ? ` · ${lastRun.symbols_count} simboli` : ""}`
+                                  : "Nessuna esecuzione nel periodo"}
+                              </div>
+                            </div>
+                            <div style={{textAlign:"right"}}>
+                              <div style={{fontSize:"1.15rem", fontWeight:700, color:mainCol, letterSpacing:"0.02em"}}>{stLabel}</div>
+                              <div style={{fontSize:"0.55rem", color:"#666", marginTop:1}}>{tot} esecuzioni · {nOk} ok</div>
+                            </div>
                           </div>
-                          {/* card strip metriche */}
-                          <div style={{display:"flex", gap:6, marginBottom:10, flexWrap:"wrap"}}>
-                            {[
-                              { lbl:"Esecuzioni", val:String(tot), col: tot > 0 ? "#e2f0e8" : "#888" },
-                              { lbl:"Completate", val:String(nOk), col: nOk === tot && tot > 0 ? "#4ade80" : nOk > 0 ? "#fbbf24" : "#f87171" },
-                              { lbl:"Errori", val:String(nErr), col: nErr === 0 ? "#4ade80" : "#f87171" },
-                              { lbl:"Qualità media", val: avgQ != null ? `${avgQ.toFixed(1)}%` : "—", col: qCol },
-                              { lbl:"Ultima esecuzione", val: lastRun ? lastRun.run_date : "—", col:"#e2f0e8" },
-                            ].map(({lbl, val, col}) => (
-                              <div key={lbl} style={{minWidth:90, background:"var(--p2)", border:"1px solid var(--border)",
-                                borderRadius:4, padding:"6px 10px"}}>
-                                <div style={{fontSize:"0.52rem", color:"#7aaa90", textTransform:"uppercase",
-                                  letterSpacing:"0.06em", marginBottom:3}}>{lbl}</div>
-                                <div style={{fontSize:"0.9rem", fontWeight:700, color:col}}>{val}</div>
+
+                          {/* ── Metric cards strip ── */}
+                          <div style={{display:"flex", gap:6, padding:"8px 12px", flexWrap:"wrap"}}>
+                            {([
+                              {lbl:"Esecuzioni", val:String(tot),  col:tot>0?"#e2f0e8":"#555"},
+                              {lbl:"Completate",  val:String(nOk),  col:nOk===tot&&tot>0?"#4ade80":nOk>0?"#fbbf24":"#f87171"},
+                              {lbl:"Errori",      val:String(nErr), col:nErr===0?"#4ade80":"#f87171"},
+                              {lbl:"Parziali",    val:String(nPar), col:nPar>0?"#fbbf24":"#e2f0e8"},
+                              {lbl:"Qualità media",val:avgQ!=null?`${avgQ.toFixed(1)}%`:"—", col:avgQ!=null?(avgQ>=95?"#4ade80":avgQ>=80?"#fbbf24":"#f87171"):"#555"},
+                            ] as Array<{lbl:string,val:string,col:string}>).map(({lbl,val,col}) => (
+                              <div key={lbl} style={{flex:"1 1 72px", background:"var(--p1)", border:"1px solid var(--border)",
+                                borderRadius:4, padding:"5px 8px", minWidth:68}}>
+                                <div style={{fontSize:"0.5rem", color:"#7aaa90", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:2}}>{lbl}</div>
+                                <div style={{fontSize:"0.85rem", fontWeight:700, color:col}}>{val}</div>
                               </div>
                             ))}
                           </div>
-                          {/* tabella righe */}
-                          {rows.length > 0 && (
-                            <div style={{overflowX:"auto"}}>
-                              <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.65rem"}}>
+
+                          {/* ── Filtri collassabili ── */}
+                          <div style={{padding:"0 12px 4px"}}>
+                            <div style={{display:"flex", alignItems:"center", gap:5, cursor:"pointer",
+                              padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: filtersOpen ? 6 : 0}}
+                              onClick={() => setDatiBlockFiltersOpen(v => ({...v, [feed]: !filtersOpen}))}>
+                              <span style={{fontSize:"0.62rem", color:"#888"}}>🔍</span>
+                              <span style={{fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", flex:1,
+                                color: activeFilters > 0 ? "#60a5fa" : "#555",
+                                fontWeight: activeFilters > 0 ? 600 : 400}}>
+                                FILTRI{activeFilters > 0 ? ` · ${activeFilters} attivo` : ""}
+                              </span>
+                              <span style={{fontSize:"0.5rem", color:"#777"}}>{filtersOpen ? "▾" : "▸"}</span>
+                            </div>
+                            {filtersOpen && (
+                              <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:6, flexWrap:"wrap"}}>
+                                <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase",
+                                  letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>stato:</span>
+                                {([
+                                  {id:"tutti",   label:"TUTTI",    col:"#888"},
+                                  {id:"ok",      label:"OK",       col:"#4ade80"},
+                                  {id:"error",   label:"ERRORE",   col:"#f87171"},
+                                  {id:"partial", label:"PARZIALE", col:"#fbbf24"},
+                                ] as Array<{id:string,label:string,col:string}>).map(({id,label,col}) => (
+                                  <button key={id}
+                                    onClick={() => setDatiBlockStatus(v => ({...v, [feed]: id}))}
+                                    style={fBtnSt(blockSt === id, col)}>
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ── Tabella ── */}
+                          {rows.length > 0 ? (
+                            <div style={{padding:"0 12px 8px", overflowX:"auto"}}>
+                              <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.62rem"}}>
                                 <thead>
                                   <tr style={{borderBottom:"2px solid var(--border)"}}>
-                                    {[
-                                      {h:"Data", align:"left"}, {h:"Ora", align:"left"},
-                                      {h:"Durata", align:"left"}, {h:"Ricevuti", align:"right"},
-                                      {h:"Salvati", align:"right"}, {h:"Qualità", align:"right"},
-                                      {h:"Simboli", align:"right"}, {h:"Stato", align:"left"},
-                                      {h:"Errore", align:"left"},
-                                    ].map(({h, align}) => (
-                                      <th key={h} style={{padding:"4px 8px", textAlign:align as "left"|"right",
+                                    {([
+                                      {h:"Data",a:"left"},{h:"Ora",a:"left"},{h:"Durata",a:"left"},
+                                      {h:"Ricevuti",a:"right"},{h:"Salvati",a:"right"},{h:"Qualità",a:"right"},
+                                      {h:"Simboli",a:"right"},{h:"Stato",a:"left"},{h:"Errore",a:"left"},
+                                    ] as Array<{h:string,a:string}>).map(({h,a}) => (
+                                      <th key={h} style={{padding:"4px 8px", textAlign:a as "left"|"right",
                                         color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap",
-                                        fontSize:"0.62rem", letterSpacing:"0.03em"}}>{h}</th>
+                                        fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
                                     ))}
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {rows.map((r, i) => {
-                                    const stCol = r.status === "ok" ? "#4ade80" : r.status === "error" ? "#f87171" : "#fbbf24";
-                                    const stLabel = r.status === "ok" ? "✓ ok" : r.status === "error" ? "✗ errore" : "~ parziale";
-                                    const rqCol = r.quality_pct != null ? (r.quality_pct >= 95 ? "#4ade80" : r.quality_pct >= 80 ? "#fbbf24" : "#f87171") : "#888";
-                                    const ora = r.started_at ? r.started_at.slice(11,16) : "—";
-                                    const dur = r.duration_ms != null ? (r.duration_ms >= 1000 ? `${(r.duration_ms/1000).toFixed(1)}s` : `${r.duration_ms}ms`) : "—";
+                                  {rows.slice(0,50).map((r, i) => {
+                                    const stC = r.status==="ok"?"#4ade80":r.status==="error"?"#f87171":"#fbbf24";
+                                    const stL = r.status==="ok"?"✓ ok":r.status==="error"?"✗ errore":"~ parziale";
+                                    const rqC = r.quality_pct!=null?(r.quality_pct>=95?"#4ade80":r.quality_pct>=80?"#fbbf24":"#f87171"):"#888";
+                                    const dur = r.duration_ms!=null?(r.duration_ms>=1000?`${(r.duration_ms/1000).toFixed(1)}s`:`${r.duration_ms}ms`):"—";
                                     return (
                                       <tr key={r.run_id} style={{borderBottom:"1px solid var(--border)",
-                                        background: i%2===0 ? "transparent" : "rgba(0,255,106,0.03)"}}>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.run_date}</td>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{ora}</td>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dur}</td>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_in?.toLocaleString("it-IT") ?? "—"}</td>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_out?.toLocaleString("it-IT") ?? "—"}</td>
-                                        <td style={{padding:"5px 8px", color:rqCol, fontWeight:600, textAlign:"right"}}>{r.quality_pct != null ? `${r.quality_pct.toFixed(1)}%` : "—"}</td>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.symbols_count ?? "—"}</td>
-                                        <td style={{padding:"5px 8px"}}><span style={{color:stCol, fontWeight:700}}>{stLabel}</span></td>
-                                        <td style={{padding:"5px 8px", color:"#f87171", fontSize:"0.6rem", maxWidth:160,
+                                        background:i%2===0?"transparent":"rgba(0,255,106,0.03)"}}>
+                                        <td style={{padding:"4px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.run_date}</td>
+                                        <td style={{padding:"4px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.started_at?.slice(11,16)??"—"}</td>
+                                        <td style={{padding:"4px 8px", color:"#e2f0e8"}}>{dur}</td>
+                                        <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_in?.toLocaleString("it-IT")??"—"}</td>
+                                        <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_out?.toLocaleString("it-IT")??"—"}</td>
+                                        <td style={{padding:"4px 8px", color:rqC, fontWeight:600, textAlign:"right"}}>{r.quality_pct!=null?`${r.quality_pct.toFixed(1)}%`:"—"}</td>
+                                        <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.symbols_count??"—"}</td>
+                                        <td style={{padding:"4px 8px"}}><span style={{color:stC, fontWeight:700}}>{stL}</span></td>
+                                        <td style={{padding:"4px 8px", color:"#f87171", maxWidth:160,
                                           overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}
-                                          title={r.error_msg ?? ""}>{r.error_msg ?? ""}</td>
+                                          title={r.error_msg??""}>{r.error_msg??""}</td>
                                       </tr>
                                     );
                                   })}
                                 </tbody>
                               </table>
                             </div>
+                          ) : (
+                            <div style={{padding:"14px 12px", textAlign:"center", color:"#555", fontSize:"0.65rem"}}>
+                              {feed === "fred"
+                                ? "Fonte non configurata — modulo FRED non attivo"
+                                : isIbkr
+                                  ? "Nessun dato IBKR — IBG deve essere attivo per raccogliere catene opzioni"
+                                  : "Nessun dato nel periodo selezionato"}
+                            </div>
                           )}
+
+                          {/* ── Footer: note + CSV ── */}
+                          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center",
+                            padding:"6px 12px 8px", borderTop:"1px solid var(--border)"}}>
+                            <span style={{fontSize:"0.58rem", color:"#555"}}>{note}</span>
+                            <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 7px"}}
+                              onClick={csvDownload} disabled={rows.length===0} title="Scarica CSV esecuzioni">
+                              ⬇ CSV
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
 
-                    {/* progress readiness in fondo */}
+                    {/* ── Progress readiness ── */}
                     {historyReadiness && (
                       <div className="lc-progress-wrap" style={{marginTop:4}}>
                         <div className="lc-panel-title">Completezza storico → soglia sizing (50 trade / 50 giorni)</div>
@@ -2927,7 +2964,6 @@ export default function App() {
                         </div>
                       </div>
                     )}
-
                   </div>
                 );
               })()}
