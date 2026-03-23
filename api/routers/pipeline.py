@@ -123,25 +123,45 @@ def opz_data_refresh(
          "; ".join(iv_err[:3]) if iv_err else None)
     results["yfinance_iv_history"] = {"ok": iv_ok, "total": len(symbols), "errors": len(iv_err)}
 
-    # ── 3. yfinance — events calendar ─────────────────────────────────────────
+    # ── 3a. yfinance — earnings calendar ──────────────────────────────────────
     t0 = datetime.now(timezone.utc)
-    ev_ok = 0
-    ev_err: list[str] = []
+    cal_ok = 0
+    cal_err: list[str] = []
     try:
-        from scripts.events_calendar import check_events
+        from scripts.events_calendar import fetch_earnings_date
         for sym in symbols:
             try:
-                check_events(sym)
-                ev_ok += 1
+                fetch_earnings_date(sym)
+                cal_ok += 1
             except Exception as exc:
-                ev_err.append(f"{sym}: {exc}")
+                cal_err.append(f"{sym}: {exc}")
     except ImportError as exc:
-        ev_err.append(f"import: {exc}")
+        cal_err.append(f"import: {exc}")
     t1 = datetime.now(timezone.utc)
-    status_ev = "ok" if ev_ok == len(symbols) else ("partial" if ev_ok > 0 else "error")
-    _rec("yfinance_events", t0, t1, len(symbols), ev_ok, status_ev,
-         "; ".join(ev_err[:3]) if ev_err else None)
-    results["yfinance_events"] = {"ok": ev_ok, "total": len(symbols), "errors": len(ev_err)}
+    status_cal = "ok" if cal_ok == len(symbols) else ("partial" if cal_ok > 0 else "error")
+    _rec("yfinance_calendar", t0, t1, len(symbols), cal_ok, status_cal,
+         "; ".join(cal_err[:3]) if cal_err else None)
+    results["yfinance_calendar"] = {"ok": cal_ok, "total": len(symbols), "errors": len(cal_err)}
+
+    # ── 3b. yfinance — ex-dividend dates ──────────────────────────────────────
+    t0 = datetime.now(timezone.utc)
+    div_ok = 0
+    div_err: list[str] = []
+    try:
+        from scripts.events_calendar import fetch_dividend_date
+        for sym in symbols:
+            try:
+                fetch_dividend_date(sym)
+                div_ok += 1
+            except Exception as exc:
+                div_err.append(f"{sym}: {exc}")
+    except ImportError as exc:
+        div_err.append(f"import: {exc}")
+    t1 = datetime.now(timezone.utc)
+    status_div = "ok" if div_ok == len(symbols) else ("partial" if div_ok > 0 else "error")
+    _rec("yfinance_exdiv", t0, t1, len(symbols), div_ok, status_div,
+         "; ".join(div_err[:3]) if div_err else None)
+    results["yfinance_exdiv"] = {"ok": div_ok, "total": len(symbols), "errors": len(div_err)}
 
     # ── 4. yfinance — macro indicators (VIX, VIX3M, 10Y/30Y) ────────────────
     t0 = datetime.now(timezone.utc)
@@ -164,15 +184,15 @@ def opz_data_refresh(
     _rec("yfinance_macro", t0, t1, macro_n_in, macro_n_out, macro_status, macro_err)
     results["yfinance_macro"] = {"ok": macro_n_out, "total": macro_n_in, "status": macro_status}
 
-    # Compat rows for older UI / reports
+    # Compat aliases per report/script legacy
     results["yfinance"] = results["yfinance_iv_history"]
-    results["events_calendar"] = results["yfinance_events"]
+    results["events_calendar"] = results["yfinance_calendar"]
     results["fred"] = results["yfinance_macro"]
 
     # ── 5. IBKR — ingest reale (prezzi, chain, greeks, IV history, account) ─
     try:
         from api.opz_api import opz_ibkr_account
-        from scripts.fetch_iv_history_ibkr import capture_ibkr_symbol_snapshot, merge_today_iv_point
+        from scripts.fetch_iv_history_ibkr import capture_ibkr_universe_snapshot, merge_today_iv_point
     except Exception as exc:
         t0 = datetime.now(timezone.utc)
         t1 = datetime.now(timezone.utc)
@@ -181,16 +201,18 @@ def opz_data_refresh(
             _rec(_feed, t0, t1, len(symbols) if _feed != "ibkr_account" else 1, 0, "error", msg)
         results["ibkr"] = {"status": "error", "error": msg}
     else:
-        snapshots: list[dict[str, Any]] = []
         ibkr_errs: list[str] = []
 
         t0 = datetime.now(timezone.utc)
-        for sym in symbols:
-            try:
-                snap = capture_ibkr_symbol_snapshot(sym, profile=profile)
-                snapshots.append(snap)
-            except Exception as exc:
-                ibkr_errs.append(f"{sym}: {exc}")
+        try:
+            snapshots: list[dict[str, Any]] = capture_ibkr_universe_snapshot(symbols, profile=profile)
+        except Exception as exc:
+            snapshots = []
+            ibkr_errs.append(str(exc))
+        # raccoglie errori per-simbolo dai risultati
+        for snap in snapshots:
+            if snap.get("error"):
+                ibkr_errs.append(f"{snap.get('symbol')}: {snap['error']}")
         t1 = datetime.now(timezone.utc)
 
         symbols_ok = len(snapshots)
@@ -243,9 +265,7 @@ def opz_data_refresh(
         _rec("ibkr_positions", t4, t5, 1 if account_status == "ok" else 0, positions_out,
              "ok" if account_status == "ok" else "error", account_err)
 
-        # Compat row per vecchia UI: health+ingest aggregato IBKR
         compat_status = "ok" if with_chain > 0 else ("partial" if snapshots else "error")
-        _rec("ibkr_demo", t0, t5, len(symbols), with_chain, compat_status, chain_err_msg or account_err)
         results["ibkr"] = {
             "status": compat_status,
             "error": chain_err_msg or account_err,

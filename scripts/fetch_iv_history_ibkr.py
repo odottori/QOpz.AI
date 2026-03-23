@@ -1,12 +1,14 @@
 """
 scripts/fetch_iv_history_ibkr.py — ATM IV + greeks da IBKR via ib_insync
 
+capture_ibkr_universe_snapshot(symbols, profile) → list[dict]
+    Apre UNA connessione IBG e cattura snapshot per tutti i simboli.
+    Per ogni simbolo: prezzo sottostante, catena opzioni (20-60 DTE), strike ATM,
+    IV implicita ATM (call+put), greche ATM (delta, gamma, theta, vega).
+    Errori per-simbolo NON bloccanti: ritorna partial con error field.
+
 capture_ibkr_symbol_snapshot(sym, profile) → dict
-    Connette a IBG, per ogni simbolo:
-    - Quota del sottostante (bid/ask/last/close)
-    - Chain opzioni: expiry più vicina in 20-60 DTE, strike ATM
-    - Market data ATM call + put → IV implicita + greche (delta, gamma, theta, vega)
-    Ritorna un dict con tutti i valori; errori NON bloccanti (ritorna partial).
+    Wrapper single-symbol per compatibilità. Usa capture_ibkr_universe_snapshot.
 
 merge_today_iv_point(sym, atm_iv) → None
     Sovrascrive il punto odierno nell'IV history JSON con il valore IBKR,
@@ -71,20 +73,11 @@ def _ibkr_connection_params(profile: str = "dev") -> tuple[str, list[int], int]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Core: snapshot per simbolo
+# Core: snapshot per simbolo / universo
 # ─────────────────────────────────────────────────────────────────────────────
 
-def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str, Any]:
-    """
-    Connette a IBG e cattura: prezzo sottostante, catena opzioni, IV ATM, greche ATM.
-
-    Ritorna dict con:
-        symbol, underlying_price, contracts_count, greeks_complete,
-        atm_iv, atm_strike, expiry, dte,
-        atm_call_iv, atm_put_iv, atm_delta, atm_gamma, atm_theta, atm_vega,
-        error (None se ok)
-    """
-    result: dict[str, Any] = {
+def _empty_result(symbol: str, error: str) -> dict[str, Any]:
+    return {
         "symbol": symbol.upper(),
         "underlying_price": None,
         "contracts_count": 0,
@@ -99,40 +92,20 @@ def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str,
         "atm_gamma": None,
         "atm_theta": None,
         "atm_vega": None,
-        "error": None,
+        "error": error,
     }
 
+
+def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
+    """
+    Cattura snapshot per un singolo simbolo su una connessione IB già aperta.
+    Non apre né chiude la connessione.
+    """
+    from ib_insync import Stock, Option
+
+    result = _empty_result(symbol, None)
+
     try:
-        from ib_insync import IB, Stock, Option
-    except ImportError as exc:
-        result["error"] = f"ib_insync non installato: {exc}"
-        return result
-
-    host, ports, client_id = _ibkr_connection_params(profile)
-    ib = IB()
-    connected_port: Optional[int] = None
-
-    try:
-        for port in ports:
-            try:
-                ok = ib.connect(host, port, clientId=client_id, timeout=8.0, readonly=True)
-                if ok and ib.isConnected():
-                    connected_port = port
-                    break
-            except Exception:
-                try:
-                    ib.disconnect()
-                except Exception:
-                    pass
-                ib = IB()
-
-        if connected_port is None:
-            result["error"] = f"IBG non raggiungibile su {host} porte {ports}"
-            return result
-
-        # Delayed data per paper/demo (tipo 3 = frozen/delayed)
-        ib.reqMarketDataType(3)
-
         # ── 1. Qualifica contratto sottostante ────────────────────────────────
         stock = Stock(symbol.upper(), "SMART", "USD")
         try:
@@ -161,7 +134,7 @@ def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str,
             result["error"] = "prezzo sottostante non disponibile"
             return result
 
-        # ── 3. Parametri catena opzioni ───────────────────────────────────────
+        # ── 3. Catena opzioni ─────────────────────────────────────────────────
         chains = ib.reqSecDefOptParams(
             stock.symbol, "", stock.secType, stock.conId
         )
@@ -169,7 +142,6 @@ def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str,
             result["error"] = "nessuna catena opzioni disponibile"
             return result
 
-        # Preferisci SMART, poi primo disponibile
         chain = next((c for c in chains if c.exchange == "SMART"), chains[0])
 
         today = date.today()
@@ -214,13 +186,12 @@ def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str,
             result["error"] = "qualifyContracts opzioni ATM fallito"
             return result
 
-        # Generic tick 106 = IV, 100 = opt vol, 101 = opt OI
         tickers = []
         for opt in qualified_opts:
             t = ib.reqMktData(opt, "100,101,106", snapshot=False, regulatorySnapshot=False)
             tickers.append((opt, t))
 
-        ib.sleep(3.0)  # attendi dati dal feed
+        ib.sleep(3.0)
 
         call_t = next((t for o, t in tickers if hasattr(o, "right") and o.right == "C"), None)
         put_t  = next((t for o, t in tickers if hasattr(o, "right") and o.right == "P"), None)
@@ -231,7 +202,6 @@ def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str,
             except Exception:
                 pass
 
-        # IV implicita
         call_iv = _safe_float(getattr(call_t, "impliedVolatility", None)) if call_t else None
         put_iv  = _safe_float(getattr(put_t,  "impliedVolatility", None)) if put_t else None
 
@@ -244,30 +214,15 @@ def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str,
         if iv_vals:
             result["atm_iv"] = round(sum(iv_vals) / len(iv_vals), 6)
 
-        # Greche dal modelGreeks del call ATM (più stabile)
         greeks_filled = 0
-        for t, prefix in ((call_t, "atm_"), ):
-            if t is None:
-                continue
-            mg = getattr(t, "modelGreeks", None)
-            if mg is None:
-                continue
-            delta = _safe_float(getattr(mg, "delta", None))
-            gamma = _safe_float(getattr(mg, "gamma", None))
-            theta = _safe_float(getattr(mg, "theta", None))
-            vega  = _safe_float(getattr(mg, "vega",  None))
-            if delta is not None:
-                result[f"{prefix}delta"] = round(delta, 6)
-                greeks_filled += 1
-            if gamma is not None:
-                result[f"{prefix}gamma"] = round(gamma, 6)
-                greeks_filled += 1
-            if theta is not None:
-                result[f"{prefix}theta"] = round(theta, 6)
-                greeks_filled += 1
-            if vega is not None:
-                result[f"{prefix}vega"] = round(vega, 6)
-                greeks_filled += 1
+        if call_t is not None:
+            mg = getattr(call_t, "modelGreeks", None)
+            if mg is not None:
+                for field in ("delta", "gamma", "theta", "vega"):
+                    val = _safe_float(getattr(mg, field, None))
+                    if val is not None:
+                        result[f"atm_{field}"] = round(val, 6)
+                        greeks_filled += 1
 
         result["greeks_complete"] = greeks_filled
 
@@ -279,12 +234,73 @@ def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str,
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
         return result
+
+
+def capture_ibkr_universe_snapshot(symbols: list[str], profile: str = "dev") -> list[dict[str, Any]]:
+    """
+    Apre UNA sola connessione IBG e cattura snapshot per tutti i simboli.
+    Ritorna lista di dict (uno per simbolo), stessa struttura di capture_ibkr_symbol_snapshot.
+    Molto più efficiente del loop per-simbolo con connessioni separate.
+    """
+    if not symbols:
+        return []
+
+    try:
+        from ib_insync import IB
+    except ImportError as exc:
+        err = f"ib_insync non installato: {exc}"
+        return [_empty_result(s, err) for s in symbols]
+
+    host, ports, client_id = _ibkr_connection_params(profile)
+    ib = IB()
+    connected_port: Optional[int] = None
+
+    try:
+        for port in ports:
+            try:
+                ok = ib.connect(host, port, clientId=client_id, timeout=8.0, readonly=True)
+                if ok and ib.isConnected():
+                    connected_port = port
+                    break
+            except Exception:
+                try:
+                    ib.disconnect()
+                except Exception:
+                    pass
+                ib = IB()
+
+        if connected_port is None:
+            err = f"IBG non raggiungibile su {host} porte {ports}"
+            return [_empty_result(s, err) for s in symbols]
+
+        ib.reqMarketDataType(3)
+
+        results = []
+        for symbol in symbols:
+            snap = _snapshot_on_connection(ib, symbol)
+            results.append(snap)
+
+        return results
+
+    except Exception as exc:
+        err = f"{type(exc).__name__}: {exc}"
+        return [_empty_result(s, err) for s in symbols]
     finally:
         try:
             if ib.isConnected():
                 ib.disconnect()
         except Exception:
             pass
+
+
+def capture_ibkr_symbol_snapshot(symbol: str, profile: str = "dev") -> dict[str, Any]:
+    """
+    Connette a IBG e cattura snapshot per un singolo simbolo.
+    Wrapper di capture_ibkr_universe_snapshot per compatibilità.
+    Per batch multi-simbolo usare direttamente capture_ibkr_universe_snapshot.
+    """
+    results = capture_ibkr_universe_snapshot([symbol], profile=profile)
+    return results[0] if results else _empty_result(symbol, "nessun risultato")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

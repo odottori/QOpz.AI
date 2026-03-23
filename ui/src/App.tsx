@@ -2764,37 +2764,38 @@ export default function App() {
 
               {/* ══ 2 Blocchi fonte ══ */}
               {!feedLogLoading && (() => {
-                const sources: Array<{feed:string, label:string, note:string, feeds:string[]}> = [
+                const sources: Array<{feed:string, label:string, note:string, feeds:string[], fullWidth?:boolean}> = [
                   {
                     feed:"ibkr",
                     label:"IBKR primaria",
-                    note:"Fonte primaria operativa: prezzi, catene opzioni, greche, IV history, conto e posizioni.",
-                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_iv_history","ibkr_account","ibkr_positions","ibkr_demo","ibkr_capture","ibkr_extract","ibkr_dataset"],
+                    note:"Fonte primaria operativa. * IV history ATM: per i primi 90 giorni la serie storica è costruita da yfinance (HV proxy) come backbone; IBKR sovrascrive il punto giornaliero con IV reale. Dopo 90 run consecutivi la serie è interamente da IBKR.",
+                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_iv_history","ibkr_account","ibkr_positions"],
                   },
                   {
                     feed:"yfinance",
                     label:"yfinance integrativa",
-                    note:"Fonte integrativa: IV history di fallback, calendario eventi, VIX/VIX3M e rendimenti 10Y/30Y.",
-                    feeds:["yfinance_iv_history","yfinance_events","yfinance_macro","yfinance","events_calendar","fred"],
+                    note:"Dati esclusivi yfinance: macro mercati (VIX/VIX3M, rendimenti 10Y/30Y) e date ex-dividendo. Non coperti da IBKR.",
+                    feeds:["yfinance_macro","yfinance_exdiv"],
+                  },
+                  {
+                    feed:"calendario",
+                    label:"Calendario eventi",
+                    note:"Earnings calendar da yfinance: prossime trimestrali per i simboli in universo.",
+                    feeds:["yfinance_calendar"],
+                    fullWidth: true,
                   },
                 ];
                 const feedStepLabel: Record<string,string> = {
-                  ibkr_prices: "Prezzi sottostante",
-                  ibkr_chain: "Catene opzioni",
-                  ibkr_greeks: "Greche complete",
-                  ibkr_iv_history: "IV history ATM",
-                  ibkr_account: "Conto",
-                  ibkr_positions: "Posizioni",
-                  ibkr_demo: "Compat legacy IBKR",
-                  ibkr_capture: "Capture legacy",
-                  ibkr_extract: "Extract legacy",
-                  ibkr_dataset: "Dataset legacy",
-                  yfinance_iv_history: "IV history fallback",
-                  yfinance_events: "Calendario eventi",
-                  yfinance_macro: "Macro mercati",
-                  yfinance: "IV history legacy",
-                  events_calendar: "Eventi legacy",
-                  fred: "Macro legacy",
+                  ibkr_prices:        "Prezzi sottostante",
+                  ibkr_chain:         "Catene opzioni",
+                  ibkr_greeks:        "Greche complete",
+                  ibkr_iv_history:    "IV history ATM *",
+                  ibkr_account:       "Conto",
+                  ibkr_positions:     "Posizioni",
+                  yfinance_iv_history:"IV — serie storica (HV proxy)",
+                  yfinance_macro:     "Macro mercati",
+                  yfinance_exdiv:     "Date ex-dividendo",
+                  yfinance_calendar:  "Earnings calendar",
                 };
                 const fBtnSt = (active: boolean, col: string) => ({
                   fontSize:"0.55rem" as const, padding:"1px 4px", borderRadius:3, cursor:"pointer" as const,
@@ -2806,7 +2807,7 @@ export default function App() {
                 });
                 return (
                   <div style={{padding:"8px 12px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14}}>
-                    {sources.map(({ feed, label, note, feeds }) => {
+                    {sources.map(({ feed, label, note, feeds, fullWidth }) => {
                       const srcRows = feedLog
                         .filter(r => feeds.includes(r.feed))
                         .sort((a,b) => (b.run_date+b.started_at).localeCompare(a.run_date+a.started_at));
@@ -2845,7 +2846,7 @@ export default function App() {
                       };
 
                       return (
-                        <div key={feed} style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
+                        <div key={feed} style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", gridColumn: fullWidth ? "1 / -1" : undefined}}>
                           <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
                             padding:"10px 14px", background:"rgba(0,255,106,0.04)", borderBottom:"1px solid var(--border)"}}>
                             <div>
@@ -2970,7 +2971,7 @@ export default function App() {
                             </div>
                           ) : (
                             <div style={{padding:"14px 12px", textAlign:"center", color:"#555", fontSize:"0.65rem"}}>
-                              {feed === "ibkr" ? "Nessun dato IBKR nel periodo selezionato" : "Nessun dato yfinance nel periodo selezionato"}
+                              {feed === "ibkr" ? "Nessun dato IBKR nel periodo selezionato" : feed === "calendario" ? "Nessun dato calendario nel periodo selezionato" : "Nessun dato yfinance nel periodo selezionato"}
                             </div>
                           )}
 
