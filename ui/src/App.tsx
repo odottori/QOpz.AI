@@ -2816,8 +2816,19 @@ export default function App() {
                   );
                 }
 
+                const feedLabel = (f: string) => ({
+                  yfinance: "Prezzi & Volatilità",
+                  events_calendar: "Calendario eventi",
+                  fred: "Dati macro",
+                  ibkr_demo: "Dati IBKR",
+                  ibkr_capture: "Cattura IBKR",
+                  ibkr_extract: "Estrazione IBKR",
+                  ibkr_dataset: "Dataset IBKR",
+                  orats: "Catene opzioni",
+                } as Record<string,string>)[f] ?? f;
+
                 return (
-                  <div style={{padding:"8px 12px", display:"flex", flexDirection:"column", gap:16}}>
+                  <div style={{padding:"8px 12px", display:"flex", flexDirection:"column", gap:20}}>
                     {(allFeeds.length > 0 ? allFeeds : ["(nessuna fonte)"]).map(feed => {
                       const rows = filtered.filter(r => r.feed === feed);
                       const tot = rows.length;
@@ -2827,45 +2838,70 @@ export default function App() {
                         ? rows.reduce((s,r) => s + (r.quality_pct ?? 0), 0) / tot
                         : null;
                       const lastRun = rows[0];
+                      const qCol = avgQ != null ? (avgQ >= 95 ? "#4ade80" : avgQ >= 80 ? "#fbbf24" : "#f87171") : "#888";
                       return (
-                        <div key={feed}>
-                          {/* card strip per fonte */}
-                          <div style={{display:"flex", gap:4, marginBottom:6, flexWrap:"wrap"}}>
-                            {mc("fonte", feed, "#888")}
-                            {mc("esecuzioni", String(tot), tot > 0 ? "#4ade80" : "#888", "Esecuzioni nel periodo")}
-                            {mc("ok", String(nOk), nOk === tot && tot > 0 ? "#4ade80" : nOk > 0 ? "#fbbf24" : "#888", "Esecuzioni completate")}
-                            {mc("errori", String(nErr), nErr === 0 ? "#4ade80" : "#f87171", "Esecuzioni in errore")}
-                            {mc("qualità% med", avgQ != null ? `${avgQ.toFixed(1)}%` : "—", avgQ != null && avgQ >= 95 ? "#4ade80" : avgQ != null && avgQ >= 80 ? "#fbbf24" : "#f87171", "Qualità media (record validi / totali)")}
-                            {mc("ultima", lastRun ? lastRun.run_date : "—", "#888", lastRun ? lastRun.started_at : "")}
+                        <div key={feed} style={{borderLeft:"2px solid var(--border)", paddingLeft:10}}>
+                          {/* intestazione fonte */}
+                          <div style={{fontSize:"0.75rem", fontWeight:700, color:"#e2f0e8", marginBottom:8, letterSpacing:"0.04em"}}>
+                            {feedLabel(feed)}
+                          </div>
+                          {/* card strip metriche */}
+                          <div style={{display:"flex", gap:6, marginBottom:10, flexWrap:"wrap"}}>
+                            {[
+                              { lbl:"Esecuzioni", val:String(tot), col: tot > 0 ? "#e2f0e8" : "#888" },
+                              { lbl:"Completate", val:String(nOk), col: nOk === tot && tot > 0 ? "#4ade80" : nOk > 0 ? "#fbbf24" : "#f87171" },
+                              { lbl:"Errori", val:String(nErr), col: nErr === 0 ? "#4ade80" : "#f87171" },
+                              { lbl:"Qualità media", val: avgQ != null ? `${avgQ.toFixed(1)}%` : "—", col: qCol },
+                              { lbl:"Ultima esecuzione", val: lastRun ? lastRun.run_date : "—", col:"#e2f0e8" },
+                            ].map(({lbl, val, col}) => (
+                              <div key={lbl} style={{minWidth:90, background:"var(--p2)", border:"1px solid var(--border)",
+                                borderRadius:4, padding:"6px 10px"}}>
+                                <div style={{fontSize:"0.52rem", color:"#7aaa90", textTransform:"uppercase",
+                                  letterSpacing:"0.06em", marginBottom:3}}>{lbl}</div>
+                                <div style={{fontSize:"0.9rem", fontWeight:700, color:col}}>{val}</div>
+                              </div>
+                            ))}
                           </div>
                           {/* tabella righe */}
                           {rows.length > 0 && (
                             <div style={{overflowX:"auto"}}>
-                              <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.6rem"}}>
+                              <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.65rem"}}>
                                 <thead>
-                                  <tr style={{borderBottom:"1px solid var(--border)"}}>
-                                    {["data","ora","durata","rec. in","rec. validi","qualità%","simboli","stato","errore"].map(h => (
-                                      <th key={h} style={{padding:"3px 6px", textAlign:"left", color:"var(--dim)", fontWeight:600, whiteSpace:"nowrap"}}>{h}</th>
+                                  <tr style={{borderBottom:"2px solid var(--border)"}}>
+                                    {[
+                                      {h:"Data", align:"left"}, {h:"Ora", align:"left"},
+                                      {h:"Durata", align:"left"}, {h:"Ricevuti", align:"right"},
+                                      {h:"Salvati", align:"right"}, {h:"Qualità", align:"right"},
+                                      {h:"Simboli", align:"right"}, {h:"Stato", align:"left"},
+                                      {h:"Errore", align:"left"},
+                                    ].map(({h, align}) => (
+                                      <th key={h} style={{padding:"4px 8px", textAlign:align as "left"|"right",
+                                        color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap",
+                                        fontSize:"0.62rem", letterSpacing:"0.03em"}}>{h}</th>
                                     ))}
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {rows.map((r, i) => {
                                     const stCol = r.status === "ok" ? "#4ade80" : r.status === "error" ? "#f87171" : "#fbbf24";
-                                    const qCol = r.quality_pct != null ? (r.quality_pct >= 95 ? "#4ade80" : r.quality_pct >= 80 ? "#fbbf24" : "#f87171") : "#888";
-                                    const ora = r.started_at ? r.started_at.slice(11,19) : "—";
+                                    const stLabel = r.status === "ok" ? "✓ ok" : r.status === "error" ? "✗ errore" : "~ parziale";
+                                    const rqCol = r.quality_pct != null ? (r.quality_pct >= 95 ? "#4ade80" : r.quality_pct >= 80 ? "#fbbf24" : "#f87171") : "#888";
+                                    const ora = r.started_at ? r.started_at.slice(11,16) : "—";
                                     const dur = r.duration_ms != null ? (r.duration_ms >= 1000 ? `${(r.duration_ms/1000).toFixed(1)}s` : `${r.duration_ms}ms`) : "—";
                                     return (
-                                      <tr key={r.run_id} style={{borderBottom:"1px solid var(--border)", background: i%2===0 ? "transparent" : "var(--p2)"}}>
-                                        <td style={{padding:"3px 6px", color:"var(--dim)", whiteSpace:"nowrap"}}>{r.run_date}</td>
-                                        <td style={{padding:"3px 6px", color:"var(--dim)", whiteSpace:"nowrap"}}>{ora}</td>
-                                        <td style={{padding:"3px 6px", color:"var(--text)"}}>{dur}</td>
-                                        <td style={{padding:"3px 6px", color:"var(--text)", textAlign:"right"}}>{r.records_in?.toLocaleString("it-IT") ?? "—"}</td>
-                                        <td style={{padding:"3px 6px", color:"var(--text)", textAlign:"right"}}>{r.records_out?.toLocaleString("it-IT") ?? "—"}</td>
-                                        <td style={{padding:"3px 6px", color:qCol, textAlign:"right"}}>{r.quality_pct != null ? `${r.quality_pct.toFixed(1)}%` : "—"}</td>
-                                        <td style={{padding:"3px 6px", color:"var(--text)", textAlign:"right"}}>{r.symbols_count ?? "—"}</td>
-                                        <td style={{padding:"3px 6px"}}><span style={{color:stCol, fontWeight:600}}>{r.status}</span></td>
-                                        <td style={{padding:"3px 6px", color:"#f87171", fontSize:"0.55rem", maxWidth:120, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.error_msg ?? ""}>{r.error_msg ?? ""}</td>
+                                      <tr key={r.run_id} style={{borderBottom:"1px solid var(--border)",
+                                        background: i%2===0 ? "transparent" : "rgba(0,255,106,0.03)"}}>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.run_date}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{ora}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dur}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_in?.toLocaleString("it-IT") ?? "—"}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_out?.toLocaleString("it-IT") ?? "—"}</td>
+                                        <td style={{padding:"5px 8px", color:rqCol, fontWeight:600, textAlign:"right"}}>{r.quality_pct != null ? `${r.quality_pct.toFixed(1)}%` : "—"}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.symbols_count ?? "—"}</td>
+                                        <td style={{padding:"5px 8px"}}><span style={{color:stCol, fontWeight:700}}>{stLabel}</span></td>
+                                        <td style={{padding:"5px 8px", color:"#f87171", fontSize:"0.6rem", maxWidth:160,
+                                          overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}
+                                          title={r.error_msg ?? ""}>{r.error_msg ?? ""}</td>
                                       </tr>
                                     );
                                   })}
