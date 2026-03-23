@@ -892,6 +892,19 @@ export default function App() {
   const [sessionLogs, setSessionLogs] = useState<SessionLogEntry[]>([]);
   const [sessionLogOpen, setSessionLogOpen] = useState(false);
 
+  type FeedRun = {
+    run_id: string; feed: string; run_date: string;
+    started_at: string; finished_at: string; duration_ms: number | null;
+    status: string; records_in: number | null; records_out: number | null;
+    quality_pct: number | null; symbols_count: number | null; error_msg: string | null;
+  };
+  const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
+  const [feedLogLoading, setFeedLogLoading] = useState(false);
+  const [datiFilterFeed, setDatiFilterFeed] = useState<string>("tutte");
+  const [datiFilterStatus, setDatiFilterStatus] = useState<string>("tutti");
+  const [datiFilterDays, setDatiFilterDays] = useState<number>(30);
+  const [datiFiltersOpen, setDatiFiltersOpen] = useState(false);
+
   const parsedPayload = useMemo(() => {
     try {
       const parsed = JSON.parse(payload);
@@ -1536,6 +1549,15 @@ export default function App() {
     } catch { /* non critico */ }
   }
 
+  async function doFetchFeedLog(days = 30) {
+    setFeedLogLoading(true);
+    try {
+      const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
+      setFeedLog(r.runs ?? []);
+    } catch { /* non critico */ }
+    finally { setFeedLogLoading(false); }
+  }
+
   async function doFetchControlStatus() {
     try {
       const r = await apiJson<ControlStatusResponse>(`${API_BASE}/opz/control/status`);
@@ -2002,6 +2024,7 @@ export default function App() {
     void doFetchSessionStatus();
     void doFetchSessionLogs();
     void doFetchControlStatus();
+    void doFetchFeedLog(30);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Heartbeat ogni 5 minuti — solo status leggeri (nessun dato daily ridondante)
@@ -2566,85 +2589,277 @@ export default function App() {
 
           {/* ── ANTE / DATI ── Steps 1-2: Ingest + Consolidamento ──────── */}
           {centerPhase === "ante" && anteSubTab === "dati" && (
-            <div className="lifecycle-panel">
+            <div className="lifecycle-panel" style={{maxWidth:"100%"}}>
               <div className="lc-header">
                 <span className="lc-step-label">STEP 1–2 — DATI</span>
                 {premarketScanAt && <span className="lc-step-sub">Aggiornato: {fmtTs(premarketScanAt)}</span>}
               </div>
-              <div className="lc-body">
-                <div className="lc-panel">
-                  {/* ── micro-card strip ── */}
-                  {(() => {
-                    const mc = (lbl: string, val: string, col: string, tip?: string) => (
-                      <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)", border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
-                        <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
-                        <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+
+              {/* ══ KPI BAR sistemica — stato globale pipeline ══ */}
+              {(() => {
+                const kpiToggle = (id: string) => setKpiExpanded(v => v === id ? null : id);
+                const kpiPin = (id: string, e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  setPinnedKpis(v => v.includes(id) ? v.filter(x => x !== id) : [...v, id]);
+                };
+                const kCard = (
+                  id: string, label: string, value: React.ReactNode,
+                  sub: string, accent: string, detail: React.ReactNode | null
+                ) => {
+                  const open = kpiExpanded === id;
+                  const pinned = pinnedKpis.includes(id);
+                  return (
+                    <div key={id} onClick={() => detail && kpiToggle(id)}
+                      style={{flex:"1 1 140px", background:"var(--p2)",
+                        border:`1px solid ${open ? accent+"55" : pinned ? accent+"33" : "var(--border)"}`,
+                        borderRadius:4, padding:"7px 10px", cursor:detail?"pointer":"default",
+                        position:"relative", transition:"border-color 0.15s"}}>
+                      <span onClick={e => kpiPin(id, e)}
+                        title={pinned ? "Rimuovi da In evidenza" : "Fissa in In evidenza"}
+                        style={{position:"absolute", top:4, right:6, fontSize:"0.65rem",
+                          cursor:"pointer", color:pinned?accent:"#555", userSelect:"none"}}
+                        onMouseEnter={e=>(e.currentTarget.style.color=accent)}
+                        onMouseLeave={e=>(e.currentTarget.style.color=pinned?accent:"#555")}>
+                        {pinned?"◆":"◇"}
+                      </span>
+                      <div style={{fontSize:"0.58rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2}}>{label}</div>
+                      <div style={{fontSize:"1rem", fontWeight:700, color:accent, lineHeight:1.1, marginBottom:2}}>{value}</div>
+                      <div style={{fontSize:"0.58rem", color:"#777"}}>
+                        {sub}{detail ? <span style={{marginLeft:4}}>{open?"▲":"▼"}</span> : null}
                       </div>
-                    );
-                    const pipeCol = pipelineStateHealth === "ok" ? "#4ade80" : pipelineStateHealth === "warn" ? "#fbbf24" : "#f87171";
-                    const histPct = historyReadiness ? historyReadiness.score_pct : null;
-                    const histCol = histPct != null ? (histPct >= 100 ? "#4ade80" : histPct >= 50 ? "#fbbf24" : "#888") : "#888";
-                    const tradeN = paperSummary?.trades ?? 0;
-                    const kellyOn = sysStatus?.kelly_enabled;
-                    const pnl = paperSummary?.pnl_cumulative;
-                    const viols = paperSummary?.compliance_violations ?? 0;
-                    return (
-                      <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
-                        {mc("pipeline", pipelineStateLabel, pipeCol, "Stato pipeline ingest+regime")}
-                        {mc("data mode", dataModeUpper || "N/D", hasRealData ? "#4ade80" : "#888", "Fonte dati attiva")}
-                        {mc("record loc.", localRecords.toLocaleString("it-IT"), healthToSevClass(localDbHealth) === "sev-ok" ? "#4ade80" : "#fbbf24", "Record DuckDB + journal")}
-                        {mc("history%", histPct != null ? `${histPct.toFixed(0)}%` : "—", histCol, `${historyReadiness?.days_observed ?? 0}/${historyReadiness?.target_days ?? 50}g osservati`)}
-                        {mc("trade chiusi", String(tradeN), tradeN >= 50 ? "#4ade80" : tradeN >= 20 ? "#fbbf24" : "#888", "Trade chiusi su 50 per Kelly gate")}
-                        {mc("kelly gate", kellyOn ? "ON" : "LOCK", kellyOn ? "#4ade80" : "#888", kellyOn ? "Kelly sizing attivo" : `Mancano ${Math.max(0,50-(sysStatus?.n_closed_trades??0))} trade`)}
-                        {mc("P&L cum.", pnl != null ? `€${pnl.toFixed(0)}` : "—", pnl != null && pnl >= 0 ? "#4ade80" : "#f87171", "P&L cumulato da inizio paper")}
-                        {mc("violations", String(viols), viols > 0 ? "#fbbf24" : "#4ade80", "Compliance violations")}
-                      </div>
-                    );
-                  })()}
-                  {historyReadiness && (
-                    <div className="lc-progress-wrap">
-                      <div className="lc-panel-title" style={{marginTop:12}}>Readiness → Kelly gate (50 trade / 50 giorni)</div>
-                      <div className="lc-progress-track">
-                        <div className={`lc-progress-fill ${historyReadiness.ready ? "ok" : "warn"}`}
-                          style={{width:`${Math.min(100, historyReadiness.score_pct)}%`}}/>
-                      </div>
-                      <div className="lc-progress-labels">
-                        <span>{historyReadiness.days_observed}g osservati · {historyReadiness.events_observed} eventi</span>
-                        <span>{historyReadiness.ready ? "✓ PRONTO" : historyEtaLabel}</span>
-                      </div>
-                      {historyReadiness.blockers.length > 0 && historyReadiness.blockers.map((b, i) => (
-                        <div key={i} style={{fontSize:"0.6rem", color:"var(--amber)", marginTop:3}}>⚠ {b}</div>
-                      ))}
+                      {open && detail && <div style={{marginTop:8, borderTop:"1px solid var(--border)", paddingTop:6}}>{detail}</div>}
                     </div>
+                  );
+                };
+                const histPct = historyReadiness?.score_pct ?? null;
+                const nFeedsOk = [
+                  pipelineFeedHealth === "ok",
+                  yfinanceHealth === "ok",
+                  fredHealth === "ok",
+                  ibwrHealth === "ok",
+                ].filter(Boolean).length;
+                const pipeCol = pipelineStateHealth === "ok" ? "#4ade80" : pipelineStateHealth === "warn" ? "#fbbf24" : "#f87171";
+                const histCol = histPct != null ? (histPct >= 100 ? "#4ade80" : histPct >= 60 ? "#fbbf24" : "#f87171") : "#888";
+                return (
+                  <div style={{display:"flex", gap:6, flexWrap:"wrap", padding:"8px 12px 4px"}}>
+                    {kCard("pipe_stato", "Pipeline", pipelineStateLabel,
+                      "ingest + regime",
+                      pipeCol,
+                      <div style={{fontSize:"0.62rem", color:"var(--dim)", display:"flex", flexDirection:"column", gap:2}}>
+                        <span>yfinance: <span className={healthToSevClass(yfinanceHealth)}>{yfinanceLabel}</span></span>
+                        <span>fred: <span className={healthToSevClass(fredHealth)}>{fredLabel}</span></span>
+                        <span>orats: <span className="sev-neutral">{oratsLabel}</span></span>
+                        <span>ibwr: <span className={healthToSevClass(ibwrHealth)}>{ibwrState}</span></span>
+                      </div>
+                    )}
+                    {kCard("pipe_fonte", "Fonte dati", dataModeUpper || "N/D",
+                      hasRealData ? "dati reali" : "dati sintetici",
+                      hasRealData ? "#4ade80" : "#fbbf24",
+                      <div style={{fontSize:"0.62rem", color:"var(--dim)"}}>
+                        <div>DATA_MODE: {dataModeUpper || "N/D"}</div>
+                        <div>feed attivi: {nFeedsOk}/4</div>
+                      </div>
+                    )}
+                    {kCard("pipe_records", "Record locali", localRecords.toLocaleString("it-IT"),
+                      "DuckDB",
+                      healthToSevClass(localDbHealth) === "sev-ok" ? "#4ade80" : "#fbbf24",
+                      <div style={{fontSize:"0.62rem", color:"var(--dim)", display:"flex", flexDirection:"column", gap:2}}>
+                        <span>equity snap: {paperSummary?.gates.data_points.equity_snapshots ?? 0}</span>
+                        <span>trade journal: {paperSummary?.gates.data_points.trade_journal ?? 0}</span>
+                        <span>compliance ev: {paperSummary?.gates.data_points.compliance_events ?? 0}</span>
+                      </div>
+                    )}
+                    {kCard("pipe_storico", "Completezza storico",
+                      histPct != null ? `${histPct.toFixed(0)}%` : "N/D",
+                      historyReadiness ? `${historyReadiness.days_observed}/${historyReadiness.target_days}g` : "—",
+                      histCol,
+                      historyReadiness ? (
+                        <div style={{fontSize:"0.62rem", color:"var(--dim)", display:"flex", flexDirection:"column", gap:2}}>
+                          <span>eventi: {historyReadiness.events_observed}/{historyReadiness.target_events}</span>
+                          <span>ritmo: {historyReadiness.pace_events_per_day.toFixed(1)} ev/g</span>
+                          <span>{historyReadiness.ready ? "✓ Pronto" : historyEtaLabel}</span>
+                          {historyReadiness.blockers.map((b,i)=><span key={i} style={{color:"var(--amber)"}}>⚠ {b}</span>)}
+                        </div>
+                      ) : null
+                    )}
+                    {kCard("pipe_feeds", "Feed attivi",
+                      `${nFeedsOk}/4`,
+                      `${nFeedsOk === 4 ? "tutti ok" : nFeedsOk >= 2 ? "degradato" : "critico"}`,
+                      nFeedsOk === 4 ? "#4ade80" : nFeedsOk >= 2 ? "#fbbf24" : "#f87171",
+                      null
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ══ Filtri ══ */}
+              <div style={{padding:"4px 12px 0"}}>
+                <div
+                  style={{display:"flex", justifyContent:"space-between", alignItems:"center",
+                    cursor:"pointer", fontSize:"0.62rem", color:"var(--dim)", userSelect:"none",
+                    borderTop:"1px solid var(--border)", paddingTop:6}}
+                  onClick={() => setDatiFiltersOpen(v => !v)}>
+                  <span>{datiFiltersOpen ? "▾" : "▸"} filtri</span>
+                  {!datiFiltersOpen && (
+                    <span style={{fontSize:"0.58rem", color:"#888"}}>
+                      fonte: {datiFilterFeed} · stato: {datiFilterStatus} · ultimi {datiFilterDays}g
+                    </span>
                   )}
                 </div>
-                <div className="lc-screen">
-                  <div className="lc-screen-bar">
-                    <span className="lc-dot r"/><span className="lc-dot y"/><span className="lc-dot g"/>
-                    <span className="lc-screen-title">ingest_pipeline.log</span>
+                {datiFiltersOpen && (
+                  <div style={{display:"flex", gap:6, flexWrap:"wrap", marginTop:6, marginBottom:4}}>
+                    <div style={{display:"flex", gap:3, alignItems:"center"}}>
+                      <span style={{fontSize:"0.58rem", color:"#888"}}>fonte:</span>
+                      {["tutte","ibkr_demo","ibkr_capture","ibkr_extract","ibkr_dataset","yfinance","fred","orats"].map(f => (
+                        <button key={f}
+                          style={{fontSize:"0.55rem", padding:"1px 4px", borderRadius:3, border:"1px solid var(--border)",
+                            background: datiFilterFeed === f ? "var(--p1)" : "transparent",
+                            color: datiFilterFeed === f ? "var(--text)" : "var(--dim)", cursor:"pointer"}}
+                          onClick={() => setDatiFilterFeed(f)}>{f === "tutte" ? "tutte" : f}</button>
+                      ))}
+                    </div>
+                    <div style={{display:"flex", gap:3, alignItems:"center"}}>
+                      <span style={{fontSize:"0.58rem", color:"#888"}}>stato:</span>
+                      {["tutti","ok","error","partial"].map(s => (
+                        <button key={s}
+                          style={{fontSize:"0.55rem", padding:"1px 4px", borderRadius:3, border:"1px solid var(--border)",
+                            background: datiFilterStatus === s ? "var(--p1)" : "transparent",
+                            color: datiFilterStatus === s ? "var(--text)" : "var(--dim)", cursor:"pointer"}}
+                          onClick={() => setDatiFilterStatus(s)}>{s}</button>
+                      ))}
+                    </div>
+                    <div style={{display:"flex", gap:3, alignItems:"center"}}>
+                      <span style={{fontSize:"0.58rem", color:"#888"}}>periodo:</span>
+                      {[7,14,30,90].map(d => (
+                        <button key={d}
+                          style={{fontSize:"0.55rem", padding:"1px 4px", borderRadius:3, border:"1px solid var(--border)",
+                            background: datiFilterDays === d ? "var(--p1)" : "transparent",
+                            color: datiFilterDays === d ? "var(--text)" : "var(--dim)", cursor:"pointer"}}
+                          onClick={() => { setDatiFilterDays(d); void doFetchFeedLog(d); }}>{d}g</button>
+                      ))}
+                    </div>
+                    <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 6px"}}
+                      onClick={() => void doFetchFeedLog(datiFilterDays)} disabled={feedLogLoading}>
+                      {feedLogLoading ? "..." : "⟳"}
+                    </button>
                   </div>
-                  <div className="lc-screen-body">
-                    <div className="lc-screen-row"><span className="lc-dim">feed_status</span><span className={pipelineFeedHealth === "ok" ? "sev-ok" : "sev-warn"}>{pipelineFeedLabel}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">yfinance/cboe</span><span className={healthToSevClass(yfinanceHealth)}>{yfinanceLabel}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">fred</span><span className={healthToSevClass(fredHealth)}>{fredLabel}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">orats</span><span className="sev-neutral">{oratsLabel}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">ibwr</span><span className={healthToSevClass(ibwrHealth)}>{ibwrState}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">data_mode</span><span className={hasRealData ? "sev-ok" : "sev-neutral"}>{dataModeUpper || "N/D"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">records_locali</span><span className="sev-data">{localRecords.toLocaleString("it-IT")}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">equity_snapshots</span><span className="sev-data">{paperSummary?.gates.data_points.equity_snapshots ?? 0}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">trade_journal</span><span className="sev-data">{paperSummary?.gates.data_points.trade_journal ?? 0}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">opportunity_log</span><span className="sev-data">{paperSummary?.gates.data_points.compliance_events ?? 0}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">readiness_pct</span><span className={historyReadiness?.ready ? "sev-ok" : "sev-warn"}>{historyReadiness ? `${historyReadiness.score_pct.toFixed(1)}%` : "N/D"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">kelly_gate</span><span className={sysStatus?.kelly_enabled ? "sev-ok" : "sev-warn"}>{sysStatus?.kelly_enabled ? "ABILITATO" : `LOCK (${sysStatus?.n_closed_trades ?? 0}/50)`}</span></div>
-                    <div className="lc-action-bar">
+                )}
+              </div>
+
+              {/* ══ Tabella ingestioni per fonte ══ */}
+              {(() => {
+                const mc = (lbl: string, val: string, col: string, tip?: string) => (
+                  <div key={lbl} title={tip} style={{flex:"1 1 0", minWidth:52, height:44, background:"var(--p2)",
+                    border:"1px solid var(--border)", borderRadius:4, padding:"4px 6px",
+                    display:"flex", flexDirection:"column", justifyContent:"center"}}>
+                    <div style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.04em",
+                      lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{lbl}</div>
+                    <div style={{fontSize:"0.78rem", fontWeight:700, color:col, lineHeight:1.2, marginTop:1,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{val}</div>
+                  </div>
+                );
+                const allFeeds = datiFilterFeed === "tutte"
+                  ? [...new Set(feedLog.map(r => r.feed))].sort()
+                  : [datiFilterFeed];
+                const filtered = feedLog.filter(r =>
+                  (datiFilterFeed === "tutte" || r.feed === datiFilterFeed) &&
+                  (datiFilterStatus === "tutti" || r.status === datiFilterStatus)
+                );
+
+                if (feedLog.length === 0 && !feedLogLoading) {
+                  return (
+                    <div style={{padding:"20px 12px", textAlign:"center", color:"var(--dim)", fontSize:"0.65rem"}}>
+                      Nessun dato di ingestione registrato. Avvia la pipeline dati per iniziare la raccolta.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{padding:"8px 12px", display:"flex", flexDirection:"column", gap:16}}>
+                    {(allFeeds.length > 0 ? allFeeds : ["(nessuna fonte)"]).map(feed => {
+                      const rows = filtered.filter(r => r.feed === feed);
+                      const tot = rows.length;
+                      const nOk = rows.filter(r => r.status === "ok").length;
+                      const nErr = rows.filter(r => r.status === "error").length;
+                      const avgQ = tot > 0
+                        ? rows.reduce((s,r) => s + (r.quality_pct ?? 0), 0) / tot
+                        : null;
+                      const lastRun = rows[0];
+                      return (
+                        <div key={feed}>
+                          {/* card strip per fonte */}
+                          <div style={{display:"flex", gap:4, marginBottom:6, flexWrap:"wrap"}}>
+                            {mc("fonte", feed, "#888")}
+                            {mc("esecuzioni", String(tot), tot > 0 ? "#4ade80" : "#888", "Esecuzioni nel periodo")}
+                            {mc("ok", String(nOk), nOk === tot && tot > 0 ? "#4ade80" : nOk > 0 ? "#fbbf24" : "#888", "Esecuzioni completate")}
+                            {mc("errori", String(nErr), nErr === 0 ? "#4ade80" : "#f87171", "Esecuzioni in errore")}
+                            {mc("qualità% med", avgQ != null ? `${avgQ.toFixed(1)}%` : "—", avgQ != null && avgQ >= 95 ? "#4ade80" : avgQ != null && avgQ >= 80 ? "#fbbf24" : "#f87171", "Qualità media (record validi / totali)")}
+                            {mc("ultima", lastRun ? lastRun.run_date : "—", "#888", lastRun ? lastRun.started_at : "")}
+                          </div>
+                          {/* tabella righe */}
+                          {rows.length > 0 && (
+                            <div style={{overflowX:"auto"}}>
+                              <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.6rem"}}>
+                                <thead>
+                                  <tr style={{borderBottom:"1px solid var(--border)"}}>
+                                    {["data","ora","durata","rec. in","rec. validi","qualità%","simboli","stato","errore"].map(h => (
+                                      <th key={h} style={{padding:"3px 6px", textAlign:"left", color:"var(--dim)", fontWeight:600, whiteSpace:"nowrap"}}>{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {rows.map((r, i) => {
+                                    const stCol = r.status === "ok" ? "#4ade80" : r.status === "error" ? "#f87171" : "#fbbf24";
+                                    const qCol = r.quality_pct != null ? (r.quality_pct >= 95 ? "#4ade80" : r.quality_pct >= 80 ? "#fbbf24" : "#f87171") : "#888";
+                                    const ora = r.started_at ? r.started_at.slice(11,19) : "—";
+                                    const dur = r.duration_ms != null ? (r.duration_ms >= 1000 ? `${(r.duration_ms/1000).toFixed(1)}s` : `${r.duration_ms}ms`) : "—";
+                                    return (
+                                      <tr key={r.run_id} style={{borderBottom:"1px solid var(--border)", background: i%2===0 ? "transparent" : "var(--p2)"}}>
+                                        <td style={{padding:"3px 6px", color:"var(--dim)", whiteSpace:"nowrap"}}>{r.run_date}</td>
+                                        <td style={{padding:"3px 6px", color:"var(--dim)", whiteSpace:"nowrap"}}>{ora}</td>
+                                        <td style={{padding:"3px 6px", color:"var(--text)"}}>{dur}</td>
+                                        <td style={{padding:"3px 6px", color:"var(--text)", textAlign:"right"}}>{r.records_in?.toLocaleString("it-IT") ?? "—"}</td>
+                                        <td style={{padding:"3px 6px", color:"var(--text)", textAlign:"right"}}>{r.records_out?.toLocaleString("it-IT") ?? "—"}</td>
+                                        <td style={{padding:"3px 6px", color:qCol, textAlign:"right"}}>{r.quality_pct != null ? `${r.quality_pct.toFixed(1)}%` : "—"}</td>
+                                        <td style={{padding:"3px 6px", color:"var(--text)", textAlign:"right"}}>{r.symbols_count ?? "—"}</td>
+                                        <td style={{padding:"3px 6px"}}><span style={{color:stCol, fontWeight:600}}>{r.status}</span></td>
+                                        <td style={{padding:"3px 6px", color:"#f87171", fontSize:"0.55rem", maxWidth:120, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.error_msg ?? ""}>{r.error_msg ?? ""}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* progress readiness in fondo */}
+                    {historyReadiness && (
+                      <div className="lc-progress-wrap" style={{marginTop:4}}>
+                        <div className="lc-panel-title">Completezza storico → soglia sizing (50 trade / 50 giorni)</div>
+                        <div className="lc-progress-track">
+                          <div className={`lc-progress-fill ${historyReadiness.ready ? "ok" : "warn"}`}
+                            style={{width:`${Math.min(100, historyReadiness.score_pct)}%`}}/>
+                        </div>
+                        <div className="lc-progress-labels">
+                          <span>{historyReadiness.days_observed}g osservati · {historyReadiness.events_observed} eventi</span>
+                          <span>{historyReadiness.ready ? "✓ Pronto" : historyEtaLabel}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* azione */}
+                    <div style={{display:"flex", gap:6, marginTop:4}}>
                       <button className="btn btn-primary" onClick={() => void doAutoDemoPipeline()} disabled={busy || !apiOnline}>
-                        {busy ? "..." : "▶ Avvia pipeline"}
+                        {busy ? "..." : "▶ Avvia pipeline dati"}
                       </button>
-                      <button className="btn btn-ghost" onClick={refreshAll} disabled={busy}>⟳</button>
+                      <button className="btn btn-ghost" onClick={() => { refreshAll(); void doFetchFeedLog(datiFilterDays); }} disabled={busy}>⟳</button>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           )}
 
