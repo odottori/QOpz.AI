@@ -1550,11 +1550,32 @@ export default function App() {
     } catch { /* non critico */ }
   }
 
-  async function doFetchFeedLog(days = 30) {
+  async function doFetchFeedLog(days = 30, autoRunIfEmpty = false) {
     setFeedLogLoading(true);
     try {
       const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
-      setFeedLog(r.runs ?? []);
+      const runs = r.runs ?? [];
+      setFeedLog(runs);
+      // Se il feed_log è vuoto (sessione mattutina non girata o non registrata),
+      // lancia automaticamente la pipeline dati e ricarica il log al termine.
+      if (autoRunIfEmpty && runs.length === 0) {
+        try {
+          const universe = await apiJson<{ symbols: string[] }>(`${API_BASE}/opz/universe/latest?profile=${ACTIVE_PROFILE}`);
+          const symbols: string[] = universe.symbols ?? [];
+          await apiJson(`${API_BASE}/opz/demo_pipeline/auto`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              profile: ACTIVE_PROFILE,
+              symbols,
+              fetch_limit: Math.max(8, Math.min(40, symbols.length || 12)),
+            }),
+          });
+          // Ricarica il log dopo l'ingestione
+          const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
+          setFeedLog(r2.runs ?? []);
+        } catch { /* pipeline auto fallita — non critico, mostra messaggio vuoto */ }
+      }
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
   }
@@ -2025,7 +2046,7 @@ export default function App() {
     void doFetchSessionStatus();
     void doFetchSessionLogs();
     void doFetchControlStatus();
-    void doFetchFeedLog(30);
+    void doFetchFeedLog(30, true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Heartbeat ogni 5 minuti — solo status leggeri (nessun dato daily ridondante)
