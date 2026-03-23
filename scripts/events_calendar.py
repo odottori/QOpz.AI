@@ -68,9 +68,18 @@ def _fetch_calendar(symbol: str) -> dict:
     """Fetch raw calendar dict da yfinance. Ritorna {} in caso di errore."""
     if yf is None:
         return {}
+    import logging as _logging
     try:
-        ticker = yf.Ticker(symbol)
-        cal = ticker.calendar
+        # ETF/indici non hanno quoteSummary — silenziamo il logger yfinance
+        # per evitare flood di ERROR 404 nel system log (l'eccezione è già gestita)
+        _yf_log = _logging.getLogger("yfinance")
+        _prev = _yf_log.level
+        _yf_log.setLevel(_logging.CRITICAL)
+        try:
+            ticker = yf.Ticker(symbol)
+            cal = ticker.calendar
+        finally:
+            _yf_log.setLevel(_prev)
         if cal is None:
             return {}
         # yfinance può ritornare DataFrame o dict a seconda della versione
