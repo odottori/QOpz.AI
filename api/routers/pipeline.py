@@ -143,19 +143,21 @@ def opz_data_refresh(
          "; ".join(ev_err[:3]) if ev_err else None)
     results["events_calendar"] = {"ok": ev_ok, "total": len(symbols), "errors": len(ev_err)}
 
-    # ── 4. FRED / macro (stub — modulo opzionale) ────────────────────────────
+    # ── 4. Macro indicators (VIX, VIX3M, yield 10Y/30Y via yfinance) ─────────
     t0 = datetime.now(timezone.utc)
-    fred_n_in, fred_n_out = 0, 0
-    fred_status, fred_err = "error", "Fonte non configurata — modulo FRED non attivo"
+    fred_n_in, fred_n_out, fred_status, fred_err = 0, 0, "error", None
     try:
-        from scripts.fetch_fred import fetch_fred_indicators  # type: ignore
-        res_fred = fetch_fred_indicators()
-        fred_n_in = res_fred.get("n_series", 0)
-        fred_n_out = res_fred.get("n_saved", 0)
-        fred_status = "ok" if fred_n_out > 0 else "partial"
-        fred_err = None
-    except ImportError:
-        pass  # modulo non configurato — mantieni status=error
+        from scripts.fetch_macro import fetch_macro_indicators
+        res_macro = fetch_macro_indicators(lookback_days=1, profile=profile)
+        fred_n_in  = res_macro.get("n_series", 0)
+        fred_n_out = res_macro.get("n_saved", 0)
+        if res_macro.get("n_errors", 0) == fred_n_in:
+            fred_status = "error"
+            fred_err = "Tutti i ticker macro in errore"
+        elif res_macro.get("n_errors", 0) > 0:
+            fred_status = "partial"
+        else:
+            fred_status = "ok"
     except Exception as exc:
         fred_err = str(exc)
     t1 = datetime.now(timezone.utc)
