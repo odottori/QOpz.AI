@@ -18,6 +18,17 @@ services:
       - TWS_SETTINGS_PATH=/home/ibgateway/settings
       - READ_ONLY_API=no
       - EXISTING_SESSION_DETECTED_ACTION=primary
+    # Entrypoint wrapper: rimuove launcher*.log non-scrivibili (owned da UID diverso)
+    # prima di avviare IBG. Necessario perché la directory viene inizializzata dal
+    # host user (UID 999) mentre il container gira come ibgateway (UID 1000).
+    # ibgateway può fare rm su file altrui in una directory world-writable (no sticky bit).
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        find "${TWS_SETTINGS_PATH:-/home/ibgateway/settings}" \
+          -maxdepth 1 -name "launcher*.log" ! -writable -delete 2>/dev/null || true
+        exec /home/ibgateway/scripts/run.sh
     volumes:
       - ./data/ibg-settings:/home/ibgateway/settings
     networks:
