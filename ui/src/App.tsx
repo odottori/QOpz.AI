@@ -1551,14 +1551,14 @@ export default function App() {
     } catch { /* non critico */ }
   }
 
-  async function doFetchFeedLog(days = 30, autoRunIfEmpty = false) {
+  async function doFetchFeedLog(days = 30, triggerRefresh = false) {
     setFeedLogLoading(true);
     try {
       const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
       const runs = r.runs ?? [];
       setFeedLog(runs);
-      // Aggiorna dati di mercato all'apertura (idempotente, una riga per fonte).
-      if (autoRunIfEmpty) {
+      // Se triggerRefresh=true: chiama data/refresh per avviare l'ingestion, poi rilegge il log.
+      if (triggerRefresh) {
         try {
           await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
           const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
@@ -2744,7 +2744,7 @@ export default function App() {
                   </button>
                 ))}
                 <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 6px", marginLeft:4}}
-                  onClick={() => void doFetchFeedLog(datiFilterDays)} disabled={feedLogLoading}>
+                  onClick={() => void doFetchFeedLog(datiFilterDays, true)} disabled={feedLogLoading}>
                   {feedLogLoading ? "..." : "⟳"}
                 </button>
               </div>
