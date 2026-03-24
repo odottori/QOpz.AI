@@ -18,12 +18,65 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 log = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Black-Scholes IV fallback (Newton-Raphson)
+# Usato quando IBKR non restituisce impliedVolatility (es. manca abbonamento OPRA)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _bs_price(S: float, K: float, T: float, r: float, sigma: float, right: str) -> float:
+    """Prezzo Black-Scholes per call (C) o put (P)."""
+    if T <= 0 or sigma <= 0:
+        return max(0.0, (S - K) if right == "C" else (K - S))
+    d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+    d2 = d1 - sigma * math.sqrt(T)
+    N = lambda x: 0.5 * (1 + math.erf(x / math.sqrt(2)))
+    if right == "C":
+        return S * N(d1) - K * math.exp(-r * T) * N(d2)
+    else:
+        return K * math.exp(-r * T) * N(-d2) - S * N(-d1)
+
+
+def _bs_vega(S: float, K: float, T: float, r: float, sigma: float) -> float:
+    if T <= 0 or sigma <= 0:
+        return 1e-8
+    d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+    N_prime = math.exp(-0.5 * d1 ** 2) / math.sqrt(2 * math.pi)
+    return S * N_prime * math.sqrt(T)
+
+
+def _implied_vol_from_price(S: float, K: float, T: float, market_price: float,
+                             right: str = "C", r: float = 0.05) -> Optional[float]:
+    """
+    Calcola IV implicita via Newton-Raphson dato il prezzo di mercato (mid bid/ask).
+    Ritorna None se non converge o il prezzo non è valido.
+    """
+    if market_price <= 0 or S <= 0 or K <= 0 or T <= 0:
+        return None
+    intrinsic = max(0.0, (S - K) if right == "C" else (K - S))
+    if market_price <= intrinsic:
+        return None
+    sigma = 0.3  # punto di partenza ragionevole
+    for _ in range(50):
+        price = _bs_price(S, K, T, r, sigma, right)
+        vega = _bs_vega(S, K, T, r, sigma)
+        diff = price - market_price
+        if abs(diff) < 1e-6:
+            break
+        if vega < 1e-8:
+            break
+        sigma -= diff / vega
+        if sigma <= 0:
+            sigma = 1e-4
+    return round(sigma, 6) if 0.001 < sigma < 20.0 else None
 
 ROOT = Path(__file__).resolve().parents[1]
 IV_HISTORY_DIR = ROOT / "data" / "providers"
@@ -175,8 +228,9 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
         result["contracts_count"] = len(strikes)
 
         # ── 5. Market data ATM call + put ─────────────────────────────────────
-        call_contract = Option(symbol.upper(), chosen_exp, atm_strike, "C", "SMART", "100", "USD")
-        put_contract  = Option(symbol.upper(), chosen_exp, atm_strike, "P", "SMART", "100", "USD")
+        # Non specificare multiplier: IBKR lo risolve (evita fallimento su NVDA e simili)
+        call_contract = Option(symbol.upper(), chosen_exp, atm_strike, "C", "SMART", currency="USD")
+        put_contract  = Option(symbol.upper(), chosen_exp, atm_strike, "P", "SMART", currency="USD")
         try:
             qualified_opts = ib.qualifyContracts(call_contract, put_contract)
         except Exception:
@@ -201,6 +255,23 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
         call_iv = _safe_float(getattr(call_t, "impliedVolatility", None)) if call_t else None
         put_iv  = _safe_float(getattr(put_t,  "impliedVolatility", None)) if put_t else None
 
+        # Fallback Black-Scholes: se IBKR non restituisce IV (abbonamento OPRA mancante),
+        # la calcoliamo dal mid bid/ask — stesso risultato, fonte diversa.
+        T = chosen_dte / 365.0
+        if (not call_iv or call_iv <= 0) and call_t is not None:
+            call_bid = _safe_float(getattr(call_t, "bid", None))
+            call_ask = _safe_float(getattr(call_t, "ask", None))
+            if call_bid and call_ask and call_bid > 0 and call_ask > 0:
+                mid = (call_bid + call_ask) / 2
+                call_iv = _implied_vol_from_price(underlying, atm_strike, T, mid, "C")
+
+        if (not put_iv or put_iv <= 0) and put_t is not None:
+            put_bid = _safe_float(getattr(put_t, "bid", None))
+            put_ask = _safe_float(getattr(put_t, "ask", None))
+            if put_bid and put_ask and put_bid > 0 and put_ask > 0:
+                mid = (put_bid + put_ask) / 2
+                put_iv = _implied_vol_from_price(underlying, atm_strike, T, mid, "P")
+
         if call_iv and call_iv > 0:
             result["atm_call_iv"] = round(call_iv, 6)
         if put_iv and put_iv > 0:
@@ -223,7 +294,7 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
         result["greeks_complete"] = greeks_filled
 
         if result["atm_iv"] is None:
-            result["error"] = "IV ATM non disponibile (mercato chiuso o feed delayed)"
+            result["error"] = "IV ATM non disponibile (no bid/ask e no abbonamento OPRA)"
 
         return result
 

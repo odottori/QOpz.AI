@@ -220,11 +220,24 @@ def opz_data_refresh(
         greeks_complete = sum(int(s.get("greeks_complete", 0) or 0) for s in snapshots)
         with_price = sum(1 for s in snapshots if float(s.get("underlying_price") or 0.0) > 0)
         with_chain = sum(1 for s in snapshots if int(s.get("contracts_count", 0) or 0) > 0)
-        chain_status = "ok" if symbols_ok == len(symbols) and len(symbols) > 0 else ("partial" if symbols_ok > 0 else "error")
-        chain_err_msg = "; ".join(ibkr_errs[:3]) if ibkr_errs else None
 
-        _rec("ibkr_prices", t0, t1, len(symbols), with_price, chain_status, chain_err_msg)
-        _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status, chain_err_msg)
+        # Errori separati per tipo: prices/chain vs IV/greeks — evita contaminazione error_msg
+        price_errs = [f"{s.get('symbol')}: {s['error']}" for s in snapshots
+                      if s.get("error") and float(s.get("underlying_price") or 0.0) <= 0]
+        chain_errs = [f"{s.get('symbol')}: {s['error']}" for s in snapshots
+                      if s.get("error") and int(s.get("contracts_count", 0) or 0) == 0]
+        iv_errs    = [f"{s.get('symbol')}: {s['error']}" for s in snapshots
+                      if s.get("error") and s.get("atm_iv") is None
+                      and float(s.get("underlying_price") or 0.0) > 0]
+
+        price_status = "ok" if with_price == len(symbols) and len(symbols) > 0 else ("partial" if with_price > 0 else "error")
+        chain_status = "ok" if with_chain == len(symbols) and len(symbols) > 0 else ("partial" if with_chain > 0 else "error")
+
+        _rec("ibkr_prices", t0, t1, len(symbols), with_price, price_status,
+             "; ".join((price_errs or ibkr_errs)[:3]) if (price_errs or (with_price < len(symbols) and ibkr_errs)) else None)
+        _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status,
+             "; ".join((chain_errs or ibkr_errs)[:3]) if (chain_errs or (with_chain < len(symbols) and ibkr_errs)) else None)
+
         # greeks_complete=0 con catene catturate = mercato chiuso, non un errore
         # records_in = simboli_ok * 4 (4 campi greek per simbolo: delta,gamma,theta,vega)
         max_greeks = symbols_ok * 4
@@ -233,7 +246,8 @@ def opz_data_refresh(
             _rec("ibkr_greeks", t0, t1, 0, 0, "ok", None)
         else:
             greek_status = "ok" if max_greeks > 0 and greeks_complete >= max_greeks * 0.75 else ("partial" if greeks_complete > 0 else "error")
-            _rec("ibkr_greeks", t0, t1, max_greeks, greeks_complete, greek_status, chain_err_msg)
+            _rec("ibkr_greeks", t0, t1, max_greeks, greeks_complete, greek_status,
+                 "; ".join(iv_errs[:3]) if iv_errs else None)
 
         t2 = datetime.now(timezone.utc)
         iv_ok_ibkr = 0
