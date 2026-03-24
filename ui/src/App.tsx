@@ -2734,7 +2734,7 @@ export default function App() {
 
           {/* ── ANTE / DATI ── Steps 1-2: Ingest + Consolidamento ──────── */}
           {centerPhase === "ante" && anteSubTab === "dati" && (
-            <div className="lifecycle-panel" style={{maxWidth:"100%"}}>
+            <div className="lifecycle-panel" style={{maxWidth:"100%", overflow:"hidden"}}>
               <div className="lc-header">
                 <span className="lc-step-label">STEP 1–2 — DATI</span>
                 {premarketScanAt && <span className="lc-step-sub">Aggiornato: {fmtTs(premarketScanAt)}</span>}
@@ -2837,7 +2837,7 @@ export default function App() {
                   transition:"all 0.15s",
                 });
                 return (
-                  <div style={{padding:"8px 12px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14}}>
+                  <div style={{padding:"8px 12px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, minWidth:0, overflow:"hidden"}}>
                     {sources.map(({ feed, label, note, feeds }) => {
                       // ── Blocco 4: Dati derivati (symbol snapshots) ─────────────────
                       if (feed === "derivati") {
@@ -2851,7 +2851,7 @@ export default function App() {
                         const fmtN   = (v: number|null, d=4) => v != null ? v.toFixed(d) : "—";
                         const fmtP   = (v: number|null) => v != null ? v.toFixed(2) : "—";
                         return (
-                          <div key="derivati" style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
+                          <div key="derivati" style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", minWidth:0}}>
                             {/* Header */}
                             <div style={{display:"flex", alignItems:"center", padding:"10px 14px 6px", gap:8, borderBottom:"1px solid var(--border)"}}>
                               <span style={{fontSize:"0.72rem", fontWeight:700, color:"var(--fg)", flex:1}}>{label}</span>
@@ -2940,7 +2940,7 @@ export default function App() {
                       };
 
                       return (
-                        <div key={feed} style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
+                        <div key={feed} style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", minWidth:0}}>
                           <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
                             padding:"10px 14px", background:"rgba(0,255,106,0.04)", borderBottom:"1px solid var(--border)"}}>
                             <div>
