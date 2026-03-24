@@ -658,6 +658,26 @@ def record_ingestion_run(
     prov = _prov(profile, now)
     quality = round(records_out / records_in * 100, 1) if records_in > 0 else None
     try:
+        # Upsert: stesso giorno + stesso feed → aggiorna solo se qualità migliore
+        existing = con.execute(
+            "SELECT quality_pct, status FROM ingestion_runs "
+            "WHERE profile=? AND feed=? AND run_date=? "
+            "ORDER BY quality_pct DESC NULLS LAST LIMIT 1",
+            (profile, feed, run_date),
+        ).fetchone()
+        if existing is not None:
+            ex_quality, ex_status = existing
+            new_q = quality if quality is not None else -1.0
+            old_q = ex_quality if ex_quality is not None else -1.0
+            # mantieni il record esistente solo se la nuova qualità è strettamente peggiore
+            # e il vecchio non era un errore — a parità vince il più recente
+            if new_q < old_q and ex_status != "error":
+                return
+            # qualità migliore (o vecchio era error): rimuovi i vecchi e inserisci il nuovo
+            con.execute(
+                "DELETE FROM ingestion_runs WHERE profile=? AND feed=? AND run_date=?",
+                (profile, feed, run_date),
+            )
         con.execute(
             """
             INSERT INTO ingestion_runs (
