@@ -436,8 +436,8 @@ const ACTIVE_PROFILE = (import.meta.env.VITE_PROFILE as string | undefined) ?? "
 const TOOLTIPS: Record<string, string> = {
   // Topbar
   regime_normal: "Il mercato è stabile. Il sistema può operare a piena capacità con sizing al 100%.",
-  regime_caution: "Il mercato è in tensione. Sizing ridotto al 50%, solo spread stretti e filtro direzionale attivo.",
-  regime_shock: "Evento di mercato estremo. Tutti i nuovi trade sono bloccati. Sizing 0%.",
+  regime_caution: "⚠ Sizing 50% — solo spread stretti con filtro direzionale. Nuovi condor sospesi. | Il mercato è in tensione. Sizing ridotto al 50%, solo spread stretti e filtro direzionale attivo.",
+  regime_shock: "🛑 Trading sospeso — tutti i pannelli operativi sono in sola lettura. Solo monitoring, kill switch e risk panel rimangono attivi. | Evento di mercato estremo. Tutti i nuovi trade sono bloccati. Sizing 0%.",
   regime_offline: "Stato regime non disponibile. Il sistema non ha ricevuto dati recenti dal classificatore.",
   ibkr_connected: "Connesso a Interactive Brokers. I dati di mercato e le opzioni chain arrivano in tempo reale.",
   ibkr_disconnected: "Non connesso a Interactive Brokers. Il sistema usa dati storici da yfinance come alternativa.",
@@ -2546,34 +2546,29 @@ export default function App() {
                 </div>
               );
             })()}
+            {historyReadiness && (
+              <div style={{background:"var(--p1)", padding:"8px 16px", display:"flex", flexDirection:"column",
+                justifyContent:"center", gridColumn:"span 4"}}>
+                <div style={{fontSize:"0.52rem", color:"var(--dim)", textTransform:"uppercase",
+                  letterSpacing:"0.06em", marginBottom:5}}>
+                  Completezza storico → soglia sizing
+                </div>
+                <div style={{background:"var(--border)", borderRadius:2, height:6, overflow:"hidden"}}>
+                  <div style={{height:"100%", borderRadius:2, transition:"width 0.5s",
+                    background: historyReadiness.ready ? "var(--g2)" : "var(--amber)",
+                    width:`${Math.min(100, historyReadiness.score_pct)}%`}}/>
+                </div>
+                <div style={{display:"flex", justifyContent:"space-between", fontSize:"0.55rem",
+                  color:"#666", marginTop:4}}>
+                  <span>{historyReadiness.days_observed}g osservati · {historyReadiness.events_observed} eventi</span>
+                  <span style={{color: historyReadiness.ready ? "var(--g2)" : "var(--amber)"}}>
+                    {historyReadiness.ready ? "✓ Pronto" : historyEtaLabel}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* ── SHOCK banner — ALWAYS_VISIBLE, collapses trading UI ── */}
-          {regimeView.text === "SHOCK" && (
-            <div style={{
-              background: "#3b0000", border: "1px solid #ef4444", borderRadius: 4,
-              padding: "8px 14px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10,
-            }}>
-              <span style={{ color: "#ef4444", fontWeight: 700, fontSize: "0.85rem" }}>🛑 REGIME SHOCK</span>
-              <span style={{ color: "#fca5a5", fontSize: "0.75rem" }}>
-                Trading sospeso — tutti i pannelli operativi sono in sola lettura.
-                Solo monitoring, kill switch e risk panel rimangono attivi.
-              </span>
-            </div>
-          )}
-
-          {/* ── CAUTION banner ── */}
-          {regimeView.text === "CAUTION" && (
-            <div style={{
-              background: "#2c1a00", border: "1px solid #f59e0b", borderRadius: 4,
-              padding: "6px 14px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10,
-            }}>
-              <span style={{ color: "#f59e0b", fontWeight: 700, fontSize: "0.8rem" }}>⚠ REGIME CAUTION</span>
-              <span style={{ color: "#fcd34d", fontSize: "0.7rem" }}>
-                Sizing 50% — solo spread stretti con filtro direzionale. Nuovi condor sospesi.
-              </span>
-            </div>
-          )}
 
           <div className="tabs phase-tabs">
             <button className={`tab ${centerPhase === "ante" ? "active" : ""}`} onClick={() => setCenterPhase("ante")}>ANTE</button>

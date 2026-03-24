@@ -33,8 +33,6 @@ body {
   color: var(--text);
   font-family: "IBM Plex Mono", Consolas, monospace;
   font-size: 13px;
-  height: 100vh;
-  overflow: hidden;
 }
 
 body::after {
@@ -66,11 +64,8 @@ p {
 }
 
 .terminal-app {
-  height: 100vh;
+  min-height: 100vh;
   min-width: 800px; /* operator console — optimized for desktop, usable from ~800px */
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .topbar {
@@ -185,7 +180,6 @@ p {
   grid-template-columns: 230px 1fr var(--right-col-width);
   height: calc(100vh - 38px);
   overflow: hidden;
-  flex: 1;
 }
 
 .leftnav {
