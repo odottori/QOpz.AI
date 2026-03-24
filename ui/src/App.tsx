@@ -2615,18 +2615,19 @@ export default function App() {
 
 
               {/* ══ Barra periodo ══ */}
-              <div style={{display:"flex", alignItems:"center", gap:8, padding:"6px 12px 4px",
-                borderTop:"1px solid var(--border)", flexWrap:"wrap"}}>
+              <div style={{display:"flex", alignItems:"center", gap:6, padding:"6px 12px 4px",
+                borderTop:"1px solid var(--border)"}}>
+                <span style={{fontSize:"0.6rem", color:"var(--dim)", fontWeight:600, whiteSpace:"nowrap"}}>Periodo:</span>
                 <span style={{fontSize:"0.58rem", color:"#888"}}>dal</span>
                 <input type="date" value={datiDateFrom} max={datiDateTo}
                   onChange={e => { setDatiDateFrom(e.target.value); void doFetchFeedLog(e.target.value, datiDateTo); }}
-                  style={{fontSize:"0.6rem", padding:"1px 4px", borderRadius:3,
+                  style={{fontSize:"0.6rem", padding:"1px 4px", borderRadius:3, width:110,
                     border:"1px solid var(--border)", background:"var(--p2)", color:"var(--text)",
                     colorScheme:"dark", cursor:"pointer"}} />
                 <span style={{fontSize:"0.58rem", color:"#888"}}>al</span>
                 <input type="date" value={datiDateTo} min={datiDateFrom} max={todayIso}
                   onChange={e => { setDatiDateTo(e.target.value); void doFetchFeedLog(datiDateFrom, e.target.value); }}
-                  style={{fontSize:"0.6rem", padding:"1px 4px", borderRadius:3,
+                  style={{fontSize:"0.6rem", padding:"1px 4px", borderRadius:3, width:110,
                     border:"1px solid var(--border)", background:"var(--p2)", color:"var(--text)",
                     colorScheme:"dark", cursor:"pointer"}} />
                 <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 6px"}}
@@ -2817,7 +2818,7 @@ export default function App() {
                                     const daySaved = dayRows.reduce((s, r) => s + (r.records_out ?? 0), 0);
                                     const dayIn = dayRows.reduce((s, r) => s + (r.records_in ?? 0), 0);
                                     const daySymbols = dayRows.reduce((s, r) => s + (r.symbols_count ?? 0), 0);
-                                    const firstErr = dayRows.find(r => r.error_msg)?.error_msg ?? "";
+                                    const firstErr = dayRows.find(r => r.status !== "ok" && r.error_msg)?.error_msg ?? "";
                                     const detailRows = dayOpen ? dayRows.map((r, j) => {
                                       const stC = r.status==="ok"?"#4ade80":r.status==="error"?"#f87171":"#fbbf24";
                                       const stL = r.status==="ok"?"✓ ok":r.status==="error"?"✗ errore":"~ parziale";
@@ -2833,7 +2834,7 @@ export default function App() {
                                           <td style={{padding:"4px 8px", color:rqC, fontWeight:600, textAlign:"right"}}>{r.quality_pct!=null?`${r.quality_pct.toFixed(1)}%`:"—"}</td>
                                           <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.symbols_count??"—"}</td>
                                           <td style={{padding:"4px 8px"}}><span style={{color:stC, fontWeight:700}}>{stL}</span></td>
-                                          <td style={{padding:"4px 8px", color:"#f87171", maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.error_msg??""}>{r.error_msg??""}</td>
+                                          <td style={{padding:"4px 8px", color:"#f87171", maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.status !== "ok" ? (r.error_msg??"") : ""}>{r.status !== "ok" ? (r.error_msg??"") : ""}</td>
                                         </tr>
                                       );
                                     }) : [];
@@ -2873,7 +2874,7 @@ export default function App() {
                     })}
                     {/* ── Progress readiness ── */}
                     {historyReadiness && (
-                      <div className="lc-progress-wrap" style={{marginTop:4}}>
+                      <div className="lc-progress-wrap" style={{marginTop:4, gridColumn:"1 / -1"}}>
                         <div className="lc-panel-title">Completezza storico → soglia sizing (50 trade / 50 giorni)</div>
                         <div className="lc-progress-track">
                           <div className={`lc-progress-fill ${historyReadiness.ready ? "ok" : "warn"}`}
@@ -2962,7 +2963,7 @@ export default function App() {
                                         <td style={{padding:"2px 6px", color:r.quality_pct != null && r.quality_pct >= 95 ? "#4ade80" : r.quality_pct != null && r.quality_pct >= 80 ? "#fbbf24" : "#f87171"}}>{qVal}</td>
                                         <td style={{padding:"2px 6px", color:"#777"}}>{r.records_in ?? "—"}</td>
                                         <td style={{padding:"2px 6px", color:"#777"}}>{r.records_out ?? "—"}</td>
-                                        <td style={{padding:"2px 6px", color:"#f87171", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.error_msg ?? ""}>{r.error_msg ? r.error_msg.slice(0, 60) : ""}</td>
+                                        <td style={{padding:"2px 6px", color:"#f87171", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.status !== "ok" ? (r.error_msg ?? "") : ""}>{r.status !== "ok" && r.error_msg ? r.error_msg.slice(0, 60) : ""}</td>
                                       </tr>
                                     );
                                   })}
