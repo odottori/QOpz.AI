@@ -2651,19 +2651,22 @@ export default function App() {
                     feed:"ibkr",
                     label:"IBKR primaria",
                     note:"Fonte primaria operativa. * IV history ATM: per i primi 90 giorni la serie storica è costruita da yfinance (HV proxy) come backbone; IBKR sovrascrive il punto giornaliero con IV reale. Dopo 90 run consecutivi la serie è interamente da IBKR.",
-                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_iv_history","ibkr_account","ibkr_positions"],
+                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_iv_history","ibkr_account","ibkr_positions",
+                           "ibkr_demo"],  // legacy alias
                   },
                   {
                     feed:"yfinance",
                     label:"yfinance integrativa",
                     note:"Dati esclusivi yfinance: macro mercati (VIX/VIX3M, rendimenti 10Y/30Y) e date ex-dividendo. Non coperti da IBKR.",
-                    feeds:["yfinance_macro","yfinance_exdiv"],
+                    feeds:["yfinance_macro","yfinance_exdiv",
+                           "fred","yfinance"],  // legacy aliases
                   },
                   {
                     feed:"calendario",
                     label:"Calendario eventi",
                     note:"Earnings calendar da yfinance: prossime trimestrali per i simboli in universo.",
-                    feeds:["yfinance_calendar"],
+                    feeds:["yfinance_calendar",
+                           "events_calendar"],  // legacy alias
                     fullWidth: true,
                   },
                 ];
@@ -2678,6 +2681,11 @@ export default function App() {
                   yfinance_macro:     "Macro mercati",
                   yfinance_exdiv:     "Date ex-dividendo",
                   yfinance_calendar:  "Earnings calendar",
+                  // legacy aliases
+                  ibkr_demo:          "Pipeline dati",
+                  fred:               "Macro mercati",
+                  yfinance:           "IV — serie storica",
+                  events_calendar:    "Earnings calendar",
                 };
                 const fBtnSt = (active: boolean, col: string) => ({
                   fontSize:"0.55rem" as const, padding:"1px 4px", borderRadius:3, cursor:"pointer" as const,
