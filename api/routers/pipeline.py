@@ -270,6 +270,13 @@ def opz_data_refresh(
             _rec("ibkr_iv_history", t2, t3, symbols_ok, iv_ok_ibkr, iv_status_ibkr,
                  "; ".join((iv_err_ibkr or ibkr_errs)[:3]) if (iv_err_ibkr or ibkr_errs) else None)
 
+        # Persiste snapshot IV/greeks per-simbolo (quarta griglia DATI tab)
+        try:
+            from execution.storage import save_symbol_snapshots
+            save_symbol_snapshots(snapshots, profile=profile)
+        except Exception as _exc:
+            logger.warning("save_symbol_snapshots failed: %s", _exc)
+
         t4 = datetime.now(timezone.utc)
         account_err = None
         account_status = "error"

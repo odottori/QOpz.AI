@@ -42,6 +42,14 @@ def opz_universe_provenance(
     return compat.opz_universe_provenance(settings_path, ocr_path, regime, batch_id)
 
 
+@router.get("/opz/universe/symbol_snapshots")
+def opz_universe_symbol_snapshots(profile: str = "paper") -> Dict[str, Any]:
+    """Dati derivati per simbolo: IV ATM, greeks, fonte (ibkr/bs), aggiornamento."""
+    from execution.storage import list_symbol_snapshots
+    items = list_symbol_snapshots(profile=profile)
+    return {"profile": profile, "count": len(items), "items": items}
+
+
 @router.post("/opz/universe/scan")
 def opz_universe_scan(req: UniverseScanRequest) -> Dict[str, Any]:
     from api import opz_api as compat

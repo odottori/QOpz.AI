@@ -913,6 +913,14 @@ export default function App() {
   const [datiDumpFeedOpen, setDatiDumpFeedOpen] = useState(false);
   const [datiCdSecs, setDatiCdSecs] = useState<number | null>(null);
   const datiCdRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  type SymbolSnap = {
+    symbol: string; run_date: string; updated_at: string;
+    underlying: number|null; atm_strike: number|null;
+    atm_iv: number|null; atm_call_iv: number|null; atm_put_iv: number|null; iv_source: string|null;
+    atm_delta: number|null; atm_gamma: number|null; atm_theta: number|null; atm_vega: number|null;
+    greeks_complete: number|null; contracts_count: number|null; error_msg: string|null;
+  };
+  const [symbolSnaps, setSymbolSnaps] = useState<SymbolSnap[]>([]);
 
   const parsedPayload = useMemo(() => {
     try {
@@ -1566,6 +1574,10 @@ export default function App() {
     try {
       const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${daysBack}`);
       setFeedLog((r.runs ?? []).filter(run => run.run_date >= f && run.run_date <= t));
+      try {
+        const snaps = await apiJson<{items: SymbolSnap[]}>(`${API_BASE}/opz/universe/symbol_snapshots?profile=${ACTIVE_PROFILE}`);
+        setSymbolSnaps(snaps.items ?? []);
+      } catch { /* non critico */ }
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
     // Refresh: conta i secondi mentre aspetta la risposta
@@ -2776,8 +2788,7 @@ export default function App() {
                     feed:"ibkr",
                     label:"IBKR primaria",
                     note:"Fonte primaria operativa. * IV history ATM: per i primi 90 giorni la serie storica è costruita da yfinance (HV proxy) come backbone; IBKR sovrascrive il punto giornaliero con IV reale. Dopo 90 run consecutivi la serie è interamente da IBKR.",
-                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_iv_history","ibkr_account","ibkr_positions",
-                           "ibkr_demo"],  // legacy alias
+                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_iv_history","ibkr_account","ibkr_positions"],
                   },
                   {
                     feed:"yfinance",
@@ -2792,7 +2803,12 @@ export default function App() {
                     note:"Earnings calendar da yfinance: prossime trimestrali per i simboli in universo.",
                     feeds:["yfinance_calendar",
                            "events_calendar"],  // legacy alias
-                    fullWidth: true,
+                  },
+                  {
+                    feed:"derivati",
+                    label:"Dati derivati",
+                    note:"IV ATM, greeks e rango volatilità calcolati dal motore. Fonte IV: ibkr = dato diretto, bs = Black-Scholes da bid/ask.",
+                    feeds:[],
                   },
                 ];
                 const feedStepLabel: Record<string,string> = {
@@ -2822,7 +2838,69 @@ export default function App() {
                 });
                 return (
                   <div style={{padding:"8px 12px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14}}>
-                    {sources.map(({ feed, label, note, feeds, fullWidth }) => {
+                    {sources.map(({ feed, label, note, feeds }) => {
+                      // ── Blocco 4: Dati derivati (symbol snapshots) ─────────────────
+                      if (feed === "derivati") {
+                        const hasSnaps = symbolSnaps.length > 0;
+                        const snapsOk = symbolSnaps.filter(s => !s.error_msg).length;
+                        const snapsPar = symbolSnaps.filter(s => s.error_msg).length;
+                        const blockC = !hasSnaps ? "#555" : snapsPar > 0 ? "#fbbf24" : "#4ade80";
+                        const blockL = !hasSnaps ? "—" : snapsPar > 0 ? `~ ${snapsOk}/${symbolSnaps.length} OK` : `✓ OK`;
+                        const lastUpd = symbolSnaps[0]?.updated_at?.slice(11,16) ?? "—";
+                        const fmtPct = (v: number|null) => v != null ? `${(v*100).toFixed(1)}%` : "—";
+                        const fmtN   = (v: number|null, d=4) => v != null ? v.toFixed(d) : "—";
+                        const fmtP   = (v: number|null) => v != null ? v.toFixed(2) : "—";
+                        return (
+                          <div key="derivati" style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
+                            {/* Header */}
+                            <div style={{display:"flex", alignItems:"center", padding:"10px 14px 6px", gap:8, borderBottom:"1px solid var(--border)"}}>
+                              <span style={{fontSize:"0.72rem", fontWeight:700, color:"var(--fg)", flex:1}}>{label}</span>
+                              <span style={{fontSize:"0.6rem", color:"#888"}}>agg. {lastUpd} · {symbolSnaps.length} simboli</span>
+                              <span style={{fontSize:"0.65rem", fontWeight:700, color:blockC}}>{blockL}</span>
+                            </div>
+                            {/* Tabella */}
+                            <div style={{overflowX:"auto"}}>
+                              {!hasSnaps
+                                ? <div style={{padding:"16px 14px", fontSize:"0.6rem", color:"#666"}}>Nessun dato — esegui un aggiornamento IBKR</div>
+                                : <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.6rem"}}>
+                                    <thead>
+                                      <tr style={{borderBottom:"1px solid var(--border)", background:"rgba(255,255,255,0.03)"}}>
+                                        {["Simbolo","Prezzo","Strike ATM","IV ATM","Fonte","Delta","Gamma","Theta","Vega","Errore"].map(h =>
+                                          <th key={h} style={{padding:"4px 8px", color:"#888", fontWeight:600, textAlign: h==="Simbolo"||h==="Fonte"||h==="Errore" ? "left" : "right", whiteSpace:"nowrap"}}>{h}</th>
+                                        )}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {symbolSnaps.map((s, i) => {
+                                        const hasErr = !!s.error_msg;
+                                        const ivC = s.atm_iv ? "#4ade80" : "#f87171";
+                                        const srcC = s.iv_source === "bs" ? "#fbbf24" : "#4ade80";
+                                        return (
+                                          <tr key={s.symbol} style={{borderBottom:"1px solid var(--border)", background: i%2===0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)"}}>
+                                            <td style={{padding:"4px 8px", fontWeight:700, color:"var(--fg)"}}>{s.symbol}</td>
+                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtP(s.underlying)}</td>
+                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtP(s.atm_strike)}</td>
+                                            <td style={{padding:"4px 8px", textAlign:"right", color:ivC, fontWeight:600}}>{fmtPct(s.atm_iv)}</td>
+                                            <td style={{padding:"4px 8px", color:srcC, fontWeight:600, fontSize:"0.55rem", textTransform:"uppercase"}}>{s.iv_source ?? "—"}</td>
+                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_delta, 3)}</td>
+                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_gamma, 4)}</td>
+                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_theta, 4)}</td>
+                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_vega, 4)}</td>
+                                            <td style={{padding:"4px 8px", color:"#f87171", maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={hasErr ? (s.error_msg??"") : ""}>{hasErr ? (s.error_msg??"") : ""}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                              }
+                            </div>
+                            {/* Note */}
+                            <div style={{padding:"6px 14px", fontSize:"0.55rem", color:"#666", borderTop:"1px solid var(--border)"}}>{note}</div>
+                          </div>
+                        );
+                      }
+
+                      // ── Blocchi 1-3: feed log standard ────────────────────────────
                       const srcRows = feedLog
                         .filter(r => feeds.includes(r.feed))
                         .sort((a,b) => (b.run_date+b.started_at).localeCompare(a.run_date+a.started_at));
@@ -2862,7 +2940,7 @@ export default function App() {
                       };
 
                       return (
-                        <div key={feed} style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", gridColumn: fullWidth ? "1 / -1" : undefined}}>
+                        <div key={feed} style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
                           <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
                             padding:"10px 14px", background:"rgba(0,255,106,0.04)", borderBottom:"1px solid var(--border)"}}>
                             <div>
@@ -2936,18 +3014,31 @@ export default function App() {
                                   {grouped.slice(0, 30).flatMap(([day, dayRows], i) => {
                                     const dayKey = `${feed}|${day}`;
                                     const dayOpen = datiDayOpen[dayKey] ?? i === 0;
-                                    const dayOk = dayRows.filter(r => r.status === "ok").length;
-                                    const dayErr = dayRows.filter(r => r.status === "error").length;
-                                    const dayPar = dayRows.filter(r => r.status === "partial").length;
-                                    const dayQVals = dayRows.map(r => r.quality_pct).filter((v): v is number => typeof v === "number");
+                                    // Dedup giorno-header: usa run più recente per feed
+                                    const seenFeedsDay = new Set<string>();
+                                    const dedupedDay = dayRows.filter(r => {
+                                      if (seenFeedsDay.has(r.feed)) return false;
+                                      seenFeedsDay.add(r.feed); return true;
+                                    });
+                                    const dayOk = dedupedDay.filter(r => r.status === "ok").length;
+                                    const dayErr = dedupedDay.filter(r => r.status === "error").length;
+                                    const dayPar = dedupedDay.filter(r => r.status === "partial").length;
+                                    const dayQVals = dedupedDay.map(r => r.quality_pct).filter((v): v is number => typeof v === "number");
                                     const dayQ = dayQVals.length ? dayQVals.reduce((s, v) => s + v, 0) / dayQVals.length : null;
                                     const dayStatus = dayErr > 0 ? (dayOk > 0 || dayPar > 0 ? "partial" : "error") : (dayPar > 0 ? "partial" : "ok");
                                     const dayStatusColor = dayStatus === "ok" ? "#4ade80" : dayStatus === "error" ? "#f87171" : "#fbbf24";
-                                    const daySaved = dayRows.reduce((s, r) => s + (r.records_out ?? 0), 0);
-                                    const dayIn = dayRows.reduce((s, r) => s + (r.records_in ?? 0), 0);
-                                    const daySymbols = dayRows.reduce((s, r) => s + (r.symbols_count ?? 0), 0);
-                                    const firstErr = dayRows.find(r => r.status !== "ok" && r.error_msg)?.error_msg ?? "";
-                                    const detailRows = dayOpen ? dayRows.map((r, j) => {
+                                    const daySaved = dedupedDay.reduce((s, r) => s + (r.records_out ?? 0), 0);
+                                    const dayIn = dedupedDay.reduce((s, r) => s + (r.records_in ?? 0), 0);
+                                    const daySymbols = dedupedDay.reduce((s, r) => s + (r.symbols_count ?? 0), 0);
+                                    const firstErr = dedupedDay.find(r => r.status !== "ok" && r.error_msg)?.error_msg ?? "";
+                                    // Dedup: per ogni feed mostra solo la run più recente del giorno
+                                    const seenFeeds = new Set<string>();
+                                    const dedupedRows = dayRows.filter(r => {
+                                      if (seenFeeds.has(r.feed)) return false;
+                                      seenFeeds.add(r.feed);
+                                      return true;
+                                    });
+                                    const detailRows = dayOpen ? dedupedRows.map((r, j) => {
                                       const stC = r.status==="ok"?"#4ade80":r.status==="error"?"#f87171":"#fbbf24";
                                       const stL = r.status==="ok"?"✓ ok":r.status==="error"?"✗ errore":"~ parz.";
                                       const rqC = r.quality_pct!=null?(r.quality_pct>=95?"#4ade80":r.quality_pct>=80?"#fbbf24":"#f87171"):"#888";
@@ -2970,8 +3061,8 @@ export default function App() {
                                       <tr key={dayKey} style={{borderBottom:"1px solid var(--border)", background:"rgba(255,255,255,0.02)", cursor:"pointer"}}
                                         onClick={() => setDatiDayOpen(v => ({...v, [dayKey]: !dayOpen}))}>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", whiteSpace:"nowrap", fontWeight:700}}>{dayOpen ? "▾" : "▸"} {day}</td>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dayRows[0]?.started_at?.slice(11,16) ?? "—"}</td>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dayRows.length} attività</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dedupedDay[0]?.started_at?.slice(11,16) ?? "—"}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dedupedDay.length} attività</td>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{dayIn.toLocaleString("it-IT")}</td>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{daySaved.toLocaleString("it-IT")}</td>
                                         <td style={{padding:"5px 8px", color:dayQ!=null?(dayQ>=95?"#4ade80":dayQ>=80?"#fbbf24":"#f87171"):"#888", fontWeight:700, textAlign:"right"}}>{dayQ!=null?`${dayQ.toFixed(1)}%`:"—"}</td>

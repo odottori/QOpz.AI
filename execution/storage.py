@@ -392,11 +392,117 @@ def init_execution_schema() -> None:
             """
         )
 
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS symbol_snapshot_latest (
+                symbol        VARCHAR PRIMARY KEY,
+                profile       VARCHAR,
+                run_date      VARCHAR,
+                updated_at    VARCHAR,
+                underlying    DOUBLE,
+                atm_strike    DOUBLE,
+                atm_iv        DOUBLE,
+                atm_call_iv   DOUBLE,
+                atm_put_iv    DOUBLE,
+                iv_source     VARCHAR,
+                atm_delta     DOUBLE,
+                atm_gamma     DOUBLE,
+                atm_theta     DOUBLE,
+                atm_vega      DOUBLE,
+                greeks_complete INTEGER,
+                contracts_count INTEGER,
+                error_msg     VARCHAR,
+                source_system VARCHAR,
+                source_mode   VARCHAR
+            )
+            """
+        )
+
         try:
             con.close()
         except Exception:
             pass
         _SCHEMA_READY = True
+
+
+def save_symbol_snapshots(snapshots: list[dict], profile: str) -> None:
+    """Upsert per-symbol IV/greeks snapshot into symbol_snapshot_latest.
+
+    Un record per simbolo — sovrascrive sempre (ultima run vince).
+    """
+    if not snapshots:
+        return
+    init_execution_schema()
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    run_date = now[:10]
+    source_mode = os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
+    con = _connect()
+    try:
+        for s in snapshots:
+            sym = str(s.get("symbol") or "").upper()
+            if not sym:
+                continue
+            # iv_source: ibkr se impliedVolatility restituita da IBKR, bs se calcolata
+            iv_source = s.get("iv_source", "ibkr")
+            con.execute(
+                """
+                INSERT OR REPLACE INTO symbol_snapshot_latest
+                  (symbol, profile, run_date, updated_at,
+                   underlying, atm_strike,
+                   atm_iv, atm_call_iv, atm_put_iv, iv_source,
+                   atm_delta, atm_gamma, atm_theta, atm_vega,
+                   greeks_complete, contracts_count, error_msg,
+                   source_system, source_mode)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                [
+                    sym, profile, run_date, now,
+                    s.get("underlying_price"), s.get("atm_strike"),
+                    s.get("atm_iv"), s.get("atm_call_iv"), s.get("atm_put_iv"), iv_source,
+                    s.get("atm_delta"), s.get("atm_gamma"), s.get("atm_theta"), s.get("atm_vega"),
+                    s.get("greeks_complete", 0), s.get("contracts_count", 0),
+                    s.get("error"), _SOURCE_SYSTEM, source_mode,
+                ],
+            )
+    except Exception as exc:
+        logger.warning("save_symbol_snapshots error: %s", exc)
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+
+
+def list_symbol_snapshots(profile: str) -> list[dict]:
+    """Ritorna tutti i record symbol_snapshot_latest per il profilo dato."""
+    init_execution_schema()
+    con = _connect()
+    try:
+        rows = con.execute(
+            """
+            SELECT symbol, run_date, updated_at, underlying, atm_strike,
+                   atm_iv, atm_call_iv, atm_put_iv, iv_source,
+                   atm_delta, atm_gamma, atm_theta, atm_vega,
+                   greeks_complete, contracts_count, error_msg
+            FROM symbol_snapshot_latest
+            WHERE profile = ?
+            ORDER BY symbol
+            """,
+            [profile],
+        ).fetchall()
+        cols = ["symbol","run_date","updated_at","underlying","atm_strike",
+                "atm_iv","atm_call_iv","atm_put_iv","iv_source",
+                "atm_delta","atm_gamma","atm_theta","atm_vega",
+                "greeks_complete","contracts_count","error_msg"]
+        return [dict(zip(cols, r)) for r in rows]
+    except Exception as exc:
+        logger.warning("list_symbol_snapshots error: %s", exc)
+        return []
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
 
 
 def save_opportunity_scan(
