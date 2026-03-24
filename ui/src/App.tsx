@@ -1555,18 +1555,17 @@ export default function App() {
     setFeedLogLoading(true);
     try {
       const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
-      const runs = r.runs ?? [];
-      setFeedLog(runs);
-      // Se triggerRefresh=true: chiama data/refresh per avviare l'ingestion, poi rilegge il log.
-      if (triggerRefresh) {
-        try {
-          await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
-          const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
-          setFeedLog(r2.runs ?? []);
-        } catch { /* non critico */ }
-      }
+      setFeedLog(r.runs ?? []);
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
+    // Refresh in background: non blocca il rendering dei blocchi
+    if (triggerRefresh) {
+      try {
+        await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
+        const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
+        setFeedLog(r2.runs ?? []);
+      } catch { /* non critico */ }
+    }
   }
 
   async function doFetchControlStatus() {
@@ -2606,129 +2605,6 @@ export default function App() {
                 {premarketScanAt && <span className="lc-step-sub">Aggiornato: {fmtTs(premarketScanAt)}</span>}
               </div>
 
-              {/* ══ KPI BAR sistemica — stato globale pipeline (collassabile) ══ */}
-              <div style={{borderBottom:"1px solid var(--border)"}}>
-                <div style={{display:"flex", alignItems:"center", gap:5, cursor:"pointer",
-                  padding:"5px 12px", userSelect:"none"}}
-                  onClick={() => setDatiSysOpen(v => !v)}>
-                  <span style={{fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em",
-                    color:"#555", flex:1}}>Sistema — stato pipeline</span>
-                  <span style={{fontSize:"0.5rem", color:"#555"}}>{datiSysOpen ? "▾" : "▸"}</span>
-                </div>
-              </div>
-              {datiSysOpen && (() => {
-                const kpiToggle = (id: string) => setKpiExpanded(v => v === id ? null : id);
-                const kpiPin = (id: string, e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  setPinnedKpis(v => v.includes(id) ? v.filter(x => x !== id) : [...v, id]);
-                };
-                const kCard = (
-                  id: string, label: string, value: React.ReactNode,
-                  sub: string, accent: string, detail: React.ReactNode | null
-                ) => {
-                  const open = kpiExpanded === id;
-                  const pinned = pinnedKpis.includes(id);
-                  return (
-                    <div key={id} onClick={() => detail && kpiToggle(id)}
-                      style={{flex:"1 1 140px", background:"var(--p2)",
-                        border:`1px solid ${open ? accent+"55" : pinned ? accent+"33" : "var(--border)"}`,
-                        borderRadius:4, padding:"7px 10px", cursor:detail?"pointer":"default",
-                        position:"relative", transition:"border-color 0.15s"}}>
-                      <span onClick={e => kpiPin(id, e)}
-                        title={pinned ? "Rimuovi da In evidenza" : "Fissa in In evidenza"}
-                        style={{position:"absolute", top:4, right:6, fontSize:"0.65rem",
-                          cursor:"pointer", color:pinned?accent:"#555", userSelect:"none"}}
-                        onMouseEnter={e=>(e.currentTarget.style.color=accent)}
-                        onMouseLeave={e=>(e.currentTarget.style.color=pinned?accent:"#555")}>
-                        {pinned?"◆":"◇"}
-                      </span>
-                      <div style={{fontSize:"0.58rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2}}>{label}</div>
-                      <div style={{fontSize:"1rem", fontWeight:700, color:accent, lineHeight:1.1, marginBottom:2}}>{value}</div>
-                      <div style={{fontSize:"0.58rem", color:"#777"}}>
-                        {sub}{detail ? <span style={{marginLeft:4}}>{open?"▲":"▼"}</span> : null}
-                      </div>
-                      {open && detail && <div style={{marginTop:8, borderTop:"1px solid var(--border)", paddingTop:6}}>{detail}</div>}
-                    </div>
-                  );
-                };
-                const histPct = historyReadiness?.score_pct ?? null;
-                const nFeedsOk = [
-                  pipelineFeedHealth === "ok",
-                  yfinanceHealth === "ok",
-                  fredHealth === "ok",
-                  ibwrHealth === "ok",
-                ].filter(Boolean).length;
-                const pipeCol = pipelineStateHealth === "ok" ? "#4ade80" : pipelineStateHealth === "warn" ? "#fbbf24" : "#f87171";
-                const histCol = histPct != null ? (histPct >= 100 ? "#4ade80" : histPct >= 60 ? "#fbbf24" : "#f87171") : "#888";
-                return (
-                  <div style={{display:"flex", gap:6, flexWrap:"wrap", padding:"8px 12px 4px"}}>
-                    {kCard("pipe_stato", "Pipeline", pipelineStateLabel,
-                      "ingest + regime",
-                      pipeCol,
-                      <div style={{fontSize:"0.62rem", color:"var(--dim)", display:"flex", flexDirection:"column", gap:2}}>
-                        <span>yfinance: <span className={healthToSevClass(yfinanceHealth)}>{yfinanceLabel}</span></span>
-                        <span>fred: <span className={healthToSevClass(fredHealth)}>{fredLabel}</span></span>
-                        <span>orats: <span className="sev-neutral">{oratsLabel}</span></span>
-                        <span>ibwr: <span className={healthToSevClass(ibwrHealth)}>{ibwrState}</span></span>
-                      </div>
-                    )}
-                    {kCard("pipe_fonte", "Fonte dati", dataModeUpper || "N/D",
-                      hasRealData ? "dati reali" : "dati sintetici",
-                      hasRealData ? "#4ade80" : "#fbbf24",
-                      <div style={{fontSize:"0.62rem", color:"var(--dim)"}}>
-                        <div>DATA_MODE: {dataModeUpper || "N/D"}</div>
-                        <div>feed attivi: {nFeedsOk}/4</div>
-                      </div>
-                    )}
-                    {kCard("pipe_records", "Record locali", localRecords.toLocaleString("it-IT"),
-                      "DuckDB",
-                      healthToSevClass(localDbHealth) === "sev-ok" ? "#4ade80" : "#fbbf24",
-                      <div style={{fontSize:"0.62rem", color:"var(--dim)", display:"flex", flexDirection:"column", gap:2}}>
-                        <span>equity snap: {paperSummary?.gates.data_points.equity_snapshots ?? 0}</span>
-                        <span>trade journal: {paperSummary?.gates.data_points.trade_journal ?? 0}</span>
-                        <span>compliance ev: {paperSummary?.gates.data_points.compliance_events ?? 0}</span>
-                      </div>
-                    )}
-                    {kCard("pipe_storico", "Completezza storico",
-                      histPct != null ? `${histPct.toFixed(0)}%` : "N/D",
-                      historyReadiness ? `${historyReadiness.days_observed}/${historyReadiness.target_days}g` : "—",
-                      histCol,
-                      historyReadiness ? (
-                        <div style={{fontSize:"0.62rem", color:"var(--dim)", display:"flex", flexDirection:"column", gap:2}}>
-                          <span>eventi: {historyReadiness.events_observed}/{historyReadiness.target_events}</span>
-                          <span>ritmo: {historyReadiness.pace_events_per_day.toFixed(1)} ev/g</span>
-                          <span>{historyReadiness.ready ? "✓ Pronto" : historyEtaLabel}</span>
-                          {historyReadiness.blockers.map((b,i)=><span key={i} style={{color:"var(--amber)"}}>⚠ {b}</span>)}
-                        </div>
-                      ) : null
-                    )}
-                    {kCard("pipe_feeds", "Feed attivi",
-                      `${nFeedsOk}/4`,
-                      `${nFeedsOk === 4 ? "tutti ok" : nFeedsOk >= 2 ? "degradato" : "critico"}`,
-                      nFeedsOk === 4 ? "#4ade80" : nFeedsOk >= 2 ? "#fbbf24" : "#f87171",
-                      null
-                    )}
-                    {kCard("pipe_sessione", "Ultima sessione",
-                      sessionStatus?.running ? "⟳ IN CORSO" :
-                        sessionStatus?.last_morning
-                          ? sessionStatus.last_morning.slice(0,16).replace("T"," ")
-                          : "N/D",
-                      sessionStatus?.running ? "sessione mattutina attiva" :
-                        sessionStatus?.last_eod
-                          ? `EOD: ${sessionStatus.last_eod.slice(0,16).replace("T"," ")}`
-                          : "nessuna sessione registrata",
-                      sessionStatus?.running ? "#fbbf24" : sessionStatus?.last_morning ? "#4ade80" : "#888",
-                      sessionStatus ? (
-                        <div style={{fontSize:"0.62rem", color:"var(--dim)", display:"flex", flexDirection:"column", gap:2}}>
-                          <span>morning: <span style={{color: sessionStatus.last_morning ? "#4ade80" : "#888"}}>{sessionStatus.last_morning ? sessionStatus.last_morning.slice(0,19).replace("T"," ") : "—"}</span></span>
-                          <span>EOD: <span style={{color: sessionStatus.last_eod ? "#4ade80" : "#888"}}>{sessionStatus.last_eod ? sessionStatus.last_eod.slice(0,19).replace("T"," ") : "—"}</span></span>
-                          <span>scheduler: <span style={{color: sessionStatus.enabled ? "#4ade80" : "#888"}}>{sessionStatus.enabled ? "ON" : "OFF"}</span></span>
-                        </div>
-                      ) : null
-                    )}
-                  </div>
-                );
-              })()}
 
               {/* ══ Barra periodo ══ */}
               <div style={{display:"flex", alignItems:"center", gap:6, padding:"6px 12px 4px",
