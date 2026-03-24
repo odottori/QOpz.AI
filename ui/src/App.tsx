@@ -901,7 +901,7 @@ export default function App() {
   };
   const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
   const [feedLogLoading, setFeedLogLoading] = useState(true);
-  const [datiFilterDays, setDatiFilterDays] = useState<number>(1);
+  const [datiFilterDays, setDatiFilterDays] = useState<number>(7);
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
   const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({});
   const [datiDayOpen, setDatiDayOpen] = useState<Record<string,boolean>>({});
