@@ -226,12 +226,14 @@ def opz_data_refresh(
         _rec("ibkr_prices", t0, t1, len(symbols), with_price, chain_status, chain_err_msg)
         _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status, chain_err_msg)
         # greeks_complete=0 con catene catturate = mercato chiuso, non un errore
+        # records_in = simboli_ok * 4 (4 campi greek per simbolo: delta,gamma,theta,vega)
+        max_greeks = symbols_ok * 4
         if greeks_complete == 0 and with_chain > 0:
             greek_status = "ok"
             _rec("ibkr_greeks", t0, t1, 0, 0, "ok", None)
         else:
-            greek_status = "ok" if greeks_complete > 0 and greeks_complete == total_contracts else ("partial" if greeks_complete > 0 else "error")
-            _rec("ibkr_greeks", t0, t1, total_contracts, greeks_complete, greek_status, chain_err_msg)
+            greek_status = "ok" if max_greeks > 0 and greeks_complete >= max_greeks * 0.75 else ("partial" if greeks_complete > 0 else "error")
+            _rec("ibkr_greeks", t0, t1, max_greeks, greeks_complete, greek_status, chain_err_msg)
 
         t2 = datetime.now(timezone.utc)
         iv_ok_ibkr = 0

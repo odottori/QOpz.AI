@@ -273,7 +273,7 @@ def capture_ibkr_universe_snapshot(symbols: list[str], profile: str = "dev") -> 
             err = f"IBG non raggiungibile su {host} porte {ports}"
             return [_empty_result(s, err) for s in symbols]
 
-        ib.reqMarketDataType(3)
+        ib.reqMarketDataType(1)  # live data — necessario per IV e greeks opzioni
 
         results = []
         for symbol in symbols:

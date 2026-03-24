@@ -911,6 +911,8 @@ export default function App() {
   const [datiDumpOpen, setDatiDumpOpen] = useState(false);
   const [datiDumpSrcOpen, setDatiDumpSrcOpen] = useState(true);
   const [datiDumpFeedOpen, setDatiDumpFeedOpen] = useState(false);
+  const [datiCdSecs, setDatiCdSecs] = useState<number | null>(null);
+  const datiCdRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const parsedPayload = useMemo(() => {
     try {
@@ -1566,13 +1568,29 @@ export default function App() {
       setFeedLog((r.runs ?? []).filter(run => run.run_date >= f && run.run_date <= t));
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
-    // Refresh in background: non blocca il rendering dei blocchi
+    // Refresh: conta i secondi mentre aspetta la risposta
     if (triggerRefresh) {
+      const CD_SECS = 90;
+      if (datiCdRef.current) clearInterval(datiCdRef.current);
+      setDatiCdSecs(CD_SECS);
+      datiCdRef.current = setInterval(() => {
+        setDatiCdSecs(prev => {
+          if (prev === null || prev <= 1) {
+            if (datiCdRef.current) { clearInterval(datiCdRef.current); datiCdRef.current = null; }
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
       try {
         await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
         const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${daysBack}`);
         setFeedLog((r2.runs ?? []).filter(run => run.run_date >= f && run.run_date <= t));
       } catch { /* non critico */ }
+      finally {
+        if (datiCdRef.current) { clearInterval(datiCdRef.current); datiCdRef.current = null; }
+        setDatiCdSecs(null);
+      }
     }
   }
 
@@ -2546,27 +2564,129 @@ export default function App() {
                 </div>
               );
             })()}
-            {historyReadiness && (
-              <div style={{background:"var(--p1)", padding:"8px 16px", display:"flex", flexDirection:"column",
-                justifyContent:"center", gridColumn:"span 4"}}>
-                <div style={{fontSize:"0.52rem", color:"var(--dim)", textTransform:"uppercase",
-                  letterSpacing:"0.06em", marginBottom:5}}>
-                  Completezza storico → soglia sizing
+            {historyReadiness && (() => {
+              const VW = 400, VH = 84;
+              const PH = 26;          // phase track height
+              const EY = PH + 8;      // equity track y-start
+              const EH = VH - EY - 6; // equity track height
+
+              const phaseDefs: {label:string; units:number; color:string; done:boolean; activePct:number}[] = [
+                { label:"MOTORE",   units:14, color:"#60a5fa", done:true,  activePct:0   },
+                { label:"PIPELINE", units:5,  color:"#a78bfa", done:false, activePct:0.2 },
+                { label:"SIMUL.",   units:3,  color:"#4ade80", done:false, activePct:0   },
+                { label:"COPERT.",  units:3,  color:"#f97316", done:false, activePct:0   },
+                { label:"VERIF.",   units:1,  color:"#fbbf24", done:false, activePct:0   },
+                { label:"LIVE",     units:1,  color:"#ef4444", done:false, activePct:0   },
+              ];
+              const totalU = 27;
+              const phases = phaseDefs.map((p, i) => ({
+                ...p,
+                x: (phaseDefs.slice(0,i).reduce((s,q)=>s+q.units,0) / totalU) * VW,
+                w: (p.units / totalU) * VW,
+              }));
+              const cursorX = ((14 + 5 * 0.2) / totalU) * VW;
+
+              const pts = equityHistory?.points ?? [];
+              const minE = pts.length > 1 ? Math.min(...pts.map(p=>p.equity)) : 0;
+              const maxE = pts.length > 1 ? Math.max(...pts.map(p=>p.equity)) : 1;
+              const rE = Math.max(maxE - minE, 1);
+              const ePts = pts.length > 1 ? pts.map((p, i) => {
+                const px = (i / (pts.length - 1)) * VW;
+                const py = EY + EH - ((p.equity - minE) / rE) * (EH - 4) - 2;
+                return `${px.toFixed(1)},${py.toFixed(1)}`;
+              }).join(" ") : "";
+              const learnW = historyReadiness.target_days > 0
+                ? Math.min(VW, (historyReadiness.days_observed / historyReadiness.target_days) * VW)
+                : 0;
+
+              return (
+                <div key="timeline-wrap" style={{background:"var(--p1)", padding:"6px 10px 6px",
+                  display:"flex", flexDirection:"column", justifyContent:"center", gridColumn:"span 4", minWidth:0}}>
+                  <div style={{fontSize:"0.5rem", color:"var(--dim)", textTransform:"uppercase",
+                    letterSpacing:"0.06em", marginBottom:3}}>
+                    Completezza storico → soglia sizing
+                  </div>
+                  <svg width="100%" style={{height:VH, display:"block"}}
+                    viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none">
+                    {/* ── FASE: segmenti colorati per milestone ── */}
+                    {phases.map(ph => (
+                      <g key={ph.label}>
+                        <rect x={ph.x} y={0} width={ph.w} height={PH}
+                          fill={ph.done ? ph.color : "#111"}
+                          fillOpacity={ph.done ? 0.5 : 1}
+                          stroke={ph.color} strokeWidth={0.5}
+                          strokeOpacity={ph.done || ph.activePct > 0 ? 0.8 : 0.2}/>
+                        {ph.activePct > 0 && (
+                          <rect x={ph.x} y={0} width={ph.w * ph.activePct} height={PH}
+                            fill={ph.color} fillOpacity={0.6}/>
+                        )}
+                        <text x={ph.x + ph.w/2} y={PH/2 + 0.5}
+                          textAnchor="middle" dominantBaseline="middle"
+                          fontSize={ph.w > 55 ? 7 : ph.w > 25 ? 6 : 5}
+                          fill={ph.done || ph.activePct > 0 ? "#fff" : "#333"}
+                          fontFamily="monospace"
+                          fontWeight={ph.activePct > 0 ? "700" : "400"}>
+                          {ph.label}
+                        </text>
+                        {ph.x + ph.w < VW - 1 && (
+                          <line x1={ph.x + ph.w} y1={PH - 5} x2={ph.x + ph.w} y2={PH + 4}
+                            stroke="#444" strokeWidth={0.8}/>
+                        )}
+                      </g>
+                    ))}
+                    {/* cursore posizione attuale */}
+                    <line x1={cursorX} y1={0} x2={cursorX} y2={PH}
+                      stroke="#ffffffaa" strokeWidth={1} strokeDasharray="2,2"/>
+                    <polygon
+                      points={`${cursorX-2.5},${PH} ${cursorX+2.5},${PH} ${cursorX},${PH+5}`}
+                      fill="#ffffff77"/>
+                    {/* score % */}
+                    <text x={VW - 2} y={PH - 3} textAnchor="end"
+                      fontSize={8} fill={historyReadiness.ready ? "#4ade80" : "#fbbf24"}
+                      fontFamily="monospace" fontWeight="700">
+                      {historyReadiness.score_pct.toFixed(0)}%
+                    </text>
+                    {/* ── STORICO: equity curve ── */}
+                    <rect x={0} y={EY} width={VW} height={EH} fill="#0d0d0d" rx={1.5}/>
+                    {/* periodo di apprendimento (intera finestra) */}
+                    {!historyReadiness.ready && (
+                      <rect x={0} y={EY} width={VW} height={EH}
+                        fill="#6366f1" fillOpacity={0.06} rx={1.5}/>
+                    )}
+                    {/* osservato finora */}
+                    {learnW > 0 && (
+                      <rect x={0} y={EY} width={learnW} height={EH}
+                        fill="#a78bfa" fillOpacity={0.12} rx={1.5}/>
+                    )}
+                    {/* etichetta track */}
+                    <text x={3} y={EY + 7} fontSize={5}
+                      fill="#6366f155" fontFamily="monospace">
+                      {historyReadiness.ready ? "storico ✓" : "apprendimento"}
+                    </text>
+                    {/* curva equity */}
+                    {pts.length > 1 ? (
+                      <polyline points={ePts} fill="none"
+                        stroke="#4ade80" strokeWidth={1.2} strokeLinejoin="round"/>
+                    ) : (
+                      <text x={VW/2} y={EY + EH/2} textAnchor="middle"
+                        dominantBaseline="middle" fontSize={6}
+                        fill="#252525" fontFamily="monospace">
+                        nessun dato equity
+                      </text>
+                    )}
+                    <line x1={0} y1={EY+EH-0.5} x2={VW} y2={EY+EH-0.5}
+                      stroke="#1c1c1c" strokeWidth={0.5}/>
+                  </svg>
+                  <div style={{display:"flex", justifyContent:"space-between",
+                    fontSize:"0.5rem", color:"#555", marginTop:2}}>
+                    <span>{historyReadiness.days_observed}g · {historyReadiness.events_observed} eventi</span>
+                    <span style={{color: historyReadiness.ready ? "var(--g2)" : "var(--amber)"}}>
+                      {historyReadiness.ready ? "✓ Pronto" : historyEtaLabel}
+                    </span>
+                  </div>
                 </div>
-                <div style={{background:"var(--border)", borderRadius:2, height:6, overflow:"hidden"}}>
-                  <div style={{height:"100%", borderRadius:2, transition:"width 0.5s",
-                    background: historyReadiness.ready ? "var(--g2)" : "var(--amber)",
-                    width:`${Math.min(100, historyReadiness.score_pct)}%`}}/>
-                </div>
-                <div style={{display:"flex", justifyContent:"space-between", fontSize:"0.55rem",
-                  color:"#666", marginTop:4}}>
-                  <span>{historyReadiness.days_observed}g osservati · {historyReadiness.events_observed} eventi</span>
-                  <span style={{color: historyReadiness.ready ? "var(--g2)" : "var(--amber)"}}>
-                    {historyReadiness.ready ? "✓ Pronto" : historyEtaLabel}
-                  </span>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
 
@@ -2625,9 +2745,14 @@ export default function App() {
                   style={{fontSize:"0.6rem", padding:"1px 4px", borderRadius:3, width:110,
                     border:"1px solid var(--border)", background:"var(--p2)", color:"var(--text)",
                     colorScheme:"dark", cursor:"pointer"}} />
-                <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 6px"}}
-                  onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)} disabled={feedLogLoading}>
-                  {feedLogLoading ? "..." : "⟳"}
+                <button className="btn btn-ghost"
+                  style={{fontSize:"0.55rem", padding:"1px 6px",
+                    minWidth:36, fontVariantNumeric:"tabular-nums",
+                    opacity: (feedLogLoading || datiCdSecs !== null) ? 0.45 : 1}}
+                  onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)}
+                  disabled={feedLogLoading || datiCdSecs !== null}
+                  title={datiCdSecs !== null ? `Aggiornamento in corso… ${datiCdSecs}s` : "Aggiorna dati"}>
+                  {feedLogLoading ? "…" : datiCdSecs !== null ? `${datiCdSecs}s` : "⟳"}
                 </button>
               </div>
 
@@ -2712,7 +2837,7 @@ export default function App() {
                       // Stato blocco = sintesi di tutte le run (non solo l'ultima singola feed)
                       const blockStatus = tot === 0 ? null : nErr === 0 && nPar === 0 ? "ok" : nOk === 0 && nPar === 0 ? "error" : "partial";
                       const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : blockStatus === "partial" ? "#fbbf24" : "#555";
-                      const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : blockStatus === "partial" ? "~ PARZIALE" : "—";
+                      const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : blockStatus === "partial" ? "~ PARZ." : "—";
                       const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
                       const activeFilters = blockSt !== "tutti" ? 1 : 0;
                       const grouped = Object.entries(rows.reduce((acc, r) => {
@@ -2824,7 +2949,7 @@ export default function App() {
                                     const firstErr = dayRows.find(r => r.status !== "ok" && r.error_msg)?.error_msg ?? "";
                                     const detailRows = dayOpen ? dayRows.map((r, j) => {
                                       const stC = r.status==="ok"?"#4ade80":r.status==="error"?"#f87171":"#fbbf24";
-                                      const stL = r.status==="ok"?"✓ ok":r.status==="error"?"✗ errore":"~ parziale";
+                                      const stL = r.status==="ok"?"✓ ok":r.status==="error"?"✗ errore":"~ parz.";
                                       const rqC = r.quality_pct!=null?(r.quality_pct>=95?"#4ade80":r.quality_pct>=80?"#fbbf24":"#f87171"):"#888";
                                       const dur = r.duration_ms!=null?(r.duration_ms>=1000?`${(r.duration_ms/1000).toFixed(1)}s`:`${r.duration_ms}ms`):"—";
                                       return (
@@ -2851,7 +2976,7 @@ export default function App() {
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{daySaved.toLocaleString("it-IT")}</td>
                                         <td style={{padding:"5px 8px", color:dayQ!=null?(dayQ>=95?"#4ade80":dayQ>=80?"#fbbf24":"#f87171"):"#888", fontWeight:700, textAlign:"right"}}>{dayQ!=null?`${dayQ.toFixed(1)}%`:"—"}</td>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{daySymbols}</td>
-                                        <td style={{padding:"5px 8px"}}><span style={{color:dayStatusColor, fontWeight:700}}>{dayStatus === "ok" ? "✓ ok" : dayStatus === "error" ? "✗ errore" : "~ parziale"}</span></td>
+                                        <td style={{padding:"5px 8px"}}><span style={{color:dayStatusColor, fontWeight:700}}>{dayStatus === "ok" ? "✓ ok" : dayStatus === "error" ? "✗ errore" : "~ parz."}</span></td>
                                         <td style={{padding:"5px 8px", color:firstErr ? "#f87171" : "#666", maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={firstErr}>{firstErr || `${dayOk} ok · ${dayPar} parziali · ${dayErr} errori`}</td>
                                       </tr>,
                                       ...detailRows,
@@ -2875,20 +3000,6 @@ export default function App() {
                         </div>
                       );
                     })}
-                    {/* ── Progress readiness ── */}
-                    {historyReadiness && (
-                      <div className="lc-progress-wrap" style={{marginTop:4, gridColumn:"1 / -1"}}>
-                        <div className="lc-panel-title">Completezza storico → soglia sizing (50 trade / 50 giorni)</div>
-                        <div className="lc-progress-track">
-                          <div className={`lc-progress-fill ${historyReadiness.ready ? "ok" : "warn"}`}
-                            style={{width:`${Math.min(100, historyReadiness.score_pct)}%`}}/>
-                        </div>
-                        <div className="lc-progress-labels">
-                          <span>{historyReadiness.days_observed}g osservati · {historyReadiness.events_observed} eventi</span>
-                          <span>{historyReadiness.ready ? "✓ Pronto" : historyEtaLabel}</span>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })()}
@@ -2927,7 +3038,12 @@ export default function App() {
                             <div className="lc-screen-row"><span className="lc-dim">runs_loaded</span><span className="sev-data">{feedLog.length}</span></div>
                             <div className="lc-screen-row"><span className="lc-dim">feeds_distinct</span><span className="sev-data">{[...new Set(feedLog.map(r => r.feed))].length}</span></div>
                             <div style={{marginTop:8}}>
-                              <button className="btn btn-ghost" style={{fontSize:"0.6rem"}} onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)} disabled={feedLogLoading}>⟳ refresh</button>
+                              <button className="btn btn-ghost" style={{fontSize:"0.6rem",
+                                opacity: (feedLogLoading || datiCdSecs !== null) ? 0.45 : 1}}
+                                onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)}
+                                disabled={feedLogLoading || datiCdSecs !== null}>
+                                {datiCdSecs !== null ? `⟳ ${datiCdSecs}s` : "⟳ refresh"}
+                              </button>
                             </div>
                           </div>
                         )}
