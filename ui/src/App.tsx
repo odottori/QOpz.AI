@@ -908,6 +908,9 @@ export default function App() {
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
   const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({});
   const [datiDayOpen, setDatiDayOpen] = useState<Record<string,boolean>>({});
+  const [datiDumpOpen, setDatiDumpOpen] = useState(false);
+  const [datiDumpSrcOpen, setDatiDumpSrcOpen] = useState(true);
+  const [datiDumpFeedOpen, setDatiDumpFeedOpen] = useState(false);
 
   const parsedPayload = useMemo(() => {
     try {
@@ -2884,6 +2887,94 @@ export default function App() {
                   </div>
                 );
               })()}
+
+              {/* ── DATI DUMP — tecnico, collassato di default ── */}
+              <div style={{borderTop:"1px solid var(--border)", marginTop:4}}>
+                <div style={{border:"1px solid #2a2a2a", borderRadius:3, overflow:"hidden"}}>
+                  <div style={{display:"flex", alignItems:"center", gap:5, padding:"4px 8px",
+                    background:"#0d0d0d", cursor:"pointer",
+                    borderBottom: datiDumpOpen ? "1px solid #2a2a2a" : "none"}}
+                    onClick={() => setDatiDumpOpen(o => !o)}>
+                    <span style={{width:7, height:7, borderRadius:"50%", background:"#ef4444", display:"inline-block"}}/>
+                    <span style={{width:7, height:7, borderRadius:"50%", background:"#eab308", display:"inline-block"}}/>
+                    <span style={{width:7, height:7, borderRadius:"50%", background:"#22c55e", display:"inline-block"}}/>
+                    <span style={{fontSize:"0.63rem", color:"#777", fontFamily:"monospace", marginLeft:4, letterSpacing:"0.05em"}}>DATI</span>
+                    <span style={{marginLeft:"auto", fontSize:"0.58rem", color:"#888"}}>{datiDumpOpen ? "▲" : "▼"}</span>
+                  </div>
+                  {datiDumpOpen && (
+                    <div style={{padding:0}}>
+
+                      {/* ─── Sezione 1: data_sources.log ─── */}
+                      <div style={{borderBottom:"1px solid #1e1e1e"}}>
+                        <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
+                          onClick={() => setDatiDumpSrcOpen(o => !o)}>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{datiDumpSrcOpen ? "▾" : "▸"}</span>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>data_sources.log</span>
+                        </div>
+                        {datiDumpSrcOpen && (
+                          <div style={{padding:"6px 12px 10px"}}>
+                            <div className="lc-screen-row"><span className="lc-dim">ibkr_connected</span><span className={ibkrStatus?.connected ? "sev-ok" : "sev-error"}>{ibkrStatus?.connected ? "yes" : "no"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">ibkr_port</span><span className="sev-data">{ibkrStatus?.port ?? "—"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">ibkr_source</span><span className="sev-meta">{ibkrStatus?.source_system ?? "—"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">data_mode</span><span className="sev-meta">{sysStatus?.data_mode ?? "—"}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">period_from</span><span className="sev-data">{datiDateFrom}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">period_to</span><span className="sev-data">{datiDateTo}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">runs_loaded</span><span className="sev-data">{feedLog.length}</span></div>
+                            <div className="lc-screen-row"><span className="lc-dim">feeds_distinct</span><span className="sev-data">{[...new Set(feedLog.map(r => r.feed))].length}</span></div>
+                            <div style={{marginTop:8}}>
+                              <button className="btn btn-ghost" style={{fontSize:"0.6rem"}} onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)} disabled={feedLogLoading}>⟳ refresh</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ─── Sezione 2: ingestion_runs ─── */}
+                      <div>
+                        <div style={{display:"flex", alignItems:"center", gap:6, padding:"5px 10px", cursor:"pointer"}}
+                          onClick={() => setDatiDumpFeedOpen(o => !o)}>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", userSelect:"none"}}>{datiDumpFeedOpen ? "▾" : "▸"}</span>
+                          <span style={{fontSize:"0.65rem", color:"var(--dim)", fontFamily:"monospace"}}>ingestion_runs</span>
+                          {!datiDumpFeedOpen && <span style={{fontSize:"0.6rem", color:"var(--muted)", marginLeft:4}}>{feedLog.length} record</span>}
+                        </div>
+                        {datiDumpFeedOpen && (
+                          <div style={{padding:"4px 12px 10px", overflowX:"auto"}}>
+                            <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.58rem", fontFamily:"monospace"}}>
+                              <thead>
+                                <tr style={{borderBottom:"1px solid #2a2a2a"}}>
+                                  {["feed","data","stato","qualità","ric","sal","errore"].map(h => (
+                                    <th key={h} style={{padding:"2px 6px", textAlign:"left", color:"#666", fontWeight:600, whiteSpace:"nowrap"}}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {feedLog
+                                  .sort((a,b) => (b.run_date+b.started_at).localeCompare(a.run_date+a.started_at))
+                                  .slice(0, 50)
+                                  .map((r, i) => {
+                                    const stCol = r.status === "ok" ? "#4ade80" : r.status === "error" ? "#f87171" : "#fbbf24";
+                                    const qVal = r.quality_pct != null ? `${Math.min(100, r.quality_pct).toFixed(0)}%` : "—";
+                                    return (
+                                      <tr key={i} style={{borderBottom:"1px solid #1a1a1a"}}>
+                                        <td style={{padding:"2px 6px", color:"#aaa"}}>{r.feed}</td>
+                                        <td style={{padding:"2px 6px", color:"#888"}}>{r.run_date}</td>
+                                        <td style={{padding:"2px 6px", color:stCol, fontWeight:600}}>{r.status}</td>
+                                        <td style={{padding:"2px 6px", color:r.quality_pct != null && r.quality_pct >= 95 ? "#4ade80" : r.quality_pct != null && r.quality_pct >= 80 ? "#fbbf24" : "#f87171"}}>{qVal}</td>
+                                        <td style={{padding:"2px 6px", color:"#777"}}>{r.records_in ?? "—"}</td>
+                                        <td style={{padding:"2px 6px", color:"#777"}}>{r.records_out ?? "—"}</td>
+                                        <td style={{padding:"2px 6px", color:"#f87171", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.error_msg ?? ""}>{r.error_msg ? r.error_msg.slice(0, 60) : ""}</td>
+                                      </tr>
+                                    );
+                                  })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
