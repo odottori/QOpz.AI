@@ -901,11 +901,13 @@ export default function App() {
   };
   const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
   const [feedLogLoading, setFeedLogLoading] = useState(true);
-  const [datiFilterDays, setDatiFilterDays] = useState<number>(7);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const minus6Iso = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+  const [datiDateFrom, setDatiDateFrom] = useState<string>(minus6Iso);
+  const [datiDateTo,   setDatiDateTo]   = useState<string>(todayIso);
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
   const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({});
   const [datiDayOpen, setDatiDayOpen] = useState<Record<string,boolean>>({});
-  const [datiSysOpen, setDatiSysOpen] = useState(false);
 
   const parsedPayload = useMemo(() => {
     try {
@@ -1551,19 +1553,22 @@ export default function App() {
     } catch { /* non critico */ }
   }
 
-  async function doFetchFeedLog(days = 30, triggerRefresh = false) {
+  async function doFetchFeedLog(from?: string, to?: string, triggerRefresh = false) {
+    const f = from ?? datiDateFrom;
+    const t = to   ?? datiDateTo;
+    const daysBack = Math.max(1, Math.ceil((Date.now() - new Date(f).getTime()) / 86400000) + 1);
     setFeedLogLoading(true);
     try {
-      const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
-      setFeedLog(r.runs ?? []);
+      const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${daysBack}`);
+      setFeedLog((r.runs ?? []).filter(run => run.run_date >= f && run.run_date <= t));
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
     // Refresh in background: non blocca il rendering dei blocchi
     if (triggerRefresh) {
       try {
         await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
-        const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${days}`);
-        setFeedLog(r2.runs ?? []);
+        const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${daysBack}`);
+        setFeedLog((r2.runs ?? []).filter(run => run.run_date >= f && run.run_date <= t));
       } catch { /* non critico */ }
     }
   }
@@ -2034,7 +2039,7 @@ export default function App() {
     void doFetchSessionStatus();
     void doFetchSessionLogs();
     void doFetchControlStatus();
-    void doFetchFeedLog(30, true);
+    void doFetchFeedLog(undefined, undefined, true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Heartbeat ogni 5 minuti — solo status leggeri (nessun dato daily ridondante)
@@ -2607,20 +2612,22 @@ export default function App() {
 
 
               {/* ══ Barra periodo ══ */}
-              <div style={{display:"flex", alignItems:"center", gap:6, padding:"6px 12px 4px",
-                borderTop:"1px solid var(--border)"}}>
-                <span style={{fontSize:"0.58rem", color:"#888"}}>periodo:</span>
-                {[1,7,14,30].map(d => (
-                  <button key={d}
-                    style={{fontSize:"0.55rem", padding:"1px 5px", borderRadius:3, border:"1px solid var(--border)",
-                      background: datiFilterDays === d ? "var(--p1)" : "transparent",
-                      color: datiFilterDays === d ? "var(--text)" : "var(--dim)", cursor:"pointer"}}
-                    onClick={() => { setDatiFilterDays(d); void doFetchFeedLog(d); }}>
-                    {d === 1 ? "oggi" : `${d}g`}
-                  </button>
-                ))}
-                <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 6px", marginLeft:4}}
-                  onClick={() => void doFetchFeedLog(datiFilterDays, true)} disabled={feedLogLoading}>
+              <div style={{display:"flex", alignItems:"center", gap:8, padding:"6px 12px 4px",
+                borderTop:"1px solid var(--border)", flexWrap:"wrap"}}>
+                <span style={{fontSize:"0.58rem", color:"#888"}}>dal</span>
+                <input type="date" value={datiDateFrom} max={datiDateTo}
+                  onChange={e => { setDatiDateFrom(e.target.value); void doFetchFeedLog(e.target.value, datiDateTo); }}
+                  style={{fontSize:"0.6rem", padding:"1px 4px", borderRadius:3,
+                    border:"1px solid var(--border)", background:"var(--p2)", color:"var(--text)",
+                    colorScheme:"dark", cursor:"pointer"}} />
+                <span style={{fontSize:"0.58rem", color:"#888"}}>al</span>
+                <input type="date" value={datiDateTo} min={datiDateFrom} max={todayIso}
+                  onChange={e => { setDatiDateTo(e.target.value); void doFetchFeedLog(datiDateFrom, e.target.value); }}
+                  style={{fontSize:"0.6rem", padding:"1px 4px", borderRadius:3,
+                    border:"1px solid var(--border)", background:"var(--p2)", color:"var(--text)",
+                    colorScheme:"dark", cursor:"pointer"}} />
+                <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 6px"}}
+                  onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)} disabled={feedLogLoading}>
                   {feedLogLoading ? "..." : "⟳"}
                 </button>
               </div>
