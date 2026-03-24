@@ -2704,10 +2704,11 @@ export default function App() {
                       const nErr = srcRows.filter(r => r.status === "error").length;
                       const nPar = srcRows.filter(r => r.status === "partial").length;
                       const lastRun = srcRows[0];
-                      const avgQ = tot > 0 ? srcRows.reduce((s,r) => s + (r.quality_pct ?? 0), 0) / tot : null;
-                      const lastSt = lastRun?.status ?? null;
-                      const mainCol = lastSt === "ok" ? "#4ade80" : lastSt === "error" ? "#f87171" : lastSt === "partial" ? "#fbbf24" : "#555";
-                      const stLabel = lastSt === "ok" ? "✓ OK" : lastSt === "error" ? "✗ ERRORE" : lastSt === "partial" ? "~ PARZIALE" : "—";
+                      const avgQ = tot > 0 ? srcRows.reduce((s,r) => s + Math.min(100, r.quality_pct ?? 0), 0) / tot : null;
+                      // Stato blocco = sintesi di tutte le run (non solo l'ultima singola feed)
+                      const blockStatus = tot === 0 ? null : nErr === 0 && nPar === 0 ? "ok" : nOk === 0 && nPar === 0 ? "error" : "partial";
+                      const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : blockStatus === "partial" ? "#fbbf24" : "#555";
+                      const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : blockStatus === "partial" ? "~ PARZIALE" : "—";
                       const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
                       const activeFilters = blockSt !== "tutti" ? 1 : 0;
                       const grouped = Object.entries(rows.reduce((acc, r) => {

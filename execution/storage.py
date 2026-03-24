@@ -656,7 +656,7 @@ def record_ingestion_run(
     con = _connect()
     now = utc_now()
     prov = _prov(profile, now)
-    quality = round(records_out / records_in * 100, 1) if records_in > 0 else None
+    quality = round(min(100.0, records_out / records_in * 100), 1) if records_in > 0 else None
     try:
         # Upsert: stesso giorno + stesso feed → aggiorna solo se qualità migliore
         existing = con.execute(
