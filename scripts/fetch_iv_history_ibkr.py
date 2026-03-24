@@ -188,19 +188,15 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
 
         tickers = []
         for opt in qualified_opts:
-            t = ib.reqMktData(opt, "100,101,106", snapshot=False, regulatorySnapshot=False)
+            # snapshot=True: richiesta singola, nessuna sottoscrizione persistente.
+            # Evita accumulo di streaming e spam di Error 10091 nel log.
+            t = ib.reqMktData(opt, "100,101,106", snapshot=True, regulatorySnapshot=False)
             tickers.append((opt, t))
 
-        ib.sleep(3.0)
+        ib.sleep(2.0)
 
         call_t = next((t for o, t in tickers if hasattr(o, "right") and o.right == "C"), None)
         put_t  = next((t for o, t in tickers if hasattr(o, "right") and o.right == "P"), None)
-
-        for opt, _ in tickers:
-            try:
-                ib.cancelMktData(opt)
-            except Exception:
-                pass
 
         call_iv = _safe_float(getattr(call_t, "impliedVolatility", None)) if call_t else None
         put_iv  = _safe_float(getattr(put_t,  "impliedVolatility", None)) if put_t else None
