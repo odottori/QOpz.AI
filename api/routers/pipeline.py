@@ -80,27 +80,30 @@ def opz_data_refresh(
             logging.getLogger(__name__).warning("record_ingestion_run(%s): %s", feed, exc)
 
     # ── 1. Universe symbols ───────────────────────────────────────────────────
+    # I simboli vengono SEMPRE dall'universe scan. Nessun fallback hardcoded:
+    # se l'universo è vuoto si esegue una scan automatica; se anche quella
+    # fallisce si restituisce errore esplicito al chiamante.
     symbols: list[str] = []
     try:
         uni = opz_universe_latest()
-        rows = uni.get("market_rows", []) or []
-        symbols = list({r.get("symbol") for r in rows if r.get("symbol")})
+        items = uni.get("items", []) or []
+        symbols = list({r.get("symbol") for r in items if r.get("symbol")})
         if not symbols:
-            # fallback: leggi da DB
-            from execution.storage import _connect
-            con = _connect()
-            try:
-                res = con.execute(
-                    "SELECT DISTINCT symbol FROM universe_latest WHERE symbol IS NOT NULL LIMIT 50"
-                ).fetchall()
-                symbols = [r[0] for r in res]
-            finally:
-                con.close()
-    except Exception:
-        pass
+            # Universo vuoto → scan automatica da impostazioni IBKR
+            import logging as _log
+            _log.getLogger(__name__).info("Universe vuoto — eseguo scan automatica prima del refresh")
+            from execution.universe import run_universe_scan_from_ibkr_settings
+            run_universe_scan_from_ibkr_settings(profile=profile, top_n=20)
+            uni2 = opz_universe_latest()
+            items2 = uni2.get("items", []) or []
+            symbols = list({r.get("symbol") for r in items2 if r.get("symbol")})
+    except Exception as exc:
+        import logging as _log
+        _log.getLogger(__name__).error("Errore recupero simboli universo: %s", exc)
 
     if not symbols:
-        symbols = ["SPY", "QQQ", "AAPL", "MSFT", "AMZN", "TSLA", "NVDA", "META"]
+        results["error"] = "Universo simboli non disponibile — eseguire prima una scan"
+        return results
 
     # ── 2. yfinance — IV history ATM ─────────────────────────────────────────
     t0 = datetime.now(timezone.utc)

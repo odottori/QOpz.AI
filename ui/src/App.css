@@ -279,7 +279,9 @@ label {
 .centerpane {
   background: var(--bg);
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
+  min-width: 0;
 }
 
 .metrics-row {
@@ -1689,7 +1691,9 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 1400px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ── Header step ── */
