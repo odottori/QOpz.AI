@@ -2077,6 +2077,10 @@ export default function App() {
     calendario: calendarioBlock.status,
     derivati: derivatiBlockStatus,
   };
+  const opsRequiredBlocks: DataBlockKey[] = ["ibkr", "derivati", "calendario", "yfinance"];
+  const opsBlockers = opsRequiredBlocks.filter((key) => dataBlockStatusMap[key] !== "ok");
+  const formatBlockName = (key: DataBlockKey): string => key;
+  const opsBlockersLabel = opsBlockers.map(formatBlockName).join(", ");
   const analysisLevel: AnalysisLevel = (() => {
     const mode = tierInfo?.active_mode;
     if (mode === "ADVANCED" || mode === "MEDIUM") return "L3";
@@ -2085,6 +2089,7 @@ export default function App() {
   })();
   const briefingRequiredBlocks = ANALYSIS_REQUIREMENTS[analysisLevel];
   const briefingBlockers = briefingRequiredBlocks.filter((key) => dataBlockStatusMap[key] !== "ok");
+  const briefingBlockersLabel = briefingBlockers.map(formatBlockName).join(", ");
   const briefingReadyByData = briefingBlockers.length === 0;
   const dataOkCount = (Object.values(dataBlockStatusMap).filter((v) => v === "ok")).length;
   const strategicDirection = premarketRegime === "NORMAL"
@@ -2226,17 +2231,20 @@ export default function App() {
     : !hasRealData
       ? "Data mode sintetico: blocco in monitoraggio"
       : "Feed reale attivo: blocco operativo";
-  const datiOpsReady = apiOnline && hasRealData && stepDataHealth === "ok";
+  const dataProcessable = opsBlockers.length === 0;
+  const datiOpsReady = apiOnline && hasRealData && dataProcessable;
   const datiBlockReason = !apiOnline
     ? "API offline"
     : !hasRealData
       ? "data mode non operativo"
-      : `stato DATI ${stepDataStatusLabel}`;
+      : opsBlockers.length > 0
+        ? `blocchi non OK: ${opsBlockersLabel}`
+        : `stato DATI ${stepDataStatusLabel}`;
   const briefingReady = datiOpsReady && briefingReadyByData;
   const briefingBlockReason = !datiOpsReady
     ? datiBlockReason
     : briefingBlockers.length > 0
-      ? `blocchi non OK: ${briefingBlockers.join(", ")}`
+      ? `blocchi non OK: ${briefingBlockersLabel}`
       : "";
 
   useEffect(() => {
