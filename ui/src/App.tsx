@@ -295,6 +295,7 @@ type IbkrAccountResponse = {
 };
 type SysLogRecord = { ts: string; level: string; name: string; msg: string; };
 type SysLogResponse = { ok: boolean; n: number; records: SysLogRecord[]; };
+type SysLogClearResponse = { ok: boolean; cleared: number; };
 type ActivityEvent = {
   ts: string; source: string; type: string;
   symbol?: string | null; detail: string;
@@ -1033,7 +1034,8 @@ export default function App() {
   const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
   const [feedLogLoading, setFeedLogLoading] = useState(true);
   const todayIso = new Date().toISOString().slice(0, 10);
-  const [datiDateFrom, setDatiDateFrom] = useState<string>(todayIso);
+  const feedWindowFromIso = new Date(Date.now() - (29 * 86400000)).toISOString().slice(0, 10);
+  const [datiDateFrom, setDatiDateFrom] = useState<string>(feedWindowFromIso);
   const [datiDateTo,   setDatiDateTo]   = useState<string>(todayIso);
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
   const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({ derivati: "ok" });
@@ -1728,9 +1730,10 @@ export default function App() {
   }
 
   async function doFetchFeedLog(from?: string, to?: string, triggerRefresh = false, autoContinue = false) {
+    const MAX_FEED_DAYS_BACK = 30;
     const f = from ?? datiDateFrom;
     const t = to   ?? datiDateTo;
-    const daysBack = Math.max(1, Math.ceil((Date.now() - new Date(f).getTime()) / 86400000) + 1);
+    const daysBack = Math.min(MAX_FEED_DAYS_BACK, Math.max(1, Math.ceil((Date.now() - new Date(f).getTime()) / 86400000) + 1));
     setFeedLogLoading(true);
     try {
       const r = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${daysBack}`);
@@ -1746,6 +1749,10 @@ export default function App() {
       const CD_SECS = 90;
       if (datiCdRef.current) clearInterval(datiCdRef.current);
       setDatiCdSecs(CD_SECS);
+      setSysLog([]);
+      try {
+        await apiJson<SysLogClearResponse>(`${API_BASE}/opz/system/log/clear`, { method: "POST" });
+      } catch { /* non critico */ }
       datiCdRef.current = setInterval(() => {
         setDatiCdSecs(prev => {
           if (prev === null || prev <= 1) {
@@ -2787,7 +2794,7 @@ export default function App() {
           <div className="nav-section syslog-section">
             <div className="left-grouphead syslog-header" onClick={() => setSysLogOpen(v => !v)} role="button" tabIndex={0}>
               <span className="left-grouphead-title">
-                <span className="group-arrow">{sysLogOpen ? "▾" : "▸"}</span>SYSTEM LOG
+                <span className="group-arrow">{sysLogOpen ? "▾" : "▸"}</span>SYSTEM LOG (RUN CORRENTE)
               </span>
               <span style={{display:"flex", gap:5, alignItems:"center"}}>
                 {sysLog.some(r => r.level === "ERROR") && <span className="sev-error" style={{fontSize:"0.58rem"}}>ERR</span>}
@@ -2824,7 +2831,10 @@ export default function App() {
                       a.click();
                     }}>⬇ salva</button>
                   <button className="btn btn-ghost syslog-btn"
-                    onClick={() => setSysLog([])}>✕ pulisci</button>
+                    onClick={() => {
+                      setSysLog([]);
+                      void apiJson<SysLogClearResponse>(`${API_BASE}/opz/system/log/clear`, { method: "POST" }).catch(() => undefined);
+                    }}>✕ pulisci</button>
                 </div>
               </>
             )}

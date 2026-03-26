@@ -85,7 +85,7 @@ def opz_demo_pipeline_auto(req: DemoPipelineAutoRequest) -> Dict[str, Any]:
 @router.get("/opz/pipeline/feed_log")
 def opz_pipeline_feed_log(
     profile: str = Query("dev"),
-    days_back: int = Query(30, ge=1, le=365),
+    days_back: int = Query(30, ge=1, le=30),
     feed: Optional[str] = Query(None),
 ) -> Dict[str, Any]:
     """Storico delle esecuzioni pipeline per fonte dati.

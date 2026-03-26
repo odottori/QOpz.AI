@@ -4043,3 +4043,14 @@ def opz_system_log(n: int = 150) -> Dict[str, Any]:
         "n": len(records),
         "records": records,
     }
+
+
+@app.post("/opz/system/log/clear")
+def opz_system_log_clear() -> Dict[str, Any]:
+    """Svuota il buffer in-memory del logger Python dell'API."""
+    cleared = len(_LOG_BUFFER)
+    _LOG_BUFFER.clear()
+    return {
+        "ok": True,
+        "cleared": cleared,
+    }
