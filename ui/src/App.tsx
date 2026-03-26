@@ -3219,7 +3219,7 @@ export default function App() {
                                           : trendDir === "down"
                                             ? "↓"
                                             : trendDir === "flat"
-                                              ? "↔↔"
+                                              ? "↔"
                                               : "";
                                         const trendColor = trendDir === "up" ? "#4ade80" : trendDir === "down" ? "#f87171" : "#888";
                                         const trendNote = (s.trend_note && String(s.trend_note).trim()) ? String(s.trend_note) : "trend non disponibile";
@@ -3233,7 +3233,12 @@ export default function App() {
                                             <td style={{padding:"4px 8px", fontWeight:700, color:"var(--fg)"}}>{s.symbol}</td>
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtP(s.underlying)}</td>
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtP(s.atm_strike)}</td>
-                                            <td style={{padding:"4px 8px", textAlign:"right", color:ivC, fontWeight:600}}>{fmtPct(s.atm_iv)}</td>
+                                            <td style={{padding:"4px 8px", textAlign:"right", color:ivC, fontWeight:600}}>
+                                              <span style={{display:"inline-flex", alignItems:"center", gap:4, justifyContent:"flex-end"}}>
+                                                <span>{fmtPct(s.atm_iv)}</span>
+                                                {trendArrow && <span style={{color: trendColor, fontWeight:700}} title={trendNote}>{trendArrow}</span>}
+                                              </span>
+                                            </td>
                                             <td style={{padding:"4px 8px", color:srcC, fontWeight:600, fontSize:"0.55rem", textTransform:"uppercase"}}>{s.iv_source ?? "—"}</td>
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_delta, 3)}</td>
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_gamma, 4)}</td>
@@ -3242,9 +3247,8 @@ export default function App() {
                                             <td style={{padding:"4px 8px"}}>
                                               <span
                                                 style={{display:"inline-flex", alignItems:"center", gap:4, color: st.color, fontWeight:700}}
-                                                title={`${hasErr ? explainDatiError(snapState.note ?? s.error_msg) : "dati derivati completi"} | ${trendNote}`}
+                                                title={hasErr ? explainDatiError(snapState.note ?? s.error_msg) : "dati derivati completi"}
                                               >
-                                                {trendArrow && <span style={{color: trendColor, fontWeight:700}}>{trendArrow}</span>}
                                                 <span>{st.label}</span>
                                               </span>
                                             </td>
