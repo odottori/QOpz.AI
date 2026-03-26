@@ -1040,6 +1040,7 @@ export default function App() {
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
   const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({ derivati: "ok" });
   const [datiDayOpen, setDatiDayOpen] = useState<Record<string,boolean>>({});
+  const [analisiCtxOpen, setAnalisiCtxOpen] = useState<Record<string, boolean>>({ universe: true, opportunity: false, paper_trade: false });
   const [datiDumpOpen, setDatiDumpOpen] = useState(false);
   const [datiDumpSrcOpen, setDatiDumpSrcOpen] = useState(true);
   const [datiDumpFeedOpen, setDatiDumpFeedOpen] = useState(false);
@@ -2037,7 +2038,7 @@ export default function App() {
     { key: "universe", label: "Universe", info: regimeSources?.universe ?? null },
     { key: "opportunity", label: "Opportunity", info: regimeSources?.opportunity ?? null },
     { key: "paper_trade", label: "Paper trade", info: regimeSources?.paper_trade ?? null },
-  ];
+  ] as const;
   const pipelineRecords = universeLatest?.market_rows_available ?? 0;
   const pipelineBatch = universeLatest?.batch_id ?? "N/D";
   const pipelineLatencyState = fetchErrors.size > 0 ? "STALE" : "FRESH";
@@ -3715,47 +3716,59 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:8, marginBottom:10}}>
-                    {contextRows.map((row) => {
-                      const info = row.info;
-                      const reg = info?.regime ?? "UNKNOWN";
-                      const regColor = reg === "NORMAL" ? "#4ade80" : reg === "CAUTION" ? "#fbbf24" : reg === "SHOCK" ? "#f87171" : "#888";
-                      return (
-                        <div key={row.key} style={{border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", background:"rgba(255,255,255,0.02)"}}>
-                          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
-                            <span style={{fontSize:"0.62rem", color:"#9ac4af", textTransform:"uppercase", letterSpacing:"0.05em"}}>{row.label}</span>
-                            <span style={{fontSize:"0.7rem", fontWeight:700, color:regColor}}>{reg}</span>
-                          </div>
-                          <div style={{display:"flex", gap:10, fontSize:"0.62rem", color:"var(--dim)"}}>
-                            <span>campioni <span className="sev-data">{info?.sample_count ?? 0}</span></span>
-                            <span>ult. {info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                   <div style={{marginBottom:10, border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
-                    <div style={{display:"grid", gridTemplateColumns:"1.2fr 0.8fr 0.8fr 1fr", padding:"5px 8px", background:"rgba(255,255,255,0.03)", fontSize:"0.56rem", color:"#7c8f84", textTransform:"uppercase", letterSpacing:"0.04em"}}>
-                      <span>Fonte</span><span>Campioni</span><span>Regime</span><span>Ultimo ts</span>
+                    <div style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"5px 8px", background:"rgba(255,255,255,0.03)", fontSize:"0.56rem", color:"#7c8f84", textTransform:"uppercase", letterSpacing:"0.04em"}}>
+                      <span>Fonte</span><span>Campioni</span><span>Regime</span><span>Ultimo ts</span><span>Stato</span>
                     </div>
                     {contextRows.map((row) => {
                       const info = row.info;
+                      const isOpen = Boolean(analisiCtxOpen[row.key]);
                       const reg = info?.regime ?? "UNKNOWN";
                       const regColor = reg === "NORMAL" ? "#4ade80" : reg === "CAUTION" ? "#fbbf24" : reg === "SHOCK" ? "#f87171" : "#888";
+                      const samples = Number(info?.sample_count ?? 0);
+                      const status = samples > 0 ? "ok" : "ko";
+                      const statusCol = status === "ok" ? "#4ade80" : "#f87171";
+                      const isResolved = regimeResolved?.source === row.key;
+                      const details = info?.regime_counts ?? { NORMAL: 0, CAUTION: 0, SHOCK: 0 };
+                      const pcts = info?.regime_pct ?? { NORMAL: 0, CAUTION: 0, SHOCK: 0 };
                       return (
-                        <div key={`${row.key}-ctx`} style={{display:"grid", gridTemplateColumns:"1.2fr 0.8fr 0.8fr 1fr", padding:"5px 8px", borderTop:"1px solid var(--border)", fontSize:"0.62rem", alignItems:"center"}}>
-                          <span className="sev-meta">{row.label}</span>
-                          <span className="sev-data">{info?.sample_count ?? 0}</span>
-                          <span style={{color:regColor, fontWeight:700}}>{reg}</span>
-                          <span className="sev-meta">{info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"}</span>
-                        </div>
+                        <React.Fragment key={`${row.key}-ctx`}>
+                          <div
+                            onClick={() => setAnalisiCtxOpen((prev) => ({ ...prev, [row.key]: !prev[row.key] }))}
+                            style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"6px 8px", borderTop:"1px solid var(--border)", fontSize:"0.62rem", alignItems:"center", cursor:"pointer", background:isResolved ? "rgba(0,255,106,0.06)" : "transparent"}}
+                          >
+                            <span className="sev-meta" style={{display:"flex", alignItems:"center", gap:6}}>
+                              <span style={{color:"var(--dim)", fontSize:"0.6rem"}}>{isOpen ? "▾" : "▸"}</span>
+                              {row.label}{isResolved ? " · source" : ""}
+                            </span>
+                            <span className="sev-data">{samples}</span>
+                            <span style={{color:regColor, fontWeight:700}}>{reg}</span>
+                            <span className="sev-meta">{info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"}</span>
+                            <span style={{color:statusCol, fontWeight:700}}>{status}</span>
+                          </div>
+                          {isOpen && (
+                            <div style={{padding:"8px 10px", borderTop:"1px dashed var(--border)", background:"rgba(255,255,255,0.02)"}}>
+                              <div style={{display:"grid", gridTemplateColumns:"repeat(3,minmax(120px,1fr))", gap:8, marginBottom:6}}>
+                                <div className="lc-screen-row"><span className="lc-dim">NORMAL</span><span className="sev-ok">{details.NORMAL} · {pcts.NORMAL.toFixed(1)}%</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">CAUTION</span><span className="sev-warn">{details.CAUTION} · {pcts.CAUTION.toFixed(1)}%</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim">SHOCK</span><span className="sev-error">{details.SHOCK} · {pcts.SHOCK.toFixed(1)}%</span></div>
+                              </div>
+                              <div className="lc-screen-row"><span className="lc-dim">window</span><span className="sev-data">{regimeContext?.window ?? 30}</span></div>
+                              <div className="lc-screen-row"><span className="lc-dim">usable</span><span className={samples > 0 ? "sev-ok" : "sev-error"}>{samples > 0 ? "yes" : "no"}</span></div>
+                              {isResolved && (
+                                <div className="lc-screen-row"><span className="lc-dim">rationale</span><span className="sev-meta">{regimeResolved?.rationale ?? "priority"}</span></div>
+                              )}
+                            </div>
+                          )}
+                        </React.Fragment>
                       );
                     })}
-                    <div style={{display:"grid", gridTemplateColumns:"1.2fr 0.8fr 0.8fr 1fr", padding:"6px 8px", borderTop:"1px solid var(--border)", background:"rgba(0,255,106,0.05)", fontSize:"0.64rem", alignItems:"center"}}>
+                    <div style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"6px 8px", borderTop:"1px solid var(--border)", background:"rgba(0,255,106,0.07)", fontSize:"0.64rem", alignItems:"center"}}>
                       <span style={{fontWeight:700}}>Regime risolto</span>
                       <span className="sev-data">{regimeResolved?.sample_count ?? 0}</span>
                       <span className={sevClassForRegime(regimeResolved?.regime)} style={{fontWeight:700}}>{regimeResolved?.regime ?? premarketRegime}</span>
                       <span className="sev-meta">{regimeResolved?.source ?? "none"}</span>
+                      <span className={(regimeResolved?.sample_count ?? 0) > 0 ? "sev-ok" : "sev-error"} style={{fontWeight:700}}>{(regimeResolved?.sample_count ?? 0) > 0 ? "ok" : "ko"}</span>
                     </div>
                   </div>
                   <div className="lc-panel-title">Regime di mercato</div>
