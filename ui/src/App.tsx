@@ -560,6 +560,19 @@ const TOOLTIPS: Record<string, string> = {
   pipe_regime: "Classificazione del regime di mercato corrente (NORMAL, CAUTION o SHOCK).",
   pipe_score: "Calcolo del punteggio composito per i candidati all'operazione.",
   pipe_kelly: "Calcolo del dimensionamento ottimale tramite la formula di Kelly. Richiede dati reali e 50 trade.",
+  // Analisi - contesto regime
+  analysis_ctx_source: "Fonte dei campioni regime. Universe = scan universo, Opportunity = scan candidati, Paper trade = trade journal.",
+  analysis_ctx_samples: "Numero di campioni validi nella finestra corrente. Se zero, la fonte non contribuisce al regime.",
+  analysis_ctx_regime: "Regime prevalente nella fonte (maggioranza tra NORMAL/CAUTION/SHOCK).",
+  analysis_ctx_last_ts: "Timestamp dell'ultimo campione disponibile per quella fonte.",
+  analysis_ctx_status: "OK se la fonte ha almeno 1 campione valido, KO se non ha campioni utili.",
+  analysis_ctx_window: "Numero massimo di campioni recenti considerati per il calcolo del regime (finestra mobile).",
+  analysis_ctx_usable: "Yes se la fonte ha campioni sufficienti per contribuire al regime, No se è vuota.",
+  analysis_ctx_rationale: "Regola di fusione tra fonti: priorità Opportunity > Universe > Paper trade.",
+  analysis_ctx_resolved: "Regime finale usato dal modello in ANALISI/BRIEFING dopo la fusione delle fonti.",
+  analysis_ctx_universe: "Campioni dal motore Universe scan (copertura ampia dei simboli).",
+  analysis_ctx_opportunity: "Campioni dal motore Opportunity scan (shortlist con scoring strategico).",
+  analysis_ctx_paper_trade: "Campioni dal journal paper trades (regime al momento dell'ingresso trade).",
 };
 
 // ── Tooltip component ──────────────────────────────────────────────────────
@@ -3718,7 +3731,11 @@ export default function App() {
                   </div>
                   <div style={{marginBottom:10, border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
                     <div style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"5px 8px", background:"rgba(255,255,255,0.03)", fontSize:"0.56rem", color:"#7c8f84", textTransform:"uppercase", letterSpacing:"0.04em"}}>
-                      <span>Fonte</span><span>Campioni</span><span>Regime</span><span>Ultimo ts</span><span>Stato</span>
+                      <span><Tooltip text={TOOLTIPS.analysis_ctx_source}>Fonte</Tooltip></span>
+                      <span><Tooltip text={TOOLTIPS.analysis_ctx_samples}>Campioni</Tooltip></span>
+                      <span><Tooltip text={TOOLTIPS.analysis_ctx_regime}>Regime</Tooltip></span>
+                      <span><Tooltip text={TOOLTIPS.analysis_ctx_last_ts}>Ultimo ts</Tooltip></span>
+                      <span><Tooltip text={TOOLTIPS.analysis_ctx_status}>Stato</Tooltip></span>
                     </div>
                     {contextRows.map((row) => {
                       const info = row.info;
@@ -3731,20 +3748,26 @@ export default function App() {
                       const isResolved = regimeResolved?.source === row.key;
                       const details = info?.regime_counts ?? { NORMAL: 0, CAUTION: 0, SHOCK: 0 };
                       const pcts = info?.regime_pct ?? { NORMAL: 0, CAUTION: 0, SHOCK: 0 };
+                      const sourceTip =
+                        row.key === "universe"
+                          ? TOOLTIPS.analysis_ctx_universe
+                          : row.key === "opportunity"
+                            ? TOOLTIPS.analysis_ctx_opportunity
+                            : TOOLTIPS.analysis_ctx_paper_trade;
                       return (
                         <React.Fragment key={`${row.key}-ctx`}>
                           <div
                             onClick={() => setAnalisiCtxOpen((prev) => ({ ...prev, [row.key]: !prev[row.key] }))}
                             style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"6px 8px", borderTop:"1px solid var(--border)", fontSize:"0.62rem", alignItems:"center", cursor:"pointer", background:isResolved ? "rgba(0,255,106,0.06)" : "transparent"}}
                           >
-                            <span className="sev-meta" style={{display:"flex", alignItems:"center", gap:6}}>
+                            <span className="sev-meta" style={{display:"flex", alignItems:"center", gap:6}} title={sourceTip}>
                               <span style={{color:"var(--dim)", fontSize:"0.6rem"}}>{isOpen ? "▾" : "▸"}</span>
                               {row.label}{isResolved ? " · source" : ""}
                             </span>
-                            <span className="sev-data">{samples}</span>
-                            <span style={{color:regColor, fontWeight:700}}>{reg}</span>
-                            <span className="sev-meta">{info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"}</span>
-                            <span style={{color:statusCol, fontWeight:700}}>{status}</span>
+                            <span className="sev-data" title={TOOLTIPS.analysis_ctx_samples}>{samples}</span>
+                            <span style={{color:regColor, fontWeight:700}} title={TOOLTIPS.analysis_ctx_regime}>{reg}</span>
+                            <span className="sev-meta" title={TOOLTIPS.analysis_ctx_last_ts}>{info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"}</span>
+                            <span style={{color:statusCol, fontWeight:700}} title={TOOLTIPS.analysis_ctx_status}>{status}</span>
                           </div>
                           {isOpen && (
                             <div style={{padding:"8px 10px", borderTop:"1px dashed var(--border)", background:"rgba(255,255,255,0.02)"}}>
@@ -3753,10 +3776,10 @@ export default function App() {
                                 <div className="lc-screen-row"><span className="lc-dim">CAUTION</span><span className="sev-warn">{details.CAUTION} · {pcts.CAUTION.toFixed(1)}%</span></div>
                                 <div className="lc-screen-row"><span className="lc-dim">SHOCK</span><span className="sev-error">{details.SHOCK} · {pcts.SHOCK.toFixed(1)}%</span></div>
                               </div>
-                              <div className="lc-screen-row"><span className="lc-dim">window</span><span className="sev-data">{regimeContext?.window ?? 30}</span></div>
-                              <div className="lc-screen-row"><span className="lc-dim">usable</span><span className={samples > 0 ? "sev-ok" : "sev-error"}>{samples > 0 ? "yes" : "no"}</span></div>
+                              <div className="lc-screen-row"><span className="lc-dim" title={TOOLTIPS.analysis_ctx_window}>window</span><span className="sev-data" title={TOOLTIPS.analysis_ctx_window}>{regimeContext?.window ?? 30}</span></div>
+                              <div className="lc-screen-row"><span className="lc-dim" title={TOOLTIPS.analysis_ctx_usable}>usable</span><span className={samples > 0 ? "sev-ok" : "sev-error"} title={TOOLTIPS.analysis_ctx_usable}>{samples > 0 ? "yes" : "no"}</span></div>
                               {isResolved && (
-                                <div className="lc-screen-row"><span className="lc-dim">rationale</span><span className="sev-meta">{regimeResolved?.rationale ?? "priority"}</span></div>
+                                <div className="lc-screen-row"><span className="lc-dim" title={TOOLTIPS.analysis_ctx_rationale}>rationale</span><span className="sev-meta" title={TOOLTIPS.analysis_ctx_rationale}>{regimeResolved?.rationale ?? "priority"}</span></div>
                               )}
                             </div>
                           )}
@@ -3764,11 +3787,11 @@ export default function App() {
                       );
                     })}
                     <div style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"6px 8px", borderTop:"1px solid var(--border)", background:"rgba(0,255,106,0.07)", fontSize:"0.64rem", alignItems:"center"}}>
-                      <span style={{fontWeight:700}}>Regime risolto</span>
-                      <span className="sev-data">{regimeResolved?.sample_count ?? 0}</span>
-                      <span className={sevClassForRegime(regimeResolved?.regime)} style={{fontWeight:700}}>{regimeResolved?.regime ?? premarketRegime}</span>
-                      <span className="sev-meta">{regimeResolved?.source ?? "none"}</span>
-                      <span className={(regimeResolved?.sample_count ?? 0) > 0 ? "sev-ok" : "sev-error"} style={{fontWeight:700}}>{(regimeResolved?.sample_count ?? 0) > 0 ? "ok" : "ko"}</span>
+                      <span style={{fontWeight:700}} title={TOOLTIPS.analysis_ctx_resolved}>Regime risolto</span>
+                      <span className="sev-data" title={TOOLTIPS.analysis_ctx_samples}>{regimeResolved?.sample_count ?? 0}</span>
+                      <span className={sevClassForRegime(regimeResolved?.regime)} style={{fontWeight:700}} title={TOOLTIPS.analysis_ctx_resolved}>{regimeResolved?.regime ?? premarketRegime}</span>
+                      <span className="sev-meta" title={TOOLTIPS.analysis_ctx_rationale}>{regimeResolved?.source ?? "none"}</span>
+                      <span className={(regimeResolved?.sample_count ?? 0) > 0 ? "sev-ok" : "sev-error"} style={{fontWeight:700}} title={TOOLTIPS.analysis_ctx_status}>{(regimeResolved?.sample_count ?? 0) > 0 ? "ok" : "ko"}</span>
                     </div>
                   </div>
                   <div className="lc-panel-title">Regime di mercato</div>
