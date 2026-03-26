@@ -257,6 +257,7 @@ type RegimeSourceInfo = {
   regime_pct: { NORMAL: number; CAUTION: number; SHOCK: number };
   last_ts: string | null;
   usable: boolean;
+  records: Array<{ ts: string; regime: "NORMAL" | "CAUTION" | "SHOCK" | string }>;
 };
 type RegimeContextResponse = {
   ok: boolean;
@@ -570,6 +571,8 @@ const TOOLTIPS: Record<string, string> = {
   analysis_ctx_usable: "Yes se la fonte ha campioni sufficienti per contribuire al regime, No se è vuota.",
   analysis_ctx_rationale: "Regola di fusione tra fonti: priorità Opportunity > Universe > Paper trade.",
   analysis_ctx_resolved: "Regime finale usato dal modello in ANALISI/BRIEFING dopo la fusione delle fonti.",
+  analysis_ctx_table_info: "Tabella campioni regime: mostra i record effettivamente usati nel calcolo (fino alla finestra window). Espandi una fonte per vedere ogni record con timestamp e regime.",
+  analysis_ctx_conclusion: "Giudizio sintetico: fonte vincente, regime finale e affidabilità basata sui campioni disponibili.",
   analysis_ctx_universe: "Campioni dal motore Universe scan (copertura ampia dei simboli).",
   analysis_ctx_opportunity: "Campioni dal motore Opportunity scan (shortlist con scoring strategico).",
   analysis_ctx_paper_trade: "Campioni dal journal paper trades (regime al momento dell'ingresso trade).",
@@ -1052,7 +1055,6 @@ export default function App() {
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
   const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({ derivati: "ok" });
   const [datiDayOpen, setDatiDayOpen] = useState<Record<string,boolean>>({});
-  const [analisiCtxOpen, setAnalisiCtxOpen] = useState<Record<string, boolean>>({ universe: true, opportunity: false, paper_trade: false });
   const [datiDumpOpen, setDatiDumpOpen] = useState(false);
   const [datiDumpSrcOpen, setDatiDumpSrcOpen] = useState(true);
   const [datiDumpFeedOpen, setDatiDumpFeedOpen] = useState(false);
@@ -3728,69 +3730,84 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  <div style={{marginBottom:10, border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
-                    <div style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"5px 8px", background:"rgba(255,255,255,0.03)", fontSize:"0.56rem", color:"#7c8f84", textTransform:"uppercase", letterSpacing:"0.04em"}}>
-                      <span><Tooltip text={TOOLTIPS.analysis_ctx_source}>Fonte</Tooltip></span>
-                      <span><Tooltip text={TOOLTIPS.analysis_ctx_samples}>Campioni</Tooltip></span>
-                      <span><Tooltip text={TOOLTIPS.analysis_ctx_regime}>Regime</Tooltip></span>
-                      <span><Tooltip text={TOOLTIPS.analysis_ctx_last_ts}>Ultimo ts</Tooltip></span>
-                      <span><Tooltip text={TOOLTIPS.analysis_ctx_status}>Stato</Tooltip></span>
+                  <div style={{marginBottom:10, border:"1px solid var(--border)", borderRadius:6, padding:"8px"}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
+                      <div className="lc-panel-title" style={{margin:0}}>
+                        Campioni regime per fonte · window {regimeContext?.window ?? 30}
+                      </div>
+                      <Tooltip text={TOOLTIPS.analysis_ctx_table_info}>
+                        <span className="btn btn-ghost" style={{fontSize:"0.58rem", padding:"2px 8px", cursor:"pointer"}}>info</span>
+                      </Tooltip>
                     </div>
-                    {contextRows.map((row) => {
-                      const info = row.info;
-                      const isOpen = Boolean(analisiCtxOpen[row.key]);
-                      const reg = info?.regime ?? "UNKNOWN";
-                      const regColor = reg === "NORMAL" ? "#4ade80" : reg === "CAUTION" ? "#fbbf24" : reg === "SHOCK" ? "#f87171" : "#888";
-                      const samples = Number(info?.sample_count ?? 0);
-                      const status = samples > 0 ? "ok" : "ko";
-                      const statusCol = status === "ok" ? "#4ade80" : "#f87171";
-                      const isResolved = regimeResolved?.source === row.key;
-                      const details = info?.regime_counts ?? { NORMAL: 0, CAUTION: 0, SHOCK: 0 };
-                      const pcts = info?.regime_pct ?? { NORMAL: 0, CAUTION: 0, SHOCK: 0 };
-                      const sourceTip =
-                        row.key === "universe"
-                          ? TOOLTIPS.analysis_ctx_universe
-                          : row.key === "opportunity"
-                            ? TOOLTIPS.analysis_ctx_opportunity
-                            : TOOLTIPS.analysis_ctx_paper_trade;
-                      return (
-                        <React.Fragment key={`${row.key}-ctx`}>
-                          <div
-                            onClick={() => setAnalisiCtxOpen((prev) => ({ ...prev, [row.key]: !prev[row.key] }))}
-                            style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"6px 8px", borderTop:"1px solid var(--border)", fontSize:"0.62rem", alignItems:"center", cursor:"pointer", background:isResolved ? "rgba(0,255,106,0.06)" : "transparent"}}
-                          >
-                            <span className="sev-meta" style={{display:"flex", alignItems:"center", gap:6}} title={sourceTip}>
-                              <span style={{color:"var(--dim)", fontSize:"0.6rem"}}>{isOpen ? "▾" : "▸"}</span>
-                              {row.label}{isResolved ? " · source" : ""}
-                            </span>
-                            <span className="sev-data" title={TOOLTIPS.analysis_ctx_samples}>{samples}</span>
-                            <span style={{color:regColor, fontWeight:700}} title={TOOLTIPS.analysis_ctx_regime}>{reg}</span>
-                            <span className="sev-meta" title={TOOLTIPS.analysis_ctx_last_ts}>{info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"}</span>
-                            <span style={{color:statusCol, fontWeight:700}} title={TOOLTIPS.analysis_ctx_status}>{status}</span>
-                          </div>
-                          {isOpen && (
-                            <div style={{padding:"8px 10px", borderTop:"1px dashed var(--border)", background:"rgba(255,255,255,0.02)"}}>
-                              <div style={{display:"grid", gridTemplateColumns:"repeat(3,minmax(120px,1fr))", gap:8, marginBottom:6}}>
-                                <div className="lc-screen-row"><span className="lc-dim">NORMAL</span><span className="sev-ok">{details.NORMAL} · {pcts.NORMAL.toFixed(1)}%</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">CAUTION</span><span className="sev-warn">{details.CAUTION} · {pcts.CAUTION.toFixed(1)}%</span></div>
-                                <div className="lc-screen-row"><span className="lc-dim">SHOCK</span><span className="sev-error">{details.SHOCK} · {pcts.SHOCK.toFixed(1)}%</span></div>
-                              </div>
-                              <div className="lc-screen-row"><span className="lc-dim" title={TOOLTIPS.analysis_ctx_window}>window</span><span className="sev-data" title={TOOLTIPS.analysis_ctx_window}>{regimeContext?.window ?? 30}</span></div>
-                              <div className="lc-screen-row"><span className="lc-dim" title={TOOLTIPS.analysis_ctx_usable}>usable</span><span className={samples > 0 ? "sev-ok" : "sev-error"} title={TOOLTIPS.analysis_ctx_usable}>{samples > 0 ? "yes" : "no"}</span></div>
-                              {isResolved && (
-                                <div className="lc-screen-row"><span className="lc-dim" title={TOOLTIPS.analysis_ctx_rationale}>rationale</span><span className="sev-meta" title={TOOLTIPS.analysis_ctx_rationale}>{regimeResolved?.rationale ?? "priority"}</span></div>
-                              )}
+                    <div style={{display:"grid", gridTemplateColumns:"repeat(3,minmax(0,1fr))", gap:8}}>
+                      {contextRows.map((row) => {
+                        const info = row.info;
+                        const reg = info?.regime ?? "UNKNOWN";
+                        const regColor = reg === "NORMAL" ? "#4ade80" : reg === "CAUTION" ? "#fbbf24" : reg === "SHOCK" ? "#f87171" : "#888";
+                        const samples = Number(info?.sample_count ?? 0);
+                        const status = samples > 0 ? "ok" : "ko";
+                        const statusCol = status === "ok" ? "#4ade80" : "#f87171";
+                        const isResolved = regimeResolved?.source === row.key;
+                        const sourceTip =
+                          row.key === "universe"
+                            ? TOOLTIPS.analysis_ctx_universe
+                            : row.key === "opportunity"
+                              ? TOOLTIPS.analysis_ctx_opportunity
+                              : TOOLTIPS.analysis_ctx_paper_trade;
+                        const records = info?.records ?? [];
+                        return (
+                          <div key={`${row.key}-table`} style={{border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", background:isResolved ? "rgba(0,255,106,0.05)" : "rgba(255,255,255,0.01)"}}>
+                            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", borderBottom:"1px solid var(--border)"}}>
+                              <span style={{fontSize:"0.63rem", color:"#9ac4af", textTransform:"uppercase", letterSpacing:"0.05em"}} title={sourceTip}>
+                                {row.label}{isResolved ? " · source" : ""}
+                              </span>
+                              <span style={{display:"flex", gap:8, alignItems:"center", fontSize:"0.62rem"}}>
+                                <span className="sev-data" title={TOOLTIPS.analysis_ctx_samples}>{samples}</span>
+                                <span style={{color:regColor, fontWeight:700}} title={TOOLTIPS.analysis_ctx_regime}>{reg}</span>
+                                <span style={{color:statusCol, fontWeight:700}} title={TOOLTIPS.analysis_ctx_status}>{status}</span>
+                              </span>
                             </div>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                    <div style={{display:"grid", gridTemplateColumns:"1.35fr 0.55fr 0.55fr 0.9fr 0.45fr", padding:"6px 8px", borderTop:"1px solid var(--border)", background:"rgba(0,255,106,0.07)", fontSize:"0.64rem", alignItems:"center"}}>
-                      <span style={{fontWeight:700}} title={TOOLTIPS.analysis_ctx_resolved}>Regime risolto</span>
-                      <span className="sev-data" title={TOOLTIPS.analysis_ctx_samples}>{regimeResolved?.sample_count ?? 0}</span>
-                      <span className={sevClassForRegime(regimeResolved?.regime)} style={{fontWeight:700}} title={TOOLTIPS.analysis_ctx_resolved}>{regimeResolved?.regime ?? premarketRegime}</span>
-                      <span className="sev-meta" title={TOOLTIPS.analysis_ctx_rationale}>{regimeResolved?.source ?? "none"}</span>
-                      <span className={(regimeResolved?.sample_count ?? 0) > 0 ? "sev-ok" : "sev-error"} style={{fontWeight:700}} title={TOOLTIPS.analysis_ctx_status}>{(regimeResolved?.sample_count ?? 0) > 0 ? "ok" : "ko"}</span>
+                            <div style={{maxHeight:170, overflowY:"auto"}}>
+                              <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.58rem"}}>
+                                <thead>
+                                  <tr style={{borderBottom:"1px solid var(--border)", color:"#7c8f84", textTransform:"uppercase", letterSpacing:"0.04em"}}>
+                                    <th style={{textAlign:"left", padding:"4px 6px", width:24}}>#</th>
+                                    <th style={{textAlign:"left", padding:"4px 6px"}} title={TOOLTIPS.analysis_ctx_last_ts}>timestamp</th>
+                                    <th style={{textAlign:"left", padding:"4px 6px"}} title={TOOLTIPS.analysis_ctx_regime}>regime</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {records.length > 0 ? records.map((rec, idx) => {
+                                    const rc = rec.regime === "NORMAL" ? "#4ade80" : rec.regime === "CAUTION" ? "#fbbf24" : "#f87171";
+                                    return (
+                                      <tr key={`${row.key}-rec-${idx}`} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                        <td style={{padding:"3px 6px", color:"#7c8f84"}}>{idx + 1}</td>
+                                        <td style={{padding:"3px 6px", color:"#9fc2b1"}}>{fmtTsMin(rec.ts)}</td>
+                                        <td style={{padding:"3px 6px", color:rc, fontWeight:700}}>{rec.regime}</td>
+                                      </tr>
+                                    );
+                                  }) : (
+                                    <tr>
+                                      <td colSpan={3} style={{padding:"8px 6px", color:"#7c8f84"}}>Nessun campione disponibile</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                            <div style={{padding:"5px 8px", borderTop:"1px solid var(--border)", fontSize:"0.57rem", color:"var(--dim)"}}>
+                              ult: {info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"} · usable {samples > 0 ? "yes" : "no"}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{marginTop:8, padding:"6px 8px", border:"1px solid var(--border)", borderRadius:6, background:"rgba(0,255,106,0.07)", fontSize:"0.62rem"}}>
+                      <span style={{fontWeight:700}} title={TOOLTIPS.analysis_ctx_conclusion}>Giudizio:</span>{" "}
+                      <span title={TOOLTIPS.analysis_ctx_resolved}>
+                        regime risolto <span className={sevClassForRegime(regimeResolved?.regime)} style={{fontWeight:700}}>{regimeResolved?.regime ?? premarketRegime}</span>
+                        {" "}da fonte <span className="sev-data">{regimeResolved?.source ?? "none"}</span>
+                        {" "}con <span className="sev-data">{regimeResolved?.sample_count ?? 0}</span> campioni.
+                      </span>
                     </div>
                   </div>
                   <div className="lc-panel-title">Regime di mercato</div>

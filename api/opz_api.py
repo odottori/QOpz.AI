@@ -2687,10 +2687,14 @@ def _build_regime_source_view(rows: list[tuple[Any, Any]]) -> Dict[str, Any]:
         if ts_raw is not None:
             last_ts = ts_raw.isoformat() if hasattr(ts_raw, "isoformat") else str(ts_raw)
 
+    records: list[dict[str, str]] = []
     for row in rows:
         lbl = str(row[0]).strip().upper()
+        ts_raw = row[1]
+        ts_str = ts_raw.isoformat() if hasattr(ts_raw, "isoformat") else str(ts_raw)
         if lbl in counts:
             counts[lbl] += 1
+            records.append({"ts": ts_str, "regime": lbl})
 
     sample_count = sum(counts.values())
     regime = max(counts, key=lambda k: counts[k]) if sample_count > 0 else "UNKNOWN"
@@ -2706,6 +2710,7 @@ def _build_regime_source_view(rows: list[tuple[Any, Any]]) -> Dict[str, Any]:
         "regime_pct": regime_pct,
         "last_ts": last_ts,
         "usable": sample_count > 0,
+        "records": records,
     }
 
 
