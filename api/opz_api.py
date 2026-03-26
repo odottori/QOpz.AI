@@ -2574,7 +2574,7 @@ def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
       regime_pct      dict  — {NORMAL: float, CAUTION: float, SHOCK: float}
       last_scan_ts    str|null — ISO timestamp ultimo candidato
       n_recent        int   — record trovati nella finestra
-      source          str   — "opportunity_candidates" | "paper_trades" | "none"
+      source          str   — "opportunity_candidates" | "universe_scan_batches" | "paper_trades" | "none"
     """
     n = max(1, min(int(window), 100))
     counts: dict[str, int] = {"NORMAL": 0, "CAUTION": 0, "SHOCK": 0}
@@ -2584,16 +2584,19 @@ def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
 
     try:
         with _db_connect_ro() as con:
-            rows = con.execute(
-                """
-                SELECT regime, scan_ts
-                FROM opportunity_candidates
-                WHERE regime IS NOT NULL
-                ORDER BY scan_ts DESC
-                LIMIT ?
-                """,
-                (n,),
-            ).fetchall()
+            try:
+                rows = con.execute(
+                    """
+                    SELECT regime, scan_ts
+                    FROM opportunity_candidates
+                    WHERE regime IS NOT NULL
+                    ORDER BY scan_ts DESC
+                    LIMIT ?
+                    """,
+                    (n,),
+                ).fetchall()
+            except Exception:
+                rows = []
             if rows:
                 source = "opportunity_candidates"
                 for row in rows:
@@ -2605,26 +2608,53 @@ def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
                 if ts_raw is not None:
                     last_scan_ts = ts_raw.isoformat() if hasattr(ts_raw, "isoformat") else str(ts_raw)
             else:
-                # Fallback: paper_trades
-                rows2 = con.execute(
-                    """
-                    SELECT regime_at_entry, entry_ts_utc
-                    FROM paper_trades
-                    WHERE regime_at_entry IS NOT NULL
-                    ORDER BY entry_ts_utc DESC
-                    LIMIT ?
-                    """,
-                    (n,),
-                ).fetchall()
-                if rows2:
-                    source = "paper_trades"
-                    for row in rows2:
+                # Fallback 1: universe_scan_batches (regime da scan universo)
+                try:
+                    rows_u = con.execute(
+                        """
+                        SELECT regime, created_at
+                        FROM universe_scan_batches
+                        WHERE regime IS NOT NULL
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                        """,
+                        (n,),
+                    ).fetchall()
+                except Exception:
+                    rows_u = []
+                if rows_u:
+                    source = "universe_scan_batches"
+                    for row in rows_u:
                         lbl = str(row[0]).strip().upper()
                         if lbl in counts:
                             counts[lbl] += 1
-                    ts_raw2 = rows2[0][1]
-                    if ts_raw2 is not None:
-                        last_scan_ts = str(ts_raw2)
+                    ts_raw_u = rows_u[0][1]
+                    if ts_raw_u is not None:
+                        last_scan_ts = ts_raw_u.isoformat() if hasattr(ts_raw_u, "isoformat") else str(ts_raw_u)
+                else:
+                    # Fallback 2: paper_trades
+                    try:
+                        rows2 = con.execute(
+                            """
+                            SELECT regime_at_entry, entry_ts_utc
+                            FROM paper_trades
+                            WHERE regime_at_entry IS NOT NULL
+                            ORDER BY entry_ts_utc DESC
+                            LIMIT ?
+                            """,
+                            (n,),
+                        ).fetchall()
+                    except Exception:
+                        rows2 = []
+                    if rows2:
+                        source = "paper_trades"
+                        for row in rows2:
+                            lbl = str(row[0]).strip().upper()
+                            if lbl in counts:
+                                counts[lbl] += 1
+                        ts_raw2 = rows2[0][1]
+                        if ts_raw2 is not None:
+                            last_scan_ts = str(ts_raw2)
     except Exception as _exc:
         logger.debug("opz_regime_current: DB unavailable — %s", _exc)
 
