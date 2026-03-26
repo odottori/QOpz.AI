@@ -78,10 +78,30 @@ def _fetch_data(api_base: str) -> dict:
 
 # ── Testo briefing ────────────────────────────────────────────────────────────
 
+def _market_phase_ny(now_utc: datetime) -> tuple[str, str]:
+    """Return (phase_key, label) for NY regular market hours."""
+    try:
+        from zoneinfo import ZoneInfo
+        now_ny = now_utc.astimezone(ZoneInfo("America/New_York"))
+    except Exception:
+        return "closed", "fase mercato non determinabile"
+
+    if now_ny.weekday() >= 5:
+        return "closed", "mercato chiuso (weekend)"
+
+    mins = now_ny.hour * 60 + now_ny.minute
+    if mins < 9 * 60 + 30:
+        return "pre", "pre-market USA"
+    if mins < 16 * 60:
+        return "open", "mercato USA aperto"
+    return "post", "post-market USA"
+
+
 def _compose_text(data: dict) -> str:
     now = datetime.now(tz=timezone.utc)
     giorno = now.strftime("%A %d %B %Y").capitalize()
     ora    = now.strftime("%H:%M UTC")
+    phase_key, phase_label = _market_phase_ny(now)
 
     regime_data = data.get("regime", {})
     summary     = data.get("summary", {})
@@ -110,6 +130,11 @@ def _compose_text(data: dict) -> str:
 
     # ── Intro ─────────────────────────────────────────────────────────────────
     lines.append(f"Buongiorno. Briefing operativo di {giorno}, ore {ora}.")
+    lines.append(f"Fase mercato USA: {phase_label}.")
+    if phase_key == "pre":
+        lines.append("Nota forecast: segnali in pre-market, da validare dopo apertura ufficiale.")
+    elif phase_key == "open":
+        lines.append("Nota forecast: segnali intraday su dati della giornata in corso.")
     lines.append("")
 
     # ── Kill switch ───────────────────────────────────────────────────────────

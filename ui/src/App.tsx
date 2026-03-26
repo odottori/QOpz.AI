@@ -601,6 +601,9 @@ function explainDatiError(err: string | null | undefined): string {
   const raw = String(err ?? "").trim();
   if (!raw) return "Errore non specificato";
   const up = raw.toUpperCase();
+  if (up.includes("PRE-MKT")) {
+    return "PRE-MKT: prima dell'apertura USA (09:30 New York). Forecast pre-apertura, da riconfermare dopo apertura.";
+  }
   if (up.includes("10089")) {
     return "KO FEED: IBKR market data API non abilitato per lo strumento richiesto (codice 10089).";
   }
@@ -624,9 +627,21 @@ function isNoMrktError(err: string | null | undefined): boolean {
   return String(err ?? "").toUpperCase().includes("NO MRKT");
 }
 
+function isPreMrktError(err: string | null | undefined): boolean {
+  return String(err ?? "").toUpperCase().includes("PRE-MKT");
+}
+
+function isBlockingDatiError(err: string | null | undefined): boolean {
+  const raw = String(err ?? "").trim();
+  if (!raw) return false;
+  if (isPreMrktError(raw) || isNoMrktError(raw)) return false;
+  return true;
+}
+
 function mapDatiStatus(status: string | null | undefined, err: string | null | undefined): { label: string; color: string } {
   const st = String(status ?? "").trim().toLowerCase();
   if (st === "ok") return { label: "ok", color: "#4ade80" };
+  if (isPreMrktError(err)) return { label: "pre-mkt", color: "#fbbf24" };
   if (isNoMrktError(err)) return { label: "no mrkt", color: "#fbbf24" };
   if (st === "partial") return { label: "parz", color: "#fbbf24" };
   return { label: "ko", color: "#f87171" };
@@ -2955,17 +2970,34 @@ export default function App() {
                       // ── Blocco 4: Dati derivati (symbol snapshots) ─────────────────
                       if (feed === "derivati") {
                         const hasSnaps = symbolSnaps.length > 0;
-                        const snapsOk = symbolSnaps.filter(s => !s.error_msg).length;
-                        const snapsErr = symbolSnaps.filter(s => s.error_msg).length;
+                        const snapsFullOk = symbolSnaps.filter(s => !String(s.error_msg ?? "").trim()).length;
+                        const snapsWarn = symbolSnaps.filter(s => {
+                          const e = String(s.error_msg ?? "").trim();
+                          return !!e && !isBlockingDatiError(e);
+                        }).length;
+                        const snapsErr = symbolSnaps.filter(s => isBlockingDatiError(s.error_msg)).length;
+                        const snapsOk = snapsFullOk + snapsWarn;
                         const ibkrCount = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "ibkr").length;
                         const bsCount   = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "bs").length;
-                        const blockStatus = !hasSnaps ? null : snapsErr === 0 ? "ok" : snapsOk === 0 ? "error" : "partial";
+                        const blockStatus = !hasSnaps
+                          ? null
+                          : snapsErr === 0 && snapsWarn === 0
+                            ? "ok"
+                            : snapsErr === 0
+                              ? "partial"
+                              : snapsOk === 0
+                                ? "error"
+                                : "partial";
                         const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : blockStatus === "partial" ? "#fbbf24" : "#555";
                         const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : blockStatus === "partial" ? "~ PARZ." : "—";
                         const lastUpd = symbolSnaps[0]?.updated_at ? fmtHm(symbolSnaps[0].updated_at) : "—";
                         const blockSt = datiBlockStatus[feed] ?? "tutti";
                         const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
-                        const rows = symbolSnaps.filter(s => blockSt === "tutti" || (blockSt === "ok" ? !s.error_msg : !!s.error_msg));
+                        const rows = symbolSnaps.filter(s => {
+                          if (blockSt === "tutti") return true;
+                          if (blockSt === "ok") return !isBlockingDatiError(s.error_msg);
+                          return isBlockingDatiError(s.error_msg);
+                        });
                         const fmtPct = (v: number|null) => v != null ? `${(v*100).toFixed(1)}%` : "—";
                         const fmtN   = (v: number|null, d=4) => v != null ? v.toFixed(d) : "—";
                         const fmtP   = (v: number|null) => v != null ? v.toFixed(2) : "—";
@@ -2982,7 +3014,10 @@ export default function App() {
                             s.atm_gamma != null ? s.atm_gamma.toFixed(4) : "",
                             s.atm_theta != null ? s.atm_theta.toFixed(4) : "",
                             s.atm_vega != null ? s.atm_vega.toFixed(4) : "",
-                            mapDatiStatus(s.error_msg ? "error" : "ok", s.error_msg).label,
+                            mapDatiStatus(
+                              isBlockingDatiError(s.error_msg) ? "error" : (s.error_msg ? "partial" : "ok"),
+                              s.error_msg,
+                            ).label,
                             explainDatiError(s.error_msg),
                           ]);
                           const blob = new Blob(
@@ -3066,9 +3101,12 @@ export default function App() {
                                     </thead>
                                     <tbody>
                                       {rows.map((s, i) => {
-                                        const hasErr = !!s.error_msg;
-                                        const st = mapDatiStatus(hasErr ? "error" : "ok", s.error_msg);
-                                        const ivC = s.atm_iv ? "#4ade80" : "#f87171";
+                                        const hasErr = !!String(s.error_msg ?? "").trim();
+                                        const hasBlockingErr = isBlockingDatiError(s.error_msg);
+                                        const st = mapDatiStatus(hasBlockingErr ? "error" : (hasErr ? "partial" : "ok"), s.error_msg);
+                                        const ivC = s.atm_iv
+                                          ? "#4ade80"
+                                          : (isPreMrktError(s.error_msg) || isNoMrktError(s.error_msg) ? "#fbbf24" : "#f87171");
                                         const srcC = s.iv_source === "bs" ? "#fbbf24" : "#4ade80";
                                         return (
                                           <tr key={s.symbol} style={{borderBottom:"1px solid var(--border)", background: i%2===0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)"}}>

@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from scripts.fetch_iv_history_ibkr import _snapshot_on_connection
@@ -17,7 +18,12 @@ class _FakeStock:
 
 class _FakeOption:
     def __init__(self, *args, **kwargs):
-        self.right = kwargs.get("right")
+        self.symbol = args[0] if len(args) > 0 else kwargs.get("symbol")
+        self.lastTradeDateOrContractMonth = args[1] if len(args) > 1 else kwargs.get("lastTradeDateOrContractMonth")
+        self.strike = args[2] if len(args) > 2 else kwargs.get("strike")
+        self.right = args[3] if len(args) > 3 else kwargs.get("right")
+        self.exchange = args[4] if len(args) > 4 else kwargs.get("exchange")
+        self.currency = kwargs.get("currency", "USD")
 
 
 class _FakeTicker:
@@ -55,6 +61,25 @@ class _FakeIb:
         return []
 
 
+class _FakeChain:
+    def __init__(self):
+        self.exchange = "SMART"
+        self.expirations = {(date.today() + timedelta(days=30)).strftime("%Y%m%d")}
+        self.strikes = [432.0]
+
+
+class _FakeIbWithChain(_FakeIb):
+    def reqMktData(self, contract, genericTickList, snapshot, regulatorySnapshot):
+        if getattr(contract, "secType", "") == "STK":
+            if self._mdt == 3:
+                return _FakeTicker(close=432.1)
+            return _FakeTicker()
+        return _FakeTicker()
+
+    def reqSecDefOptParams(self, *_args, **_kwargs):
+        return [_FakeChain()]
+
+
 class TestF6T2FetchIvHistoryIbkr(unittest.TestCase):
     def test_underlying_fallback_uses_delayed_when_live_unavailable(self):
         fake_module = types.SimpleNamespace(Stock=_FakeStock, Option=_FakeOption)
@@ -77,6 +102,16 @@ class TestF6T2FetchIvHistoryIbkr(unittest.TestCase):
 
         self.assertEqual(out.get("market_data_type"), 3)
         self.assertEqual(fake_ib.requested_types, [3])
+
+    def test_pre_market_error_label_when_iv_missing_before_open(self):
+        fake_module = types.SimpleNamespace(Stock=_FakeStock, Option=_FakeOption)
+        fake_ib = _FakeIbWithChain()
+        with patch.dict(sys.modules, {"ib_insync": fake_module}):
+            with patch("scripts.fetch_iv_history_ibkr._market_phase_ny", return_value="pre"):
+                out = _snapshot_on_connection(fake_ib, "AAPL")
+
+        self.assertEqual(out.get("market_data_type"), 3)
+        self.assertIn("PRE-MKT", str(out.get("error")))
 
 
 if __name__ == "__main__":

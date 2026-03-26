@@ -104,6 +104,27 @@ def _data_mode() -> str:
     return os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
 
 
+def _market_phase_ny(now_utc: Optional[datetime] = None) -> str:
+    """pre | open | post | closed (timezone America/New_York)."""
+    now_ref = now_utc or datetime.now(timezone.utc)
+    try:
+        from zoneinfo import ZoneInfo
+        now_ny = now_ref.astimezone(ZoneInfo("America/New_York"))
+    except Exception:
+        # Fallback conservativo: senza timezone affidabile non inferiamo pre/post.
+        return "closed"
+
+    if now_ny.weekday() >= 5:
+        return "closed"
+
+    mins = now_ny.hour * 60 + now_ny.minute
+    if mins < 9 * 60 + 30:
+        return "pre"
+    if mins < 16 * 60:
+        return "open"
+    return "post"
+
+
 def _ibkr_connection_params(profile: str = "dev") -> tuple[str, list[int], int]:
     """Ritorna (host, ports, client_id) leggendo env vars + config profilo."""
     host = (os.environ.get("IBKR_HOST") or "127.0.0.1").strip()
@@ -328,7 +349,11 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
         result["greeks_complete"] = greeks_filled
 
         if result["atm_iv"] is None:
-            result["error"] = "NO MRKT - IV ATM non disponibile (mercato opzioni chiuso o feed OPRA assente)"
+            phase = _market_phase_ny()
+            if phase == "pre":
+                result["error"] = "PRE-MKT - IV ATM non disponibile prima apertura USA (09:30 ET)"
+            else:
+                result["error"] = "NO MRKT - IV ATM non disponibile (mercato opzioni chiuso o feed OPRA assente)"
 
         return result
 
