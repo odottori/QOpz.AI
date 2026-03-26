@@ -3014,15 +3014,11 @@ export default function App() {
                         const bsCount   = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "bs").length;
                         const blockStatus = !hasSnaps
                           ? null
-                          : snapsErr === 0 && snapsWarn === 0
+                          : snapsOk > 0
                             ? "ok"
-                            : snapsErr === 0
-                              ? "partial"
-                              : snapsOk === 0
-                                ? "error"
-                                : "partial";
-                        const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : blockStatus === "partial" ? "#fbbf24" : "#555";
-                        const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : blockStatus === "partial" ? "~ PARZ." : "—";
+                            : "error";
+                        const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : "#555";
+                        const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : "—";
                         const lastUpd = symbolSnaps[0]?.updated_at ? fmtHm(symbolSnaps[0].updated_at) : "—";
                         const blockSt = datiBlockStatus[feed] ?? "tutti";
                         const filtersOpen = datiBlockFiltersOpen[feed] ?? false;

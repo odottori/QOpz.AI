@@ -388,14 +388,9 @@ def opz_data_refresh(
         if with_chain <= 0:
             _rec("ibkr_greeks", t0, t1, 0, 0, "error", "Catene opzioni assenti")
         else:
-            if symbols_greeks_ok == with_chain:
-                greek_status = "ok"
-            elif symbols_greeks_ok == 0:
-                greek_status = "error"
-            else:
-                greek_status = "partial"
+            greek_status = "ok" if symbols_greeks_ok > 0 else "error"
             greek_errs: list[str] = []
-            if symbols_greeks_ok < with_chain:
+            if symbols_greeks_ok <= 0:
                 greek_errs.append(f"righe derivati valide su {symbols_greeks_ok}/{with_chain} simboli con catena")
             if iv_errs:
                 greek_errs.extend(iv_errs)
