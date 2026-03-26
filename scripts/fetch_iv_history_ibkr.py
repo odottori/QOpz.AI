@@ -271,12 +271,17 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
 
         tickers = []
         for opt in qualified_opts:
-            # snapshot=True: richiesta singola, nessuna sottoscrizione persistente.
-            # Evita accumulo di streaming e spam di Error 10091 nel log.
-            t = ib.reqMktData(opt, "100,101,106", snapshot=True, regulatorySnapshot=False)
+            # Snapshot + genericTicks (100/101/106) su alcune configurazioni IBKR
+            # produce Error 321. Usiamo uno stream breve e poi cancelliamo.
+            t = ib.reqMktData(opt, "100,101,106", snapshot=False, regulatorySnapshot=False)
             tickers.append((opt, t))
 
         ib.sleep(2.0)
+        for opt, _ in tickers:
+            try:
+                ib.cancelMktData(opt)
+            except Exception:
+                pass
 
         call_t = next((t for o, t in tickers if hasattr(o, "right") and o.right == "C"), None)
         put_t  = next((t for o, t in tickers if hasattr(o, "right") and o.right == "P"), None)
