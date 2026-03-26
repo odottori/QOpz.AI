@@ -159,54 +159,78 @@ class _NewYorkFallbackTz(tzinfo):
         return "EDT" if self._is_dst(dt) else "EST"
 
 
+def _resolve_timezone(tz_name: str) -> tuple[tzinfo, bool]:
+    """Resolve timezone by IANA name with explicit fallback for New York."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(tz_name), False
+    except Exception as exc:
+        if tz_name != "America/New_York":
+            raise RuntimeError(
+                f"timezone '{tz_name}' unavailable: install tzdata or use a valid IANA timezone"
+            ) from exc
+        return _NewYorkFallbackTz(), True
+
+
+def _is_schedulable_day(d: date, *, skip_weekends: bool, skip_holidays: bool) -> bool:
+    if skip_weekends and d.weekday() >= 5:
+        return False
+    if skip_holidays and d in nyse_holidays(d.year):
+        return False
+    return True
+
+
 def _next_session_dt(
     now: datetime,
     morning_time: "time_cls",
     eod_time: "time_cls",
     tz_name: str,
+    *,
+    skip_weekends: bool = True,
+    skip_holidays: bool = True,
+    preferred_type: Optional[str] = None,
 ) -> "tuple[datetime, str]":
     """
     Calcola (datetime_prossima_sessione, tipo) a partire da now (timezone-aware).
     Considera skip weekend e holiday NYSE.
     """
-    use_fallback = False
-    try:
-        from zoneinfo import ZoneInfo
-
-        tz = ZoneInfo(tz_name)
-    except Exception:
-        if tz_name != "America/New_York":
-            raise RuntimeError(f"timezone '{tz_name}' unavailable and no fallback is defined")
-        tz = _NewYorkFallbackTz()
-        use_fallback = True
+    preferred = (preferred_type or "").strip().lower()
+    if preferred not in {"", "morning", "eod"}:
+        raise ValueError("preferred_type must be one of: None, 'morning', 'eod'")
+    tz, _ = _resolve_timezone(tz_name)
     now_local = now.astimezone(tz)
     today = now_local.date()
 
     def _make_dt(d: date, t: "time_cls") -> datetime:
         naive = datetime(d.year, d.month, d.day, t.hour, t.minute, 0)
-        if use_fallback:
-            return naive.replace(tzinfo=tz)
         return naive.replace(tzinfo=tz)
 
     candidates: list[tuple[datetime, str]] = []
     for offset in range(0, 8):   # cerca nei prossimi 7 giorni
         d = today + timedelta(days=offset)
-        if not is_trading_day(d):
+        if not _is_schedulable_day(d, skip_weekends=skip_weekends, skip_holidays=skip_holidays):
             continue
         morning_dt = _make_dt(d, morning_time)
         eod_dt = _make_dt(d, eod_time)
-        if morning_dt > now_local:
+        if morning_dt > now_local and (not preferred or preferred == "morning"):
             candidates.append((morning_dt, "morning"))
-        if eod_dt > now_local:
+        if eod_dt > now_local and (not preferred or preferred == "eod"):
             candidates.append((eod_dt, "eod"))
 
     if not candidates:
-        # fallback: prossimo giorno di trading (salta weekend/festivi)
+        # fallback: primo giorno schedulabile successivo secondo policy.
         for fallback_offset in range(1, 9):
             fallback_day = today + timedelta(days=fallback_offset)
-            if is_trading_day(fallback_day):
+            if _is_schedulable_day(
+                fallback_day, skip_weekends=skip_weekends, skip_holidays=skip_holidays
+            ):
+                if preferred == "eod":
+                    return _make_dt(fallback_day, eod_time), "eod"
                 return _make_dt(fallback_day, morning_time), "morning"
-        # ultima risorsa: domani (non dovrebbe mai accadere)
+        # ultima risorsa: domani, mantiene tipo richiesto.
+        if preferred == "eod":
+            return _make_dt(today + timedelta(days=1), eod_time), "eod"
         return _make_dt(today + timedelta(days=1), morning_time), "morning"
 
     candidates.sort(key=lambda x: x[0])

@@ -1001,6 +1001,11 @@ export default function App() {
     status: string; records_in: number | null; records_out: number | null;
     quality_pct: number | null; symbols_count: number | null; error_msg: string | null;
   };
+  type DataRefreshResponse = {
+    ok: boolean;
+    status_code: number;
+    critical_failed: string[];
+  };
   const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
   const [feedLogLoading, setFeedLogLoading] = useState(true);
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -1718,7 +1723,15 @@ export default function App() {
         });
       }, 1000);
       try {
-        await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
+        const refreshOut = await apiJson<DataRefreshResponse>(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
+        if (!refreshOut.ok) {
+          const critical = (refreshOut.critical_failed ?? []).join(", ");
+          throw new Error(
+            critical
+              ? `refresh incompleto: feed critici in errore (${critical})`
+              : "refresh incompleto: feed critici in errore",
+          );
+        }
         if (autoContinue) {
           await doRunSession("morning"); // prosegue autonomamente: forecast + briefing scheduler chain
           await Promise.allSettled([
@@ -2231,15 +2244,13 @@ export default function App() {
     : !hasRealData
       ? "Data mode sintetico: blocco in monitoraggio"
       : "Feed reale attivo: blocco operativo";
-  const dataProcessable = opsBlockers.length === 0;
-  const datiOpsReady = apiOnline && hasRealData && dataProcessable;
+  const dataProcessable = apiOnline && opsBlockers.length === 0;
+  const datiOpsReady = dataProcessable;
   const datiBlockReason = !apiOnline
     ? "API offline"
-    : !hasRealData
-      ? "data mode non operativo"
-      : opsBlockers.length > 0
-        ? `blocchi non OK: ${opsBlockersLabel}`
-        : `stato DATI ${stepDataStatusLabel}`;
+    : opsBlockers.length > 0
+      ? `blocchi non OK: ${opsBlockersLabel}`
+      : "";
   const briefingReady = datiOpsReady && briefingReadyByData;
   const briefingBlockReason = !datiOpsReady
     ? datiBlockReason

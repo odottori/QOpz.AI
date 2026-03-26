@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import patch
+try:
+    from fastapi import Response
+except Exception:
+    Response = None  # type: ignore[assignment]
 
 try:
     from api.routers.pipeline import opz_data_refresh
@@ -14,7 +18,7 @@ class _DummyMgr:
         return None
 
 
-@unittest.skipIf(opz_data_refresh is None, "fastapi not installed in this environment")
+@unittest.skipIf(opz_data_refresh is None or Response is None, "fastapi not installed in this environment")
 class TestDataRefreshIvHistoryStatus(unittest.TestCase):
     def test_ibkr_iv_history_is_partial_when_zero_points_with_premarket_error(self):
         recorded: list[dict] = []
@@ -67,9 +71,11 @@ class TestDataRefreshIvHistoryStatus(unittest.TestCase):
                 }
             ],
         ):
-            out = opz_data_refresh(profile="paper")
+            out = opz_data_refresh(profile="paper", response=Response())
 
-        self.assertTrue(out["ok"])
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["status_code"], 207)
+        self.assertIn("ibkr_greeks", out["critical_failed"])
         row = next((r for r in recorded if r.get("feed") == "ibkr_iv_history"), None)
         self.assertIsNotNone(row, "ibkr_iv_history run not recorded")
         self.assertEqual(row["status"], "partial")
@@ -128,9 +134,11 @@ class TestDataRefreshIvHistoryStatus(unittest.TestCase):
                 }
             ],
         ):
-            out = opz_data_refresh(profile="paper")
+            out = opz_data_refresh(profile="paper", response=Response())
 
-        self.assertTrue(out["ok"])
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["status_code"], 207)
+        self.assertIn("ibkr_greeks", out["critical_failed"])
         row = next((r for r in recorded if r.get("feed") == "ibkr_greeks"), None)
         self.assertIsNotNone(row, "ibkr_greeks run not recorded")
         self.assertEqual(row["status"], "error")
@@ -198,9 +206,11 @@ class TestDataRefreshIvHistoryStatus(unittest.TestCase):
                 },
             ],
         ):
-            out = opz_data_refresh(profile="paper")
+            out = opz_data_refresh(profile="paper", response=Response())
 
         self.assertTrue(out["ok"])
+        self.assertEqual(out["status_code"], 200)
+        self.assertEqual(out["critical_failed"], [])
         row = next((r for r in recorded if r.get("feed") == "ibkr_greeks"), None)
         self.assertIsNotNone(row, "ibkr_greeks run not recorded")
         self.assertEqual(row["status"], "ok")

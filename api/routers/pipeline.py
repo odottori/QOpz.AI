@@ -4,7 +4,7 @@ import logging
 from datetime import date, datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from api.models import DemoPipelineAutoRequest, ScanFullRequest
 
@@ -108,6 +108,7 @@ def opz_pipeline_feed_log(
 
 @router.post("/opz/data/refresh")
 def opz_data_refresh(
+    response: Response,
     profile: str = Query("dev"),
 ) -> Dict[str, Any]:
     """Aggiorna i dati di mercato (yfinance) e registra ogni fonte in ingestion_runs.
@@ -120,6 +121,8 @@ def opz_data_refresh(
 
     today = date.today().isoformat()
     results: Dict[str, Any] = {}
+    feed_status: Dict[str, str] = {}
+    feed_errors: Dict[str, str] = {}
 
     def _rec(
         feed: str,
@@ -131,6 +134,11 @@ def opz_data_refresh(
         error: Optional[str] = None,
         symbols_count: Optional[int] = None,
     ) -> None:
+        feed_status[feed] = status
+        if error:
+            feed_errors[feed] = str(error)
+        elif feed in feed_errors:
+            feed_errors.pop(feed, None)
         try:
             record_ingestion_run(
                 profile=profile, feed=feed, run_date=today,
@@ -510,10 +518,28 @@ def opz_data_refresh(
 
     # Totale runs registrate oggi
     total_runs = list_ingestion_runs(profile=profile, days_back=1)
+    critical_feeds = (
+        "yfinance_iv_history",
+        "yfinance_calendar",
+        "yfinance_exdiv",
+        "yfinance_macro",
+        "ibkr_prices",
+        "ibkr_chain",
+        "ibkr_greeks",
+        "ibkr_account",
+    )
+    critical_failed = [feed for feed in critical_feeds if feed_status.get(feed) == "error"]
+    critical_okish = sum(1 for feed in critical_feeds if feed_status.get(feed) in {"ok", "partial"})
+    aggregate_ok = len(critical_failed) == 0
+    status_code = 200 if aggregate_ok else (503 if critical_okish == 0 else 207)
+    response.status_code = status_code
     return {
-        "ok": True,
+        "ok": aggregate_ok,
         "profile": profile,
         "symbols_count": len(symbols),
         "feeds": results,
         "runs_today": len(total_runs),
+        "status_code": status_code,
+        "critical_failed": critical_failed,
+        "critical_error_detail": {feed: feed_errors.get(feed, "") for feed in critical_failed},
     }

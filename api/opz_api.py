@@ -203,10 +203,22 @@ def _next_session_dt(
     morning_time: "time_cls",
     eod_time: "time_cls",
     tz_name: str,
+    *,
+    skip_weekends: bool = True,
+    skip_holidays: bool = True,
+    preferred_type: Optional[str] = None,
 ) -> tuple[datetime, str]:
     """Delega a scripts.session_runner._next_session_dt (unica implementazione)."""
     from scripts.session_runner import _next_session_dt as _sr_next
-    return _sr_next(now, morning_time, eod_time, tz_name)
+    return _sr_next(
+        now,
+        morning_time,
+        eod_time,
+        tz_name,
+        skip_weekends=skip_weekends,
+        skip_holidays=skip_holidays,
+        preferred_type=preferred_type,
+    )
 
 
 async def _run_session_subprocess(session_type: str, cfg: dict[str, Any]) -> dict[str, Any]:
@@ -244,14 +256,31 @@ async def _run_session_subprocess(session_type: str, cfg: dict[str, Any]) -> dic
 
 async def _scheduler_loop(cfg: dict[str, Any]) -> None:
     """Loop infinito che dorme fino alla prossima sessione e la esegue."""
-    from zoneinfo import ZoneInfo
     try:
         morning_t = _parse_session_time(cfg.get("morning_time", "09:00"), cfg.get("timezone", "America/New_York"))
         eod_t     = _parse_session_time(cfg.get("eod_time", "16:30"),    cfg.get("timezone", "America/New_York"))
     except Exception as exc:
         logger.critical("SESSION_SCHEDULER cannot parse times — scheduler disabled: %s", exc)
         _SESSION_STATE["enabled"] = False
+        _SESSION_STATE["running"] = False
+        _SESSION_STATE["last_result"] = {"ok": False, "reason": f"SCHEDULER_CONFIG_ERROR: {exc}"}
         return
+
+    def _as_bool(value: Any, default: bool) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return default
+        text = str(value).strip().lower()
+        if text in {"1", "true", "yes", "on"}:
+            return True
+        if text in {"0", "false", "no", "off"}:
+            return False
+        return default
+
+    skip_weekends = _as_bool(cfg.get("skip_weekends"), True)
+    skip_holidays = _as_bool(cfg.get("skip_holidays"), True)
+    tz_name = str(cfg.get("timezone", "America/New_York") or "America/New_York")
 
     logger.info("SESSION_SCHEDULER started | morning=%s eod=%s tz=%s",
                 cfg.get("morning_time"), cfg.get("eod_time"), cfg.get("timezone"))
@@ -259,10 +288,41 @@ async def _scheduler_loop(cfg: dict[str, Any]) -> None:
     while True:
         try:
             now = datetime.now(timezone.utc)
-            next_dt, session_type = _next_session_dt(now, morning_t, eod_t, cfg.get("timezone", "America/New_York"))
+            try:
+                next_morning, _ = _next_session_dt(
+                    now,
+                    morning_t,
+                    eod_t,
+                    tz_name,
+                    skip_weekends=skip_weekends,
+                    skip_holidays=skip_holidays,
+                    preferred_type="morning",
+                )
+                next_eod, _ = _next_session_dt(
+                    now,
+                    morning_t,
+                    eod_t,
+                    tz_name,
+                    skip_weekends=skip_weekends,
+                    skip_holidays=skip_holidays,
+                    preferred_type="eod",
+                )
+            except RuntimeError as exc:
+                reason = f"SCHEDULER_DISABLED_TZ: {exc}"
+                logger.critical("SESSION_SCHEDULER timezone unavailable - scheduler disabled: %s", exc)
+                _SESSION_STATE["enabled"] = False
+                _SESSION_STATE["running"] = False
+                _SESSION_STATE["next_morning"] = None
+                _SESSION_STATE["next_eod"] = None
+                _SESSION_STATE["last_result"] = {"ok": False, "reason": reason}
+                return
 
-            # Aggiorna stato
-            _SESSION_STATE[f"next_{session_type}"] = next_dt.isoformat()
+            _SESSION_STATE["next_morning"] = next_morning.isoformat()
+            _SESSION_STATE["next_eod"] = next_eod.isoformat()
+            if next_morning <= next_eod:
+                next_dt, session_type = next_morning, "morning"
+            else:
+                next_dt, session_type = next_eod, "eod"
             sleep_sec = max(1.0, (next_dt.astimezone(timezone.utc) - now).total_seconds())
             logger.info("SESSION_SCHEDULER sleeping %.0fs until %s (%s)",
                         sleep_sec, next_dt.isoformat(), session_type)
@@ -2498,10 +2558,6 @@ def opz_ibkr_account() -> IbkrAccountOut:
                 ib.RequestTimeout = prev_timeout
         except (AttributeError, RuntimeError, TypeError) as exc:
             logger.debug("IBKR account timeout restore skipped: %s", exc)
-        try:
-            mgr.disconnect()
-        except Exception as exc:
-            logger.debug("IBKR disconnect after account fetch skipped: %s", exc)
 
 
 def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
