@@ -132,6 +132,7 @@ def _ibkr_connection_params(profile: str = "dev") -> tuple[str, list[int], int]:
 def _empty_result(symbol: str, error: str) -> dict[str, Any]:
     return {
         "symbol": symbol.upper(),
+        "market_data_type": None,
         "underlying_price": None,
         "contracts_count": 0,
         "greeks_complete": 0,
@@ -171,20 +172,48 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
             return result
 
         # ── 2. Prezzo sottostante ─────────────────────────────────────────────
-        tkr = ib.reqMktData(stock, "", snapshot=True, regulatorySnapshot=False)
-        ib.sleep(2.0)
-        ib.cancelMktData(stock)
+        preferred_type = getattr(ib, "_qopz_market_data_type", None)
+        tried_types: list[int] = []
+        ordered_types = [preferred_type, 1, 3, 4]  # 1=live, 3=delayed, 4=delayed-frozen
+        underlying: Optional[float] = None
+        for mdt in ordered_types:
+            if not isinstance(mdt, int) or mdt in tried_types:
+                continue
+            tried_types.append(mdt)
+            try:
+                ib.reqMarketDataType(mdt)
+            except Exception:
+                pass
+            tkr = ib.reqMktData(stock, "", snapshot=True, regulatorySnapshot=False)
+            ib.sleep(2.0)
+            try:
+                ib.cancelMktData(stock)
+            except Exception:
+                pass
 
-        underlying = (
-            _safe_float(tkr.last) or
-            _safe_float(tkr.close) or
-            _safe_float(tkr.bid) or
-            _safe_float(tkr.ask)
-        )
+            candidate = (
+                _safe_float(tkr.last) or
+                _safe_float(tkr.close) or
+                _safe_float(tkr.bid) or
+                _safe_float(tkr.ask)
+            )
+            if candidate and candidate > 0:
+                underlying = candidate
+                result["market_data_type"] = mdt
+                try:
+                    setattr(ib, "_qopz_market_data_type", mdt)
+                except Exception:
+                    pass
+                break
+
         if underlying and underlying > 0:
             result["underlying_price"] = round(underlying, 4)
         else:
-            result["error"] = "NO MRKT - Prezzo sottostante non disponibile (mercato chiuso o feed non attivo)"
+            tried_repr = ",".join(str(x) for x in tried_types) if tried_types else "-"
+            result["error"] = (
+                "NO MRKT - Prezzo sottostante non disponibile "
+                f"(mercato chiuso o feed non attivo; tipi provati: {tried_repr})"
+            )
             return result
 
         # ── 3. Catena opzioni ─────────────────────────────────────────────────
