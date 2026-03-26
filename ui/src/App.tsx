@@ -1020,6 +1020,8 @@ export default function App() {
     atm_iv: number|null; atm_call_iv: number|null; atm_put_iv: number|null; iv_source: string|null;
     atm_delta: number|null; atm_gamma: number|null; atm_theta: number|null; atm_vega: number|null;
     greeks_complete: number|null; contracts_count: number|null; error_msg: string|null;
+    trend_dir?: "up" | "down" | "flat" | string | null;
+    trend_note?: string | null;
   };
   const [symbolSnaps, setSymbolSnaps] = useState<SymbolSnap[]>([]);
   const REFRESH_CONTROLS_ENABLED = false; // flusso operativo auto on-connect + hard reload (Ctrl+F5)
@@ -3211,6 +3213,16 @@ export default function App() {
                                         const snapState = deriveSnapState(s);
                                         const hasErr = snapState.status !== "ok";
                                         const st = mapDatiStatus(snapState.status, snapState.note ?? s.error_msg);
+                                        const trendDir = String(s.trend_dir ?? "").toLowerCase();
+                                        const trendArrow = trendDir === "up"
+                                          ? "↑"
+                                          : trendDir === "down"
+                                            ? "↓"
+                                            : trendDir === "flat"
+                                              ? "↔↔"
+                                              : "";
+                                        const trendColor = trendDir === "up" ? "#4ade80" : trendDir === "down" ? "#f87171" : "#888";
+                                        const trendNote = (s.trend_note && String(s.trend_note).trim()) ? String(s.trend_note) : "trend non disponibile";
                                         const ivC = s.atm_iv
                                           ? "#4ade80"
                                           : (isPreMrktError(s.error_msg) || isNoMrktError(s.error_msg) ? "#fbbf24" : "#f87171");
@@ -3228,7 +3240,13 @@ export default function App() {
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_theta, 4)}</td>
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_vega, 4)}</td>
                                             <td style={{padding:"4px 8px"}}>
-                                              <span style={{color: st.color, fontWeight:700}} title={hasErr ? explainDatiError(snapState.note ?? s.error_msg) : "dati derivati completi"}>{st.label}</span>
+                                              <span
+                                                style={{display:"inline-flex", alignItems:"center", gap:4, color: st.color, fontWeight:700}}
+                                                title={`${hasErr ? explainDatiError(snapState.note ?? s.error_msg) : "dati derivati completi"} | ${trendNote}`}
+                                              >
+                                                {trendArrow && <span style={{color: trendColor, fontWeight:700}}>{trendArrow}</span>}
+                                                <span>{st.label}</span>
+                                              </span>
                                             </td>
                                           </tr>
                                         );

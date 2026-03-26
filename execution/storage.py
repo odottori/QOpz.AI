@@ -417,6 +417,25 @@ def init_execution_schema() -> None:
             )
             """
         )
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS symbol_snapshot_history (
+                snapshot_id     VARCHAR PRIMARY KEY,
+                symbol          VARCHAR,
+                profile         VARCHAR,
+                run_date        VARCHAR,
+                updated_at      VARCHAR,
+                status          VARCHAR,
+                underlying      DOUBLE,
+                atm_strike      DOUBLE,
+                atm_iv          DOUBLE,
+                greeks_complete INTEGER,
+                contracts_count INTEGER,
+                error_msg       VARCHAR,
+                iv_source       VARCHAR
+            )
+            """
+        )
 
         try:
             con.close()
@@ -453,18 +472,27 @@ def save_symbol_snapshots(snapshots: list[dict], profile: str) -> None:
             return False
         return ("PRE-MKT" not in txt) and ("NO MRKT" not in txt)
 
-    def _snapshot_is_ok(row: dict[str, Any], *, incoming: bool) -> bool:
+    def _snapshot_state(row: dict[str, Any], *, incoming: bool) -> str:
         err_key = "error" if incoming else "error_msg"
         price_key = "underlying_price" if incoming else "underlying"
         err = str(row.get(err_key) or "").strip()
         if _is_blocking_snapshot_error(err):
-            return False
+            return "error"
         has_chain = _to_int(row.get("contracts_count")) > 0
         has_price = _to_float(row.get(price_key)) > 0.0
         has_strike = _to_float(row.get("atm_strike")) > 0.0
         has_iv = _to_float(row.get("atm_iv")) > 0.0
         has_greeks = _to_int(row.get("greeks_complete")) >= 4
-        return has_chain and has_price and has_strike and has_iv and has_greeks
+        if has_chain and not has_greeks:
+            return "partial"
+        if not has_chain:
+            return "error"
+        if has_price and has_strike and has_iv and has_greeks:
+            return "ok"
+        return "partial"
+
+    def _snapshot_is_ok(row: dict[str, Any], *, incoming: bool) -> bool:
+        return _snapshot_state(row, incoming=incoming) == "ok"
 
     init_execution_schema()
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -499,6 +527,32 @@ def save_symbol_snapshots(snapshots: list[dict], profile: str) -> None:
             sym = str(s.get("symbol") or "").upper()
             if not sym:
                 continue
+            incoming_state = _snapshot_state(s, incoming=True)
+            hist_now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            con.execute(
+                """
+                INSERT INTO symbol_snapshot_history
+                  (snapshot_id, symbol, profile, run_date, updated_at, status,
+                   underlying, atm_strike, atm_iv, greeks_complete, contracts_count,
+                   error_msg, iv_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    str(uuid.uuid4()),
+                    sym,
+                    profile,
+                    run_date,
+                    hist_now,
+                    incoming_state,
+                    s.get("underlying_price"),
+                    s.get("atm_strike"),
+                    s.get("atm_iv"),
+                    s.get("greeks_complete", 0),
+                    s.get("contracts_count", 0),
+                    s.get("error"),
+                    s.get("iv_source", "ibkr"),
+                ],
+            )
             existing = existing_by_symbol.get(sym)
             existing_same_day = bool(existing and str(existing.get("run_date") or "") == run_date)
             keep_existing = bool(
@@ -576,7 +630,71 @@ def list_symbol_snapshots(profile: str) -> list[dict]:
                 "atm_iv","atm_call_iv","atm_put_iv","iv_source",
                 "atm_delta","atm_gamma","atm_theta","atm_vega",
                 "greeks_complete","contracts_count","error_msg"]
-        return [dict(zip(cols, r)) for r in rows]
+        items = [dict(zip(cols, r)) for r in rows]
+
+        def _to_float(v: Any) -> float:
+            try:
+                return float(v or 0.0)
+            except Exception:
+                return 0.0
+
+        def _to_int(v: Any) -> int:
+            try:
+                return int(v or 0)
+            except Exception:
+                return 0
+
+        def _quality_score(status: str, underlying: Any, strike: Any, iv: Any, greeks: Any, contracts: Any) -> int:
+            rank = 2 if status == "ok" else (1 if status == "partial" else 0)
+            score = rank * 100
+            score += min(4, max(0, _to_int(greeks))) * 5
+            score += 1 if _to_float(underlying) > 0 else 0
+            score += 1 if _to_float(strike) > 0 else 0
+            score += 1 if _to_float(iv) > 0 else 0
+            score += 1 if _to_int(contracts) > 0 else 0
+            return score
+
+        for item in items:
+            sym = str(item.get("symbol") or "").upper()
+            rdate = str(item.get("run_date") or "")
+            if not sym or not rdate:
+                item["trend_dir"] = "flat"
+                item["trend_note"] = "trend non disponibile"
+                continue
+
+            hist = con.execute(
+                """
+                SELECT status, underlying, atm_strike, atm_iv, greeks_complete, contracts_count, updated_at
+                FROM symbol_snapshot_history
+                WHERE profile = ? AND symbol = ? AND run_date = ?
+                ORDER BY updated_at DESC
+                LIMIT 2
+                """,
+                [profile, sym, rdate],
+            ).fetchall()
+            if len(hist) < 2:
+                item["trend_dir"] = None
+                item["trend_note"] = "prima rilevazione"
+                continue
+
+            cur = hist[0]
+            prev = hist[1]
+            cur_score = _quality_score(str(cur[0] or ""), cur[1], cur[2], cur[3], cur[4], cur[5])
+            prev_score = _quality_score(str(prev[0] or ""), prev[1], prev[2], prev[3], prev[4], prev[5])
+            if cur_score > prev_score:
+                trend_dir = "up"
+            elif cur_score < prev_score:
+                trend_dir = "down"
+            else:
+                trend_dir = "flat"
+            item["trend_dir"] = trend_dir
+            item["trend_note"] = (
+                "invariato"
+                if trend_dir == "flat"
+                else f"{str(prev[0] or 'n/a')} -> {str(cur[0] or 'n/a')}"
+            )
+
+        return items
     except Exception as exc:
         logger.warning("list_symbol_snapshots error: %s", exc)
         return []
