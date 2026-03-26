@@ -428,23 +428,90 @@ def init_execution_schema() -> None:
 def save_symbol_snapshots(snapshots: list[dict], profile: str) -> None:
     """Upsert per-symbol IV/greeks snapshot into symbol_snapshot_latest.
 
-    Un record per simbolo — sovrascrive sempre (ultima run vince).
+    Operative guardrail:
+    - same run_date: no intraday regression (keep last-good symbol snapshot)
+    - new run_date: latest run wins
     """
     if not snapshots:
         return
+
+    def _to_float(v: Any) -> float:
+        try:
+            return float(v or 0.0)
+        except Exception:
+            return 0.0
+
+    def _to_int(v: Any) -> int:
+        try:
+            return int(v or 0)
+        except Exception:
+            return 0
+
+    def _is_blocking_snapshot_error(msg: Any) -> bool:
+        txt = str(msg or "").strip().upper()
+        if not txt:
+            return False
+        return ("PRE-MKT" not in txt) and ("NO MRKT" not in txt)
+
+    def _snapshot_is_ok(row: dict[str, Any], *, incoming: bool) -> bool:
+        err_key = "error" if incoming else "error_msg"
+        price_key = "underlying_price" if incoming else "underlying"
+        err = str(row.get(err_key) or "").strip()
+        if _is_blocking_snapshot_error(err):
+            return False
+        has_chain = _to_int(row.get("contracts_count")) > 0
+        has_price = _to_float(row.get(price_key)) > 0.0
+        has_strike = _to_float(row.get("atm_strike")) > 0.0
+        has_iv = _to_float(row.get("atm_iv")) > 0.0
+        has_greeks = _to_int(row.get("greeks_complete")) >= 4
+        return has_chain and has_price and has_strike and has_iv and has_greeks
+
     init_execution_schema()
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     run_date = now[:10]
     source_mode = os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
     con = _connect()
     try:
+        existing_rows = con.execute(
+            """
+            SELECT symbol, run_date, underlying, atm_strike, atm_iv,
+                   greeks_complete, contracts_count, error_msg
+            FROM symbol_snapshot_latest
+            WHERE profile = ?
+            """,
+            [profile],
+        ).fetchall()
+        existing_by_symbol: dict[str, dict[str, Any]] = {}
+        for r in existing_rows:
+            existing_by_symbol[str(r[0]).upper()] = {
+                "symbol": r[0],
+                "run_date": r[1],
+                "underlying": r[2],
+                "atm_strike": r[3],
+                "atm_iv": r[4],
+                "greeks_complete": r[5],
+                "contracts_count": r[6],
+                "error_msg": r[7],
+            }
+
         current_symbols: set[str] = set()
         for s in snapshots:
             sym = str(s.get("symbol") or "").upper()
             if not sym:
                 continue
+            existing = existing_by_symbol.get(sym)
+            existing_same_day = bool(existing and str(existing.get("run_date") or "") == run_date)
+            keep_existing = bool(
+                existing_same_day
+                and existing is not None
+                and _snapshot_is_ok(existing, incoming=False)
+                and (not _snapshot_is_ok(s, incoming=True))
+            )
             current_symbols.add(sym)
-            # iv_source: ibkr se impliedVolatility restituita da IBKR, bs se calcolata
+            if keep_existing:
+                # Preserve last-good snapshot for this symbol within the same day.
+                continue
+
             iv_source = s.get("iv_source", "ibkr")
             con.execute(
                 """
@@ -466,13 +533,18 @@ def save_symbol_snapshots(snapshots: list[dict], profile: str) -> None:
                     s.get("error"), _SOURCE_SYSTEM, source_mode,
                 ],
             )
-        # Mantieni "latest" coerente con l'ultima run: rimuovi simboli stale
-        # dello stesso profilo non presenti nell'ultimo batch salvato.
+
+        # Keep same-day symbols even if they are missing in the latest batch.
+        for sym, prev in existing_by_symbol.items():
+            if str(prev.get("run_date") or "") == run_date:
+                current_symbols.add(sym)
+
+        # Cleanup only current day set for this profile.
         if current_symbols:
             placeholders = ",".join(["?"] * len(current_symbols))
             con.execute(
-                f"DELETE FROM symbol_snapshot_latest WHERE profile = ? AND symbol NOT IN ({placeholders})",
-                [profile, *sorted(current_symbols)],
+                f"DELETE FROM symbol_snapshot_latest WHERE profile = ? AND run_date = ? AND symbol NOT IN ({placeholders})",
+                [profile, run_date, *sorted(current_symbols)],
             )
     except Exception as exc:
         logger.warning("save_symbol_snapshots error: %s", exc)
