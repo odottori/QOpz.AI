@@ -250,6 +250,29 @@ type RegimeCurrentResponse = {
   regime_pct: { NORMAL: number; CAUTION: number; SHOCK: number };
   last_scan_ts: string | null; n_recent: number; source: string;
 };
+type RegimeSourceInfo = {
+  sample_count: number;
+  regime: string;
+  regime_counts: { NORMAL: number; CAUTION: number; SHOCK: number };
+  regime_pct: { NORMAL: number; CAUTION: number; SHOCK: number };
+  last_ts: string | null;
+  usable: boolean;
+};
+type RegimeContextResponse = {
+  ok: boolean;
+  window: number;
+  sources: {
+    opportunity: RegimeSourceInfo;
+    universe: RegimeSourceInfo;
+    paper_trade: RegimeSourceInfo;
+  };
+  resolved: {
+    source: "opportunity" | "universe" | "paper_trade" | "none";
+    regime: string;
+    sample_count: number;
+    rationale: string;
+  };
+};
 type EquityPoint = { date: string; equity: number };
 type EquityHistoryResponse = {
   ok: boolean; profile: string; n_points: number;
@@ -904,6 +927,7 @@ export default function App() {
   const [posStrategyFilter, setPosStrategyFilter] = useState<string>("tutte");
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
+  const [regimeContext, setRegimeContext] = useState<RegimeContextResponse | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
   const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
   const [activityStream, setActivityStream] = useState<ActivityStreamResponse | null>(null);
@@ -1358,6 +1382,7 @@ export default function App() {
       void doFetchEquityHistory();
       void doFetchSysStatus();
       void doFetchRegimeCurrent();
+      void doFetchRegimeContext();
       void doFetchExitCandidates();
       void doFetchActivityStream();
       void doFetchSysLog();
@@ -1641,6 +1666,14 @@ export default function App() {
       setRegimeCurrent(r);
       clearFetchErr("regime");
     } catch (e) { markFetchErr("regime"); }
+  }
+
+  async function doFetchRegimeContext() {
+    try {
+      const r = await apiJson<RegimeContextResponse>(`${API_BASE}/opz/regime/context?window=30`);
+      setRegimeContext(r);
+      clearFetchErr("regimeContext");
+    } catch (e) { markFetchErr("regimeContext"); }
   }
 
   async function doFetchEquityHistory() {
@@ -1991,6 +2024,13 @@ export default function App() {
   const premarketRegime = regimeCurrent?.regime ?? universeLatest?.regime ?? "UNKNOWN";
   const premarketScanAt = oppScanResult?.scan_ts ?? regimeCurrent?.last_scan_ts ?? universeLatest?.created_at_utc ?? null;
   const premarketSource = premarketUsesScanFull ? "scan_full" : (universeLatest?.source ?? "universe_latest");
+  const regimeSources = regimeContext?.sources ?? null;
+  const regimeResolved = regimeContext?.resolved ?? null;
+  const contextRows = [
+    { key: "universe", label: "Universe", info: regimeSources?.universe ?? null },
+    { key: "opportunity", label: "Opportunity", info: regimeSources?.opportunity ?? null },
+    { key: "paper_trade", label: "Paper trade", info: regimeSources?.paper_trade ?? null },
+  ];
   const pipelineRecords = universeLatest?.market_rows_available ?? 0;
   const pipelineBatch = universeLatest?.batch_id ?? "N/D";
   const pipelineLatencyState = fetchErrors.size > 0 ? "STALE" : "FRESH";
@@ -2290,6 +2330,7 @@ export default function App() {
     void doCheckIbkr(false);
     void doFetchSysStatus();
     void doFetchRegimeCurrent();
+    void doFetchRegimeContext();
     void doFetchEquityHistory();
     void doFetchExitCandidates();
     void doFetchActivityStream();
@@ -2304,6 +2345,7 @@ export default function App() {
     const id = window.setInterval(() => {
       void doCheckIbkr(false);   // stato IBKR passivo, senza reconnessioni automatiche
       void doFetchSysStatus();   // 1 query DuckDB — kill switch, kelly, data_mode
+      void doFetchRegimeContext(); // contesto regime per fonte (opportunity/universe/paper)
       void doFetchSessionStatus(); // stato scheduler sessioni
       void doFetchSessionLogs(); // storico sessioni → aggiorna card morning/EOD
       void doFetchControlStatus(); // observer + ibwr + control plane
@@ -3662,6 +3704,49 @@ export default function App() {
                         Perche bloccato: {briefingBlockReason}
                       </div>
                     )}
+                  </div>
+                  <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:8, marginBottom:10}}>
+                    {contextRows.map((row) => {
+                      const info = row.info;
+                      const reg = info?.regime ?? "UNKNOWN";
+                      const regColor = reg === "NORMAL" ? "#4ade80" : reg === "CAUTION" ? "#fbbf24" : reg === "SHOCK" ? "#f87171" : "#888";
+                      return (
+                        <div key={row.key} style={{border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", background:"rgba(255,255,255,0.02)"}}>
+                          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+                            <span style={{fontSize:"0.62rem", color:"#9ac4af", textTransform:"uppercase", letterSpacing:"0.05em"}}>{row.label}</span>
+                            <span style={{fontSize:"0.7rem", fontWeight:700, color:regColor}}>{reg}</span>
+                          </div>
+                          <div style={{display:"flex", gap:10, fontSize:"0.62rem", color:"var(--dim)"}}>
+                            <span>campioni <span className="sev-data">{info?.sample_count ?? 0}</span></span>
+                            <span>ult. {info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{marginBottom:10, border:"1px solid var(--border)", borderRadius:6, overflow:"hidden"}}>
+                    <div style={{display:"grid", gridTemplateColumns:"1.2fr 0.8fr 0.8fr 1fr", padding:"5px 8px", background:"rgba(255,255,255,0.03)", fontSize:"0.56rem", color:"#7c8f84", textTransform:"uppercase", letterSpacing:"0.04em"}}>
+                      <span>Fonte</span><span>Campioni</span><span>Regime</span><span>Ultimo ts</span>
+                    </div>
+                    {contextRows.map((row) => {
+                      const info = row.info;
+                      const reg = info?.regime ?? "UNKNOWN";
+                      const regColor = reg === "NORMAL" ? "#4ade80" : reg === "CAUTION" ? "#fbbf24" : reg === "SHOCK" ? "#f87171" : "#888";
+                      return (
+                        <div key={`${row.key}-ctx`} style={{display:"grid", gridTemplateColumns:"1.2fr 0.8fr 0.8fr 1fr", padding:"5px 8px", borderTop:"1px solid var(--border)", fontSize:"0.62rem", alignItems:"center"}}>
+                          <span className="sev-meta">{row.label}</span>
+                          <span className="sev-data">{info?.sample_count ?? 0}</span>
+                          <span style={{color:regColor, fontWeight:700}}>{reg}</span>
+                          <span className="sev-meta">{info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"}</span>
+                        </div>
+                      );
+                    })}
+                    <div style={{display:"grid", gridTemplateColumns:"1.2fr 0.8fr 0.8fr 1fr", padding:"6px 8px", borderTop:"1px solid var(--border)", background:"rgba(0,255,106,0.05)", fontSize:"0.64rem", alignItems:"center"}}>
+                      <span style={{fontWeight:700}}>Regime risolto</span>
+                      <span className="sev-data">{regimeResolved?.sample_count ?? 0}</span>
+                      <span className={sevClassForRegime(regimeResolved?.regime)} style={{fontWeight:700}}>{regimeResolved?.regime ?? premarketRegime}</span>
+                      <span className="sev-meta">{regimeResolved?.source ?? "none"}</span>
+                    </div>
                   </div>
                   <div className="lc-panel-title">Regime di mercato</div>
                   <div className={`lc-regime-big ${premarketRegime.toLowerCase() === "normal" ? "normal" : premarketRegime.toLowerCase() === "caution" ? "caution" : premarketRegime.toLowerCase() === "shock" ? "shock" : "unknown"}`}>

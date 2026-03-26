@@ -11,3 +11,10 @@ def opz_regime_current(window: int = 20):
     from api import opz_api as compat
 
     return compat.opz_regime_current(window)
+
+
+@router.get("/opz/regime/context")
+def opz_regime_context(window: int = 30):
+    from api import opz_api as compat
+
+    return compat.opz_regime_context(window)

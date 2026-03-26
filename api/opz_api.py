@@ -2678,6 +2678,125 @@ def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
     }
 
 
+def _build_regime_source_view(rows: list[tuple[Any, Any]]) -> Dict[str, Any]:
+    counts: dict[str, int] = {"NORMAL": 0, "CAUTION": 0, "SHOCK": 0}
+    last_ts: str | None = None
+
+    if rows:
+        ts_raw = rows[0][1]
+        if ts_raw is not None:
+            last_ts = ts_raw.isoformat() if hasattr(ts_raw, "isoformat") else str(ts_raw)
+
+    for row in rows:
+        lbl = str(row[0]).strip().upper()
+        if lbl in counts:
+            counts[lbl] += 1
+
+    sample_count = sum(counts.values())
+    regime = max(counts, key=lambda k: counts[k]) if sample_count > 0 else "UNKNOWN"
+    regime_pct = {
+        k: round(v / sample_count * 100, 1) if sample_count > 0 else 0.0
+        for k, v in counts.items()
+    }
+
+    return {
+        "sample_count": sample_count,
+        "regime": regime,
+        "regime_counts": counts,
+        "regime_pct": regime_pct,
+        "last_ts": last_ts,
+        "usable": sample_count > 0,
+    }
+
+
+def opz_regime_context(window: int = 30) -> Dict[str, Any]:
+    """
+    Contesto regime per sorgente (Universe / Opportunity / Paper trade).
+
+    Restituisce campioni per fonte + regime risolto con priorita:
+      1) opportunity_candidates
+      2) universe_scan_batches
+      3) paper_trades
+    """
+    n = max(1, min(int(window), 200))
+    cand_rows: list[tuple[Any, Any]] = []
+    uni_rows: list[tuple[Any, Any]] = []
+    trade_rows: list[tuple[Any, Any]] = []
+
+    try:
+        with _db_connect_ro() as con:
+            try:
+                cand_rows = con.execute(
+                    """
+                    SELECT regime, scan_ts
+                    FROM opportunity_candidates
+                    WHERE regime IS NOT NULL
+                    ORDER BY scan_ts DESC
+                    LIMIT ?
+                    """,
+                    (n,),
+                ).fetchall()
+            except Exception:
+                cand_rows = []
+            try:
+                uni_rows = con.execute(
+                    """
+                    SELECT regime, created_at
+                    FROM universe_scan_batches
+                    WHERE regime IS NOT NULL
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (n,),
+                ).fetchall()
+            except Exception:
+                uni_rows = []
+            try:
+                trade_rows = con.execute(
+                    """
+                    SELECT regime_at_entry, entry_ts_utc
+                    FROM paper_trades
+                    WHERE regime_at_entry IS NOT NULL
+                    ORDER BY entry_ts_utc DESC
+                    LIMIT ?
+                    """,
+                    (n,),
+                ).fetchall()
+            except Exception:
+                trade_rows = []
+    except Exception as exc:
+        logger.debug("opz_regime_context: DB unavailable - %s", exc)
+
+    sources = {
+        "opportunity": _build_regime_source_view(cand_rows),
+        "universe": _build_regime_source_view(uni_rows),
+        "paper_trade": _build_regime_source_view(trade_rows),
+    }
+
+    resolved_source = "none"
+    resolved_regime = "UNKNOWN"
+    resolved_samples = 0
+    for src in ("opportunity", "universe", "paper_trade"):
+        info = sources[src]
+        if int(info.get("sample_count") or 0) > 0:
+            resolved_source = src
+            resolved_regime = str(info.get("regime") or "UNKNOWN")
+            resolved_samples = int(info.get("sample_count") or 0)
+            break
+
+    return {
+        "ok": True,
+        "window": n,
+        "sources": sources,
+        "resolved": {
+            "source": resolved_source,
+            "regime": resolved_regime,
+            "sample_count": resolved_samples,
+            "rationale": "priority: opportunity > universe > paper_trade",
+        },
+    }
+
+
 def _build_history_readiness(profile: str = "paper") -> HistoryReadinessOut:
     return cast(
         HistoryReadinessOut,
