@@ -121,8 +121,16 @@ def opz_data_refresh(
     today = date.today().isoformat()
     results: Dict[str, Any] = {}
 
-    def _rec(feed: str, t0: datetime, t1: datetime, n_in: int, n_out: int,
-             status: str, error: Optional[str] = None) -> None:
+    def _rec(
+        feed: str,
+        t0: datetime,
+        t1: datetime,
+        n_in: int,
+        n_out: int,
+        status: str,
+        error: Optional[str] = None,
+        symbols_count: Optional[int] = None,
+    ) -> None:
         try:
             record_ingestion_run(
                 profile=profile, feed=feed, run_date=today,
@@ -130,7 +138,8 @@ def opz_data_refresh(
                 finished_at=t1.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
                 duration_ms=int((t1 - t0).total_seconds() * 1000),
                 status=status, records_in=n_in, records_out=n_out,
-                symbols_count=n_in, error_msg=error,
+                symbols_count=(n_in if symbols_count is None else symbols_count),
+                error_msg=error,
             )
         except Exception as exc:
             import logging
@@ -386,7 +395,7 @@ def opz_data_refresh(
             and not _is_blocking_snapshot_error(s.get("error"))
         )
         if with_chain <= 0:
-            _rec("ibkr_greeks", t0, t1, 0, 0, "error", "Catene opzioni assenti")
+            _rec("ibkr_greeks", t0, t1, 0, 0, "error", "Catene opzioni assenti", symbols_count=0)
         else:
             greek_status = "ok" if symbols_greeks_ok > 0 else "error"
             greek_errs: list[str] = []
@@ -398,10 +407,11 @@ def opz_data_refresh(
                 "ibkr_greeks",
                 t0,
                 t1,
-                with_chain,
+                (symbols_greeks_ok if greek_status == "ok" else with_chain),
                 symbols_greeks_ok,
                 greek_status,
                 "; ".join(_unique_errs(greek_errs, 3)) if greek_errs else None,
+                symbols_count=symbols_greeks_ok,
             )
 
         t2 = datetime.now(timezone.utc)

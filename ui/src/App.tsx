@@ -421,6 +421,21 @@ type IbwrServiceResponse = {
 
 type CenterPhase = "ante" | "op" | "post";
 type AnteSubTab = "dati" | "analisi" | "briefing";
+type AnalysisLevel = "L1" | "L2" | "L3";
+type DataBlockKey = "ibkr" | "derivati" | "calendario" | "yfinance";
+type DataBlockStatus = "ok" | "partial" | "error" | null;
+
+const ANALYSIS_REQUIREMENTS: Record<AnalysisLevel, DataBlockKey[]> = {
+  L1: ["ibkr", "derivati"],
+  L2: ["ibkr", "derivati", "calendario"],
+  L3: ["ibkr", "derivati", "calendario", "yfinance"],
+};
+
+const DATA_FEED_GROUPS: Record<Exclude<DataBlockKey, "derivati">, string[]> = {
+  ibkr: ["ibkr_prices", "ibkr_chain", "ibkr_greeks", "ibkr_account", "ibkr_positions"],
+  yfinance: ["yfinance_iv_history", "yfinance_macro", "yfinance_exdiv"],
+  calendario: ["yfinance_calendar"],
+};
 type OpSubTab = "trading" | "wheel" | "metriche" | "backtest";
 type PostSubTab = "chiusura" | "report";
 type UniverseSubTab = "titoli" | "indici" | "opzioni" | "ciclo" | "palinsesto";
@@ -1008,6 +1023,31 @@ export default function App() {
   };
   const [symbolSnaps, setSymbolSnaps] = useState<SymbolSnap[]>([]);
   const REFRESH_CONTROLS_ENABLED = false; // flusso operativo auto on-connect + hard reload (Ctrl+F5)
+
+  const deriveSnapState = (s: SymbolSnap): { status: "ok" | "partial" | "error"; note: string | null } => {
+    const errRaw = String(s.error_msg ?? "").trim();
+    if (isBlockingDatiError(errRaw)) return { status: "error", note: errRaw || null };
+    const hasChain = Number(s.contracts_count ?? 0) > 0;
+    const greekCount = Number(s.greeks_complete ?? 0);
+    const hasUnderlying = Number(s.underlying ?? 0) > 0;
+    const hasStrike = Number(s.atm_strike ?? 0) > 0;
+    const hasIv = Number(s.atm_iv ?? 0) > 0;
+    if (hasChain && greekCount < 4) {
+      const prefix = errRaw ? `${errRaw} | ` : "";
+      return { status: "partial", note: `${prefix}Greche incomplete ${greekCount}/4` };
+    }
+    if (!hasChain) {
+      const prefix = errRaw ? `${errRaw} | ` : "";
+      return { status: "error", note: `${prefix}Catena opzioni assente` };
+    }
+    const rowComplete = hasUnderlying && hasStrike && hasIv && greekCount >= 4;
+    if (rowComplete) {
+      // PRE-MKT/NO-MRKT resta informativo, ma la riga e operativamente completa.
+      return { status: "ok", note: errRaw || null };
+    }
+    if (errRaw) return { status: "partial", note: errRaw };
+    return { status: "partial", note: "Dati derivati incompleti" };
+  };
 
   const parsedPayload = useMemo(() => {
     try {
@@ -1771,6 +1811,11 @@ export default function App() {
   }
 
   async function doBriefingGenerate() {
+    if (!briefingReady) {
+      setError(`Briefing bloccato: ${briefingBlockReason || "prerequisiti DATI/ANALISI non soddisfatti"}`);
+      setMessage("");
+      return;
+    }
     setBriefingBusy(true);
     setMessage("Generazione briefing in corso... (30-60s)");
     try {
@@ -1997,6 +2042,58 @@ export default function App() {
     : premarketUniversePrimary
       ? toTen(premarketUniversePrimary.score)
       : null;
+  const summarizeFeedBlock = (feeds: string[]): { status: DataBlockStatus; total: number; ok: number; partial: number; error: number } => {
+    const rows = feedLog.filter((r) => feeds.includes(r.feed));
+    const total = rows.length;
+    const ok = rows.filter((r) => r.status === "ok").length;
+    const error = rows.filter((r) => r.status === "error").length;
+    const partial = rows.filter((r) => r.status === "partial").length;
+    const status: DataBlockStatus = total === 0
+      ? null
+      : error === 0 && partial === 0
+        ? "ok"
+        : ok === 0 && partial === 0
+          ? "error"
+          : "partial";
+    return { status, total, ok, partial, error };
+  };
+  const ibkrBlock = summarizeFeedBlock(DATA_FEED_GROUPS.ibkr);
+  const yfinanceBlock = summarizeFeedBlock(DATA_FEED_GROUPS.yfinance);
+  const calendarioBlock = summarizeFeedBlock(DATA_FEED_GROUPS.calendario);
+  const derivatiSnapStates = symbolSnaps.map(deriveSnapState);
+  const derivatiOkCount = derivatiSnapStates.filter((s) => s.status === "ok").length;
+  const derivatiPartialCount = derivatiSnapStates.filter((s) => s.status === "partial").length;
+  const derivatiErrorCount = derivatiSnapStates.filter((s) => s.status === "error").length;
+  const derivatiBlockStatus: DataBlockStatus = symbolSnaps.length === 0
+    ? null
+    : derivatiOkCount > 0
+      ? "ok"
+      : "error";
+  const dataBlockStatusMap: Record<DataBlockKey, DataBlockStatus> = {
+    ibkr: ibkrBlock.status,
+    yfinance: yfinanceBlock.status,
+    calendario: calendarioBlock.status,
+    derivati: derivatiBlockStatus,
+  };
+  const analysisLevel: AnalysisLevel = (() => {
+    const mode = tierInfo?.active_mode;
+    if (mode === "ADVANCED" || mode === "MEDIUM") return "L3";
+    if (mode === "SMALL") return "L2";
+    return "L1";
+  })();
+  const briefingRequiredBlocks = ANALYSIS_REQUIREMENTS[analysisLevel];
+  const briefingBlockers = briefingRequiredBlocks.filter((key) => dataBlockStatusMap[key] !== "ok");
+  const briefingReadyByData = briefingBlockers.length === 0;
+  const dataOkCount = (Object.values(dataBlockStatusMap).filter((v) => v === "ok")).length;
+  const strategicDirection = premarketRegime === "NORMAL"
+    ? "operativo pieno"
+    : premarketRegime === "CAUTION"
+      ? "operativo ridotto 50%"
+      : premarketRegime === "SHOCK"
+        ? "operativita sospesa"
+        : "in attesa regime";
+  const strategicChoiceCode = premarketRegime === "NORMAL" ? "1" : premarketRegime === "CAUTION" ? "2" : premarketRegime === "SHOCK" ? "3" : "-";
+  const strategicRationale = `a,b,c=regime:${premarketRegime}|top:${premarketTopScorePct != null ? premarketTopScorePct.toFixed(0) : "N/D"}|ready:${premarketReadyCount}; x,y,z=tier:${tierInfo?.active_mode ?? "N/D"}|data_ok:${dataOkCount}/4|source:${premarketSource}; k1=regime->sizing, k2=gate briefing; output=1(full),2(reduced),3(stop); scelgo ${strategicChoiceCode} perche ${strategicDirection}`;
   const selectedScanCandidate: ScanFullCandidate | null =
     scanCandidates.find((c) => `${c.symbol}::${c.strategy}::${c.expiry}` === selectedScanKey) ?? scanCandidates[0] ?? null;
   const nonOptionsRows = universeSubTab === "opzioni" ? [] : rowsByTab[universeSubTab as Exclude<UniverseSubTab, "opzioni">];
@@ -2007,7 +2104,7 @@ export default function App() {
     source === "ocr" ? "field-ocr" : source === "api" ? "field-api" : ""
   );
 
-  const apiOnline = Boolean(!error && stateJson && paperSummary);
+  const apiOnline = Boolean((sysStatus?.api_online ?? null) ?? (stateJson && paperSummary));
   const hasPaperData = Boolean((paperSummary?.equity_points ?? 0) > 0 || (paperSummary?.trades ?? 0) > 0);
   const executionConfigReady = Boolean(symbol.trim() && strategy.trim() && parsedPayload && !payloadJsonError);
 
@@ -2133,6 +2230,12 @@ export default function App() {
     : !hasRealData
       ? "data mode non operativo"
       : `stato DATI ${stepDataStatusLabel}`;
+  const briefingReady = datiOpsReady && briefingReadyByData;
+  const briefingBlockReason = !datiOpsReady
+    ? datiBlockReason
+    : briefingBlockers.length > 0
+      ? `blocchi non OK: ${briefingBlockers.join(", ")}`
+      : "";
 
   useEffect(() => {
     if (!datiOpsReady && (centerPhase !== "ante" || anteSubTab !== "dati")) {
@@ -2981,42 +3084,14 @@ export default function App() {
                       // ── Blocco 4: Dati derivati (symbol snapshots) ─────────────────
                       if (feed === "derivati") {
                         const hasSnaps = symbolSnaps.length > 0;
-                        const deriveSnapState = (s: SymbolSnap): { status: "ok" | "partial" | "error"; note: string | null } => {
-                          const errRaw = String(s.error_msg ?? "").trim();
-                          if (isBlockingDatiError(errRaw)) return { status: "error", note: errRaw || null };
-                          const hasChain = Number(s.contracts_count ?? 0) > 0;
-                          const greekCount = Number(s.greeks_complete ?? 0);
-                          const hasUnderlying = Number(s.underlying ?? 0) > 0;
-                          const hasStrike = Number(s.atm_strike ?? 0) > 0;
-                          const hasIv = Number(s.atm_iv ?? 0) > 0;
-                          if (hasChain && greekCount < 4) {
-                            const prefix = errRaw ? `${errRaw} | ` : "";
-                            return { status: "partial", note: `${prefix}Greche incomplete ${greekCount}/4` };
-                          }
-                          if (!hasChain) {
-                            const prefix = errRaw ? `${errRaw} | ` : "";
-                            return { status: "error", note: `${prefix}Catena opzioni assente` };
-                          }
-                          const rowComplete = hasUnderlying && hasStrike && hasIv && greekCount >= 4;
-                          if (rowComplete) {
-                            // PRE-MKT/NO-MRKT resta informativo, ma la riga è operativamente completa.
-                            return { status: "ok", note: errRaw || null };
-                          }
-                          if (errRaw) return { status: "partial", note: errRaw };
-                          return { status: "partial", note: "Dati derivati incompleti" };
-                        };
-                        const snapStates = symbolSnaps.map(deriveSnapState);
-                        const snapsOk = snapStates.filter(s => s.status === "ok").length;
-                        const snapsWarn = snapStates.filter(s => s.status === "partial").length;
-                        const snapsErr = snapStates.filter(s => s.status === "error").length;
+                        const snapStates = derivatiSnapStates;
+                        const snapsOk = derivatiOkCount;
+                        const snapsWarn = derivatiPartialCount;
+                        const snapsErr = derivatiErrorCount;
                         const ibkrCount = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "ibkr").length;
                         const yfinCount = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "yfinance").length;
                         const bsCount   = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "bs").length;
-                        const blockStatus = !hasSnaps
-                          ? null
-                          : snapsOk > 0
-                            ? "ok"
-                            : "error";
+                        const blockStatus = derivatiBlockStatus;
                         const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : "#555";
                         const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : "—";
                         const lastUpd = symbolSnaps[0]?.updated_at ? fmtHm(symbolSnaps[0].updated_at) : "—";
@@ -3482,6 +3557,10 @@ export default function App() {
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
+                  <div style={{marginBottom:8, border:"1px solid #0ea5e9", borderRadius:6, padding:"6px 8px", background:"rgba(14,165,233,0.10)"}}>
+                    <div style={{fontSize:"0.6rem", color:"#7dd3fc", textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:700}}>Decision Engine (ANALISI)</div>
+                    <div style={{fontSize:"0.62rem", color:"#cfefff"}}>Elabora DATI + regole modello e produce scelta strategica motivata (non esecutiva).</div>
+                  </div>
                   {/* ── micro-card strip ── */}
                   {(() => {
                     const mc = (lbl: string, val: string, col: string, tip?: string) => (
@@ -3506,6 +3585,43 @@ export default function App() {
                       </div>
                     );
                   })()}
+                  <div style={{marginBottom:10, border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", background:"rgba(0,255,106,0.03)"}}>
+                    <div style={{display:"flex", justifyContent:"space-between", gap:8, alignItems:"center", marginBottom:6}}>
+                      <div style={{fontSize:"0.62rem", color:"#9ac4af", textTransform:"uppercase", letterSpacing:"0.06em"}}>
+                        Strategia modello · {analysisLevel}
+                      </div>
+                      <div style={{fontSize:"0.62rem", fontWeight:700, color:briefingReady ? "#4ade80" : "#fbbf24"}}>
+                        {briefingReady ? "briefing ready" : "briefing in attesa"}
+                      </div>
+                    </div>
+                    <div style={{fontSize:"0.68rem", color:"#d0e8dc", marginBottom:6}}>
+                      Direzione: <span style={{fontWeight:700}}>{strategicDirection}</span>
+                      {" · "}regime {premarketRegime}
+                      {" · "}top score {premarketTopScorePct != null ? `${premarketTopScorePct.toFixed(0)}/100` : "N/D"}
+                      {" · "}pronti {premarketReadyCount}
+                    </div>
+                    <div style={{fontSize:"0.56rem", color:"#88aa99", marginBottom:6}}>
+                      {strategicRationale}
+                    </div>
+                    <div style={{display:"flex", gap:4, flexWrap:"wrap", marginBottom:4}}>
+                      {briefingRequiredBlocks.map((key) => {
+                        const st = dataBlockStatusMap[key];
+                        const col = st === "ok" ? "#4ade80" : st === "partial" ? "#fbbf24" : "#f87171";
+                        const label = st === "ok" ? "OK" : st === "partial" ? "PARZ" : "KO";
+                        const pretty = key === "ibkr" ? "IBKR" : key === "derivati" ? "DERIVATI" : key === "calendario" ? "CALENDAR" : "YF";
+                        return (
+                          <div key={key} style={{fontSize:"0.58rem", border:`1px solid ${col}`, borderRadius:4, padding:"2px 6px", color:col, background:`${col}1a`}}>
+                            {pretty}: {label}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {!briefingReady && (
+                      <div style={{fontSize:"0.58rem", color:"#fbbf24"}}>
+                        Perche bloccato: {briefingBlockReason}
+                      </div>
+                    )}
+                  </div>
                   <div className="lc-panel-title">Regime di mercato</div>
                   <div className={`lc-regime-big ${premarketRegime.toLowerCase() === "normal" ? "normal" : premarketRegime.toLowerCase() === "caution" ? "caution" : premarketRegime.toLowerCase() === "shock" ? "shock" : "unknown"}`}>
                     {premarketRegime}
@@ -3618,10 +3734,14 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 5 — BRIEFING</span>
-                <span className="lc-step-sub">10 min prima del mercato</span>
+                <span className="lc-step-sub">Layer esecutivo/comunicazione dall'output ANALISI</span>
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
+                  <div style={{marginBottom:8, border:"1px solid #f59e0b", borderRadius:6, padding:"6px 8px", background:"rgba(245,158,11,0.10)"}}>
+                    <div style={{fontSize:"0.6rem", color:"#fcd34d", textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:700}}>Execution Brief (BRIEFING)</div>
+                    <div style={{fontSize:"0.62rem", color:"#ffe7b0"}}>Non ricalcola la strategia: valida prerequisiti OK, prepara checklist e comunicazione operativa.</div>
+                  </div>
                   {/* ── micro-card strip ── */}
                   {(() => {
                     const mc = (lbl: string, val: string, col: string, tip?: string) => (
@@ -3715,10 +3835,20 @@ export default function App() {
                       <span className="lc-check-name">Briefing disponibile</span>
                       <span className="lc-check-val">{briefingList.length > 0 ? `${briefingList.length} file` : "nessuno"}</span>
                     </li>
+                    <li className={`lc-check-item ${briefingReady ? "pass" : "warn"}`}>
+                      <span className="lc-check-icon">{briefingReady ? "✅" : "⚠️"}</span>
+                      <span className="lc-check-name">Prerequisiti briefing</span>
+                      <span className="lc-check-val">{briefingReady ? `OK (${analysisLevel})` : briefingBlockReason}</span>
+                    </li>
                     <li className={`lc-check-item ${premarketRegime === "NORMAL" ? "pass" : premarketRegime === "CAUTION" ? "warn" : "fail"}`}>
                       <span className="lc-check-icon">{premarketRegime === "NORMAL" ? "✅" : premarketRegime === "CAUTION" ? "⚠️" : "🛑"}</span>
                       <span className="lc-check-name">Regime del giorno</span>
                       <span className="lc-check-val">{premarketRegime} · sizing {premarketRegime === "NORMAL" ? "100%" : premarketRegime === "CAUTION" ? "50%" : "0%"}</span>
+                    </li>
+                    <li className={`lc-check-item ${briefingReady ? "pass" : "warn"}`}>
+                      <span className="lc-check-icon">{briefingReady ? "✅" : "⚠️"}</span>
+                      <span className="lc-check-name">Scelta strategica</span>
+                      <span className="lc-check-val">{`scelta ${strategicChoiceCode} · ${strategicDirection}`}</span>
                     </li>
                     <li className={`lc-check-item ${goGate?.pass ? "pass" : "warn"}`}>
                       <span className="lc-check-icon">{goGate?.pass ? "✅" : "⚠️"}</span>
@@ -3757,7 +3887,12 @@ export default function App() {
                         disabled={!apiOnline || (!briefingPlaying && briefingList.length === 0)}>
                         {briefingPlaying ? "■ STOP" : "▶ PLAY"}
                       </button>
-                      <button className="btn btn-ghost" onClick={() => void doBriefingGenerate()} disabled={briefingBusy || !apiOnline}>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => void doBriefingGenerate()}
+                        disabled={briefingBusy || !apiOnline || !briefingReady}
+                        title={!briefingReady ? `Briefing bloccato: ${briefingBlockReason}` : "Genera briefing"}
+                      >
                         {briefingBusy ? "..." : "⊕ Genera"}
                       </button>
                       <button className="btn btn-ghost" onClick={() => void doRunSession("morning")} disabled={sessionStatus?.running || !apiOnline}>
@@ -4187,25 +4322,25 @@ export default function App() {
                     return (
                       <>
                       <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
-                        <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                        <table style={{width:"100%", fontSize:"0.62rem", borderCollapse:"collapse"}}>
                           <thead>
-                            <tr style={{color:"#888", borderBottom:"1px solid #444"}}>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}
+                            <tr style={{borderBottom:"2px solid var(--border)"}}>
+                              <th style={{textAlign:"left", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>#</th>
+                              <th style={{textAlign:"left", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>Sym</th>
+                              <th style={{textAlign:"left", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}
                                 title="Struttura operativa">Str</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                              <th style={{textAlign:"right", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}
                                 title="Score composito 0–100. Min operativo: 50">Score</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                              <th style={{textAlign:"right", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}
                                 title="Spread bid-ask % del mid. 🟢≤5% 🟡5–10% 🔴>10%">Spr%</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                              <th style={{textAlign:"right", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}
                                 title="IV Rank percentile. 🔴<20 🟡20–30 🟢≥30">IVR%</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                              <th style={{textAlign:"right", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}
                                 title="Giorni alla scadenza. 🔴<14 o >60 🟡14–20 🟢20–55">DTE</th>
-                              <th style={{textAlign:"right", padding:"2px 4px"}}
+                              <th style={{textAlign:"right", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}
                                 title="Open Interest. 🔴<100 🟡100–500 🟢≥500">OI</th>
-                              <th style={{textAlign:"left", padding:"2px 4px"}}>Stato</th>
-                              <th style={{padding:"2px 4px"}}></th>
+                              <th style={{textAlign:"left", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>Stato</th>
+                              <th style={{padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -4226,13 +4361,13 @@ export default function App() {
                                   HEDGE_ACTIVE:  "Copertura attiva · protezione direzionale portafoglio",
                                 };
                                 return (
-                                  <tr key={i} style={{borderBottom:"1px solid #222",
-                                    background: isSelected ? "rgba(74,222,128,0.08)" : undefined}}>
-                                    <td style={{padding:"2px 4px", color:"#888"}}>#{i+1}</td>
-                                    <td style={{padding:"2px 4px", fontWeight:600}}>{c.symbol}</td>
-                                    <td style={{padding:"2px 4px", color:"#888"}}
+                                  <tr key={i} style={{borderBottom:"1px solid var(--border)",
+                                    background: isSelected ? "rgba(74,222,128,0.08)" : (i % 2 === 0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)")}}>
+                                    <td style={{padding:"4px 8px", color:"#888"}}>#{i+1}</td>
+                                    <td style={{padding:"4px 8px", fontWeight:600}}>{c.symbol}</td>
+                                    <td style={{padding:"4px 8px", color:"#888"}}
                                       title={stratTip[c.strategy ?? ""] ?? c.strategy ?? ""}>{c.strategy}</td>
-                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                    <td style={{padding:"4px 8px", textAlign:"right"}}>
                                       {c.scorePct !== undefined ? (
                                         <span className={c.scorePct >= 65 ? "sev-ok" : c.scorePct >= 50 ? "sev-warn" : "sev-error"}
                                           title={`${c.scorePct.toFixed(0)}/100 — min operativo 50`}>
@@ -4240,7 +4375,7 @@ export default function App() {
                                         </span>
                                       ) : "—"}
                                     </td>
-                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                    <td style={{padding:"4px 8px", textAlign:"right"}}>
                                       {c.spreadPct != null && c.spreadPct > 0 ? (
                                         <span style={{color: c.spreadPct > 10 ? "#f87171" : c.spreadPct > 5 ? "#fbbf24" : "#4ade80"}}
                                           title={`Spread ${c.spreadPct.toFixed(1)}% — soglia hard ≤10%`}>
@@ -4248,7 +4383,7 @@ export default function App() {
                                         </span>
                                       ) : <span style={{color:"var(--dim)"}} title="Dato non acquisito">—</span>}
                                     </td>
-                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                    <td style={{padding:"4px 8px", textAlign:"right"}}>
                                       {c.ivRankPct != null && c.ivRankPct > 0 ? (
                                         <span style={{color: c.ivRankPct < 20 ? "#f87171" : c.ivRankPct < 30 ? "#fbbf24" : "#4ade80"}}
                                           title={`IVR ${c.ivRankPct.toFixed(0)} — soglia hard ≥20`}>
@@ -4256,7 +4391,7 @@ export default function App() {
                                         </span>
                                       ) : <span style={{color:"var(--dim)"}} title="Dato non disponibile">—</span>}
                                     </td>
-                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                    <td style={{padding:"4px 8px", textAlign:"right"}}>
                                       {c.dte != null ? (
                                         <span style={{color: c.dte < 14 || c.dte > 60 ? "#f87171" : c.dte < 20 || c.dte > 55 ? "#fbbf24" : "#4ade80"}}
                                           title={`DTE ${c.dte} — range valido 14–60`}>
@@ -4264,7 +4399,7 @@ export default function App() {
                                         </span>
                                       ) : <span style={{color:"var(--dim)"}}>—</span>}
                                     </td>
-                                    <td style={{padding:"2px 4px", textAlign:"right"}}>
+                                    <td style={{padding:"4px 8px", textAlign:"right"}}>
                                       {c.openInterest != null ? (
                                         <span style={{color: c.openInterest < 100 ? "#f87171" : c.openInterest < 500 ? "#fbbf24" : "#4ade80"}}
                                           title={`OI ${c.openInterest.toLocaleString()} — soglia hard ≥100`}>
@@ -4272,8 +4407,8 @@ export default function App() {
                                         </span>
                                       ) : <span style={{color:"var(--dim)"}}>—</span>}
                                     </td>
-                                    <td style={{padding:"2px 4px"}}>{lcBadge(c.symbol ?? "", c.strategy ?? "")}</td>
-                                    <td style={{padding:"2px 2px"}}>
+                                    <td style={{padding:"4px 8px"}}>{lcBadge(c.symbol ?? "", c.strategy ?? "")}</td>
+                                    <td style={{padding:"4px 8px"}}>
                                       {(c.spreadPct == null || c.spreadPct === 0 || c.ivRankPct == null || c.ivRankPct === 0) ? (
                                         <span title="Dati incompleti — aggiorna scan"
                                           style={{fontSize:"0.6rem", color:"var(--amber)", padding:"1px 6px"}}>⚠</span>
@@ -4293,27 +4428,27 @@ export default function App() {
                                 );
                               })}
                               {deadRows.map((d, i) => (
-                                <tr key={`dead-${i}`} style={{borderBottom:"1px solid #1a1a1a", opacity:0.45}}>
-                                  <td style={{padding:"2px 4px", color:"#777"}}>—</td>
-                                  <td style={{padding:"2px 4px", color:"#777", fontWeight:600}}>{d.symbol}</td>
-                                  <td style={{padding:"2px 4px", color:"#888"}}>{d.strategy}</td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
+                                <tr key={`dead-${i}`} style={{borderBottom:"1px solid var(--border)", opacity:0.45, background: i % 2 === 0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)"}}>
+                                  <td style={{padding:"4px 8px", color:"#777"}}>—</td>
+                                  <td style={{padding:"4px 8px", color:"#777", fontWeight:600}}>{d.symbol}</td>
+                                  <td style={{padding:"4px 8px", color:"#888"}}>{d.strategy}</td>
+                                  <td style={{padding:"4px 8px", textAlign:"right", color:"#888"}}>
                                     {d.score > 0 ? d.score.toFixed(0) : "—"}
                                   </td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"#888"}}>
+                                  <td style={{padding:"4px 8px", textAlign:"right", color:"#888"}}>
                                     {d.spread_pct != null ? d.spread_pct.toFixed(1) : "—"}
                                   </td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"var(--dim)"}}>—</td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"var(--dim)"}}>—</td>
-                                  <td style={{padding:"2px 4px", textAlign:"right", color:"var(--dim)"}}>—</td>
-                                  <td style={{padding:"2px 4px"}}>
+                                  <td style={{padding:"4px 8px", textAlign:"right", color:"var(--dim)"}}>—</td>
+                                  <td style={{padding:"4px 8px", textAlign:"right", color:"var(--dim)"}}>—</td>
+                                  <td style={{padding:"4px 8px", textAlign:"right", color:"var(--dim)"}}>—</td>
+                                  <td style={{padding:"4px 8px"}}>
                                     <span style={{fontSize:"0.5rem", color:"#f87171", border:"1px solid #f8717130",
                                       borderRadius:2, padding:"0 3px"}}
                                       title={`Scomparso il ${d.last_seen} — era presente dal ${d.first_seen}`}>
                                       DEAD
                                     </span>
                                   </td>
-                                  <td style={{padding:"2px 4px"}}></td>
+                                  <td style={{padding:"4px 8px"}}></td>
                                 </tr>
                               ))}
                             </>)}
@@ -4569,15 +4704,15 @@ export default function App() {
                         )}
                         {/* tabella sempre visibile — header fissa, messaggio inline nel tbody */}
                         <div style={{overflowX:"auto", maxHeight:220, overflowY:"auto"}}>
-                          <table style={{width:"100%", fontSize:"0.68rem", borderCollapse:"collapse"}}>
+                          <table style={{width:"100%", fontSize:"0.62rem", borderCollapse:"collapse"}}>
                             <thead>
-                              <tr style={{color:"#888", borderBottom:"1px solid #444"}}>
-                                <th style={{textAlign:"left", padding:"2px 4px"}}>#</th>
-                                <th style={{textAlign:"left", padding:"2px 4px"}}>Sym</th>
-                                <th style={{textAlign:"left", padding:"2px 4px"}}>Str</th>
-                                <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL realizzato">PnL</th>
-                                <th style={{textAlign:"right", padding:"2px 4px"}} title="PnL %">%</th>
-                                <th style={{textAlign:"left", padding:"2px 4px"}}>
+                              <tr style={{borderBottom:"2px solid var(--border)"}}>
+                                <th style={{textAlign:"left", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>#</th>
+                                <th style={{textAlign:"left", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>Sym</th>
+                                <th style={{textAlign:"left", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>Str</th>
+                                <th style={{textAlign:"right", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}} title="PnL realizzato">PnL</th>
+                                <th style={{textAlign:"right", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}} title="PnL %">%</th>
+                                <th style={{textAlign:"left", padding:"4px 8px", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>
                                   {posOutcomeFilter === "aperti" ? "Entrata" : "Uscita"}
                                 </th>
                               </tr>
@@ -4602,17 +4737,17 @@ export default function App() {
                                     ? (t.entry_ts_utc?.slice(0,10) ?? "—")
                                     : (t.exit_ts_utc?.slice(0,10)  ?? "—");
                                   return (
-                                    <tr key={i} style={{borderBottom:"1px solid #222"}}>
-                                      <td style={{padding:"2px 4px", color:"#888"}}>#{i+1}</td>
-                                      <td style={{padding:"2px 4px", fontWeight:600}}>{t.symbol||"—"}</td>
-                                      <td style={{padding:"2px 4px", color:"#888", fontSize:"0.62rem"}}>{t.strategy||"—"}</td>
-                                      <td style={{padding:"2px 4px", textAlign:"right", color:pnlCol}}>
+                                    <tr key={i} style={{borderBottom:"1px solid var(--border)", background: i % 2 === 0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)"}}>
+                                      <td style={{padding:"4px 8px", color:"#888"}}>#{i+1}</td>
+                                      <td style={{padding:"4px 8px", fontWeight:600}}>{t.symbol||"—"}</td>
+                                      <td style={{padding:"4px 8px", color:"#888", fontSize:"0.62rem"}}>{t.strategy||"—"}</td>
+                                      <td style={{padding:"4px 8px", textAlign:"right", color:pnlCol}}>
                                         {pnl != null ? `${pnl >= 0 ? "+" : ""}${pnl.toFixed(0)}` : "—"}
                                       </td>
-                                      <td style={{padding:"2px 4px", textAlign:"right", color:pnlCol, fontSize:"0.62rem"}}>
+                                      <td style={{padding:"4px 8px", textAlign:"right", color:pnlCol, fontSize:"0.62rem"}}>
                                         {pnlPct != null ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%` : "—"}
                                       </td>
-                                      <td style={{padding:"2px 4px", color:"#777", fontSize:"0.62rem"}}>{dateVal}</td>
+                                      <td style={{padding:"4px 8px", color:"#777", fontSize:"0.62rem"}}>{dateVal}</td>
                                     </tr>
                                   );
                                 })
