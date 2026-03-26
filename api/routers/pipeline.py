@@ -1,14 +1,71 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from api.models import DemoPipelineAutoRequest, ScanFullRequest
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _unique_errs(items: list[str], limit: int = 3) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in items:
+        txt = str(raw or "").strip()
+        if not txt or txt in seen:
+            continue
+        seen.add(txt)
+        out.append(txt)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _yfinance_underlying_fallback(symbols: list[str]) -> tuple[dict[str, float], list[str]]:
+    """Best-effort fallback prezzo sottostante via yfinance (senza IV/greche)."""
+    prices: dict[str, float] = {}
+    errs: list[str] = []
+    try:
+        import yfinance as yf  # type: ignore
+    except Exception as exc:
+        return {}, [f"yfinance import: {type(exc).__name__}: {exc}"]
+
+    for s in symbols:
+        sym = str(s or "").strip().upper()
+        if not sym:
+            continue
+        try:
+            tkr = yf.Ticker(sym)
+            px = 0.0
+            try:
+                fi = getattr(tkr, "fast_info", None)
+                px = float(getattr(fi, "last_price", 0.0) or 0.0)
+            except Exception:
+                px = 0.0
+
+            if px <= 0.0:
+                try:
+                    hist = tkr.history(period="2d", auto_adjust=False)
+                    if hist is not None and not hist.empty:
+                        close = hist["Close"].dropna()
+                        if len(close) > 0:
+                            px = float(close.iloc[-1] or 0.0)
+                except Exception:
+                    pass
+
+            if px > 0.0:
+                prices[sym] = round(px, 4)
+            else:
+                errs.append(f"{sym}: prezzo non disponibile")
+        except Exception as exc:
+            errs.append(f"{sym}: {type(exc).__name__}")
+    return prices, errs
 
 
 @router.post("/opz/opportunity/scan_full")
@@ -85,7 +142,7 @@ def opz_data_refresh(
     # fallisce si restituisce errore esplicito al chiamante.
     symbols: list[str] = []
     try:
-        uni = opz_universe_latest()
+        uni = opz_universe_latest(profile=profile)
         items = uni.get("items", []) or []
         symbols = list({r.get("symbol") for r in items if r.get("symbol")})
         if not symbols:
@@ -94,7 +151,7 @@ def opz_data_refresh(
             _log.getLogger(__name__).info("Universe vuoto - eseguo scan automatica prima del refresh")
             from execution.universe import run_universe_scan_from_ibkr_settings
             run_universe_scan_from_ibkr_settings(profile=profile, top_n=20)
-            uni2 = opz_universe_latest()
+            uni2 = opz_universe_latest(profile=profile)
             items2 = uni2.get("items", []) or []
             symbols = list({r.get("symbol") for r in items2 if r.get("symbol")})
     except Exception as exc:
@@ -102,8 +159,10 @@ def opz_data_refresh(
         _log.getLogger(__name__).error("Errore recupero simboli universo: %s", exc)
 
     if not symbols:
-        results["error"] = "Universo simboli non disponibile - eseguire prima una scan"
-        return results
+        raise HTTPException(
+            status_code=409,
+            detail="Universo simboli non disponibile - eseguire prima una scan",
+        )
 
     # 2) yfinance - IV history ATM
     t0 = datetime.now(timezone.utc)
@@ -217,6 +276,8 @@ def opz_data_refresh(
         results["ibkr"] = {"status": "error", "error": msg}
     else:
         ibkr_errs: list[str] = []
+        yfin_price_errs: list[str] = []
+        yfin_price_ok = 0
 
         t0 = datetime.now(timezone.utc)
         try:
@@ -236,6 +297,22 @@ def opz_data_refresh(
         with_price = sum(1 for s in snapshots if float(s.get("underlying_price") or 0.0) > 0)
         with_chain = sum(1 for s in snapshots if int(s.get("contracts_count", 0) or 0) > 0)
 
+        # Fallback locale: se IBKR non fornisce prezzi, prova yfinance per popolare
+        # almeno il sottostante nella tabella "Dati derivati".
+        if with_price < len(symbols):
+            yfin_prices, yfin_price_errs = _yfinance_underlying_fallback(symbols)
+            if yfin_prices:
+                for snap in snapshots:
+                    if float(snap.get("underlying_price") or 0.0) > 0:
+                        continue
+                    sym = str(snap.get("symbol") or "").upper()
+                    px = yfin_prices.get(sym)
+                    if px is not None and px > 0:
+                        snap["underlying_price"] = float(px)
+                with_price = sum(1 for s in snapshots if float(s.get("underlying_price") or 0.0) > 0)
+                yfin_price_ok = len(yfin_prices)
+                logger.info("data_refresh: yfinance price fallback applied ok=%s/%s", yfin_price_ok, len(symbols))
+
         # Errori separati per tipo: prices/chain vs IV/greeks - evita contaminazione error_msg
         price_errs = [f"{s.get('symbol')}: {s['error']}" for s in snapshots
                       if s.get("error") and float(s.get("underlying_price") or 0.0) <= 0]
@@ -246,11 +323,18 @@ def opz_data_refresh(
                       and float(s.get("underlying_price") or 0.0) > 0]
 
         price_status = "ok" if with_price == len(symbols) and len(symbols) > 0 else ("partial" if with_price > 0 else "error")
+        if yfin_price_ok > 0:
+            # Prezzi presenti, ma non tutti da IBKR: stato minimo partial.
+            if price_status == "ok":
+                price_status = "partial"
+            price_errs = [f"IBKR prezzo non disponibile - fallback yfinance {yfin_price_ok}/{len(symbols)}"] + price_errs
+            if yfin_price_errs:
+                price_errs.extend(yfin_price_errs[:2])
         chain_status = "ok" if with_chain == len(symbols) and len(symbols) > 0 else ("partial" if with_chain > 0 else "error")
-        chain_err_msg = "; ".join((chain_errs or ibkr_errs)[:3]) if (chain_errs or (with_chain < len(symbols) and ibkr_errs)) else None
+        chain_err_msg = "; ".join(_unique_errs(chain_errs or ibkr_errs, 3)) if (chain_errs or (with_chain < len(symbols) and ibkr_errs)) else None
 
         _rec("ibkr_prices", t0, t1, len(symbols), with_price, price_status,
-             "; ".join((price_errs or ibkr_errs)[:3]) if (price_errs or (with_price < len(symbols) and ibkr_errs)) else None)
+             "; ".join(_unique_errs(price_errs or ibkr_errs, 3)) if (price_errs or (with_price < len(symbols) and ibkr_errs)) else None)
         _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status,
              chain_err_msg)
 
@@ -263,7 +347,7 @@ def opz_data_refresh(
         else:
             greek_status = "ok" if max_greeks > 0 and greeks_complete >= max_greeks * 0.75 else ("partial" if greeks_complete > 0 else "error")
             _rec("ibkr_greeks", t0, t1, max_greeks, greeks_complete, greek_status,
-                 "; ".join(iv_errs[:3]) if iv_errs else None)
+                 "; ".join(_unique_errs(iv_errs, 3)) if iv_errs else None)
 
         t2 = datetime.now(timezone.utc)
         iv_ok_ibkr = 0
@@ -284,7 +368,7 @@ def opz_data_refresh(
         else:
             iv_status_ibkr = "ok" if iv_ok_ibkr == symbols_ok and symbols_ok > 0 else ("partial" if iv_ok_ibkr > 0 else "error")
             _rec("ibkr_iv_history", t2, t3, symbols_ok, iv_ok_ibkr, iv_status_ibkr,
-                 "; ".join((iv_err_ibkr or ibkr_errs)[:3]) if (iv_err_ibkr or ibkr_errs) else None)
+                 "; ".join(_unique_errs(iv_err_ibkr or ibkr_errs, 3)) if (iv_err_ibkr or ibkr_errs) else None)
 
         # Persiste snapshot IV/greeks per-simbolo (quarta griglia DATI tab)
         try:

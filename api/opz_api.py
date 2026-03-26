@@ -36,11 +36,29 @@ class _MemoryLogHandler(logging.Handler):
     """Handler che accumula record nel buffer circolare _LOG_BUFFER."""
     def emit(self, record: logging.LogRecord) -> None:
         try:
+            ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%H:%M:%S")
+            level = record.levelname
+            name = record.name.split(".")[-1]
+            msg = self.format(record)
+            if _LOG_BUFFER:
+                last = _LOG_BUFFER[-1]
+                if (
+                    last.get("level") == level
+                    and last.get("name") == name
+                    and last.get("msg_raw") == msg
+                ):
+                    rep = int(last.get("repeat", 1)) + 1
+                    last["repeat"] = rep
+                    last["ts"] = ts
+                    last["msg"] = f"{msg} (x{rep})"
+                    return
             _LOG_BUFFER.append({
-                "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%H:%M:%S"),
-                "level": record.levelname,
-                "name": record.name.split(".")[-1],
-                "msg": self.format(record),
+                "ts": ts,
+                "level": level,
+                "name": name,
+                "msg": msg,
+                "msg_raw": msg,
+                "repeat": 1,
             })
         except Exception:
             pass
@@ -142,6 +160,7 @@ def _load_sessions_config() -> dict[str, Any]:
     """
     defaults: dict[str, Any] = {
         "enabled": False,
+        "scheduler_mode": "internal",
         "morning_time": "09:00",
         "eod_time": "16:30",
         "timezone": "America/New_York",
@@ -151,6 +170,7 @@ def _load_sessions_config() -> dict[str, Any]:
         "profile": "paper",
         "api_base": "http://localhost:8765",
     }
+    cfg: dict[str, Any] = dict(defaults)
     for profile in ("paper", "dev"):
         cfg_path = ROOT / "config" / f"{profile}.toml"
         if cfg_path.exists():
@@ -159,10 +179,17 @@ def _load_sessions_config() -> dict[str, Any]:
                 with open(cfg_path, "rb") as f:
                     data = tomllib.load(f)
                 sess = data.get("sessions", {})
-                return {**defaults, **sess}
+                cfg = {**defaults, **sess}
+                break
             except Exception as exc:
                 logger.warning("SESSION_CFG_WARN %s: %s", cfg_path, exc)
-    return defaults
+    env_mode = (os.environ.get("OPZ_SESSION_SCHEDULER_MODE") or "").strip().lower()
+    if env_mode:
+        if env_mode in {"internal", "external"}:
+            cfg["scheduler_mode"] = env_mode
+        else:
+            logger.warning("SESSION_CFG_WARN invalid OPZ_SESSION_SCHEDULER_MODE=%r (expected internal|external)", env_mode)
+    return cfg
 
 
 def _parse_session_time(time_str: str, tz_name: str) -> "time_cls":
@@ -289,7 +316,12 @@ async def _app_lifespan(_app: FastAPI):
     # Avvia scheduler se abilitato in config
     cfg = _load_sessions_config()
     _SESSION_STATE["enabled"] = bool(cfg.get("enabled", False))
-    if _SESSION_STATE["enabled"]:
+    scheduler_mode = str(cfg.get("scheduler_mode", "internal")).strip().lower()
+    if scheduler_mode not in {"internal", "external"}:
+        logger.warning("SESSION_SCHEDULER invalid mode=%r, fallback=internal", scheduler_mode)
+        scheduler_mode = "internal"
+    _SESSION_STATE["scheduler_mode"] = scheduler_mode
+    if _SESSION_STATE["enabled"] and scheduler_mode == "internal":
         _SESSION_TASK = asyncio.create_task(_scheduler_loop(cfg))
         # Callback per rilevare crash inattesi del task
         def _scheduler_done_cb(task: asyncio.Task) -> None:
@@ -302,6 +334,8 @@ async def _app_lifespan(_app: FastAPI):
         _SESSION_TASK.add_done_callback(_scheduler_done_cb)
         logger.info("SESSION_SCHEDULER task created (morning=%s, eod=%s)",
                     cfg.get("morning_time"), cfg.get("eod_time"))
+    elif _SESSION_STATE["enabled"] and scheduler_mode == "external":
+        logger.info("SESSION_SCHEDULER external mode enabled (internal loop disabled)")
     else:
         logger.info("SESSION_SCHEDULER disabled (enabled=false in config)")
 
@@ -1993,8 +2027,8 @@ def opz_opportunity_decision(req: OpportunityDecisionRequest) -> Dict[str, Any]:
     }
 
 
-def opz_universe_latest() -> Dict[str, Any]:
-    return fetch_latest_universe_batch()
+def opz_universe_latest(profile: str = "paper") -> Dict[str, Any]:
+    return fetch_latest_universe_batch(profile=profile)
 
 
 def opz_universe_ibkr_context(settings_path: Optional[str] = None) -> Dict[str, Any]:
@@ -3396,6 +3430,7 @@ def opz_session_status() -> Dict[str, Any]:
     return {
         "ok": True,
         "enabled": _SESSION_STATE.get("enabled", False),
+        "scheduler_mode": _SESSION_STATE.get("scheduler_mode", "internal"),
         "running": _SESSION_STATE.get("running", False),
         "last_morning": _SESSION_STATE.get("last_morning"),
         "last_eod": _SESSION_STATE.get("last_eod"),

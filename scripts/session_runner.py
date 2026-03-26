@@ -26,7 +26,7 @@ import argparse
 import calendar
 import json
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from typing import Any, Optional
 
@@ -122,6 +122,43 @@ def is_trading_day(d: Optional[date] = None) -> bool:
     return d not in nyse_holidays(d.year)
 
 
+class _NewYorkFallbackTz(tzinfo):
+    """Fallback timezone for America/New_York when IANA tzdata is unavailable."""
+
+    @staticmethod
+    def _nth_weekday(year: int, month: int, n: int, weekday: int) -> date:
+        d = date(year, month, 1)
+        diff = (weekday - d.weekday()) % 7
+        first = d.replace(day=1 + diff)
+        return first.replace(day=first.day + (n - 1) * 7)
+
+    @classmethod
+    def _dst_window(cls, year: int) -> tuple[datetime, datetime]:
+        # US DST since 2007: second Sunday March 02:00 -> first Sunday November 02:00
+        start_day = cls._nth_weekday(year, 3, 2, 6)   # Sunday
+        end_day = cls._nth_weekday(year, 11, 1, 6)    # Sunday
+        return (
+            datetime(year, 3, start_day.day, 2, 0, 0),
+            datetime(year, 11, end_day.day, 2, 0, 0),
+        )
+
+    def _is_dst(self, dt: Optional[datetime]) -> bool:
+        if dt is None:
+            return False
+        naive = dt.replace(tzinfo=None)
+        start, end = self._dst_window(naive.year)
+        return start <= naive < end
+
+    def utcoffset(self, dt: Optional[datetime]) -> timedelta:
+        return timedelta(hours=-4 if self._is_dst(dt) else -5)
+
+    def dst(self, dt: Optional[datetime]) -> timedelta:
+        return timedelta(hours=1 if self._is_dst(dt) else 0)
+
+    def tzname(self, dt: Optional[datetime]) -> str:
+        return "EDT" if self._is_dst(dt) else "EST"
+
+
 def _next_session_dt(
     now: datetime,
     morning_time: "time_cls",
@@ -132,14 +169,24 @@ def _next_session_dt(
     Calcola (datetime_prossima_sessione, tipo) a partire da now (timezone-aware).
     Considera skip weekend e holiday NYSE.
     """
-    from zoneinfo import ZoneInfo
+    use_fallback = False
+    try:
+        from zoneinfo import ZoneInfo
 
-    tz = ZoneInfo(tz_name)
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        if tz_name != "America/New_York":
+            raise RuntimeError(f"timezone '{tz_name}' unavailable and no fallback is defined")
+        tz = _NewYorkFallbackTz()
+        use_fallback = True
     now_local = now.astimezone(tz)
     today = now_local.date()
 
     def _make_dt(d: date, t: "time_cls") -> datetime:
-        return datetime(d.year, d.month, d.day, t.hour, t.minute, 0, tzinfo=tz)
+        naive = datetime(d.year, d.month, d.day, t.hour, t.minute, 0)
+        if use_fallback:
+            return naive.replace(tzinfo=tz)
+        return naive.replace(tzinfo=tz)
 
     candidates: list[tuple[datetime, str]] = []
     for offset in range(0, 8):   # cerca nei prossimi 7 giorni
@@ -219,17 +266,49 @@ def _post_json(api_base: str, path: str, payload: Optional[dict] = None) -> tupl
 # Universe symbols
 # ─────────────────────────────────────────────────────────────────────────────
 
-_FALLBACK_SYMBOLS = ["SPY", "QQQ", "IWM", "GLD", "TLT"]
+def _universe_symbols_from_latest(api_base: str, profile: str = DEFAULT_PROFILE) -> list[str]:
+    ok, data = _get(api_base, "/opz/universe/latest", {"profile": profile})
+    if not ok:
+        return []
+    items = data.get("items") or []
+    out: list[str] = []
+    seen: set[str] = set()
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        sym = str(row.get("symbol") or "").strip().upper()
+        if not sym or sym in seen:
+            continue
+        seen.add(sym)
+        out.append(sym)
+    return out
 
 
-def _get_universe_symbols(api_base: str) -> list[str]:
-    """Recupera i simboli universe dalle impostazioni IBKR o usa fallback."""
-    ok, ctx = _get(api_base, "/opz/universe/ibkr_context")
-    if ok:
-        syms = ctx.get("quote_symbols") or []
-        if syms:
-            return [str(s).upper() for s in syms[:MAX_SYMBOLS]]
-    return _FALLBACK_SYMBOLS[:MAX_SYMBOLS]
+def _get_universe_symbols(
+    api_base: str,
+    *,
+    profile: str = DEFAULT_PROFILE,
+    regime: str = "NORMAL",
+) -> list[str]:
+    """Recupera simboli da universe_latest; se vuoto tenta auto-scan e poi fallisce esplicitamente."""
+    symbols = _universe_symbols_from_latest(api_base, profile=profile)
+    if symbols:
+        return symbols[:MAX_SYMBOLS]
+
+    scan_regime = str(regime or "NORMAL").strip().upper()
+    if scan_regime not in {"NORMAL", "CAUTION", "SHOCK"}:
+        scan_regime = "NORMAL"
+    _post_json(api_base, "/opz/universe/scan", {
+        "profile": profile,
+        "source": "auto",
+        "regime": scan_regime,
+        "top_n": MAX_SYMBOLS,
+    })
+
+    symbols = _universe_symbols_from_latest(api_base, profile=profile)
+    if symbols:
+        return symbols[:MAX_SYMBOLS]
+    raise RuntimeError("universe symbols unavailable: run /opz/universe/scan and verify universe_latest")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -257,8 +336,16 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
         errors.append(f"regime: {data.get('error')}")
 
     # ── Step 2: Universe symbols ──────────────────────────────────────────────
-    symbols = _get_universe_symbols(api_base)
-    steps["symbols"] = {"ok": True, "symbols": symbols, "count": len(symbols)}
+    scan_regime = str(steps["regime"].get("regime") or "NORMAL").strip().upper()
+    if scan_regime not in {"NORMAL", "CAUTION", "SHOCK"}:
+        scan_regime = "NORMAL"
+    try:
+        symbols = _get_universe_symbols(api_base, profile=profile, regime=scan_regime)
+        steps["symbols"] = {"ok": True, "symbols": symbols, "count": len(symbols)}
+    except Exception as exc:
+        symbols = []
+        steps["symbols"] = {"ok": False, "symbols": [], "count": 0, "error": str(exc)}
+        errors.append(f"symbols: {exc}")
 
     # ── Step 3: IV history ────────────────────────────────────────────────────
     iv_results: dict[str, Any] = {}
@@ -300,10 +387,6 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
     steps["events"] = {"ok": True, "symbols": events_results}
 
     # ── Step 5: Universe scan (tramite API) ───────────────────────────────────
-    scan_regime = str(steps["regime"].get("regime") or "NORMAL").strip().upper()
-    if scan_regime not in {"NORMAL", "CAUTION", "SHOCK"}:
-        scan_regime = "NORMAL"
-
     # Recupera account size per scan_full
     account_size = 10000.0  # default
     ok_acct, acct_data = _get(api_base, "/opz/ibkr/account")
@@ -332,23 +415,33 @@ def run_morning(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE
 
     # ── Step 6: Scan full (scoring + chain IBKR) ──────────────────────────────
     scan_symbols = symbols[:6]  # max 6 simboli
-    ok, data = _post_json(api_base, "/opz/opportunity/scan_full", {
-        "profile": profile,
-        "regime": scan_regime,
-        "symbols": scan_symbols,
-        "top_n": 5,
-        "account_size": account_size,
-        "use_cache": False,
-    })
-    steps["scan_full"] = {
-        "ok": ok,
-        "candidates": data.get("candidates_count", len(data.get("candidates", []))) if ok else 0,
-        "batch_id": data.get("batch_id") if ok else None,
-        "suspension_reason": data.get("suspension_reason") if ok else None,
-        "error": data.get("error") if not ok else None,
-    }
-    if not ok:
-        errors.append(f"scan_full: {data.get('error')}")
+    if scan_symbols:
+        ok, data = _post_json(api_base, "/opz/opportunity/scan_full", {
+            "profile": profile,
+            "regime": scan_regime,
+            "symbols": scan_symbols,
+            "top_n": 5,
+            "account_size": account_size,
+            "use_cache": False,
+        })
+        steps["scan_full"] = {
+            "ok": ok,
+            "candidates": data.get("candidates_count", len(data.get("candidates", []))) if ok else 0,
+            "batch_id": data.get("batch_id") if ok else None,
+            "suspension_reason": data.get("suspension_reason") if ok else None,
+            "error": data.get("error") if not ok else None,
+        }
+        if not ok:
+            errors.append(f"scan_full: {data.get('error')}")
+    else:
+        steps["scan_full"] = {
+            "ok": False,
+            "candidates": 0,
+            "batch_id": None,
+            "suspension_reason": None,
+            "error": "universe symbols unavailable",
+        }
+        errors.append("scan_full: universe symbols unavailable")
 
     # ── Step 7: Briefing ──────────────────────────────────────────────────────
     ok, data = _post(api_base, "/opz/briefing/generate", {"no_telegram": "true"})
@@ -428,7 +521,13 @@ def run_eod(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE) ->
     errors: list[str] = []
 
     # Recupera simboli universe per scan_full EOD
-    eod_symbols = _get_universe_symbols(api_base)
+    try:
+        eod_symbols = _get_universe_symbols(api_base, profile=profile, regime="NORMAL")
+        steps["symbols"] = {"ok": True, "symbols": eod_symbols, "count": len(eod_symbols)}
+    except Exception as exc:
+        eod_symbols = []
+        steps["symbols"] = {"ok": False, "symbols": [], "count": 0, "error": str(exc)}
+        errors.append(f"symbols: {exc}")
 
     # ── Step 1: Paper summary ─────────────────────────────────────────────────
     ok, data = _get(api_base, "/opz/paper/summary", {"profile": profile, "window_days": 60})
@@ -499,21 +598,30 @@ def run_eod(profile: str = DEFAULT_PROFILE, api_base: str = DEFAULT_API_BASE) ->
         steps["equity_snapshot"] = {"ok": False, "reason": "IBKR non connesso o NAV non disponibile"}
 
     # ── Step 6: Scan full EOD (best-effort — mercato potenzialmente chiuso) ───
-    ok, data = _post_json(api_base, "/opz/opportunity/scan_full", {
-        "profile": profile,
-        "regime": str(steps.get("regime_eod", {}).get("regime") or "NORMAL").strip().upper(),
-        "symbols": eod_symbols[:6],
-        "top_n": 5,
-        "account_size": float(equity_val) if equity_val and equity_val > 0 else 10000.0,
-        "use_cache": True,  # usa cache se disponibile
-    })
-    steps["scan_full"] = {
-        "ok": ok,
-        "candidates": data.get("candidates_count", len(data.get("candidates", []))) if ok else 0,
-        "batch_id": data.get("batch_id") if ok else None,
-        "note": "best-effort EOD — mercato potenzialmente chiuso",
-        "error": data.get("error") if not ok else None,
-    }
+    if eod_symbols:
+        ok, data = _post_json(api_base, "/opz/opportunity/scan_full", {
+            "profile": profile,
+            "regime": str(steps.get("regime_eod", {}).get("regime") or "NORMAL").strip().upper(),
+            "symbols": eod_symbols[:6],
+            "top_n": 5,
+            "account_size": float(equity_val) if equity_val and equity_val > 0 else 10000.0,
+            "use_cache": True,  # usa cache se disponibile
+        })
+        steps["scan_full"] = {
+            "ok": ok,
+            "candidates": data.get("candidates_count", len(data.get("candidates", []))) if ok else 0,
+            "batch_id": data.get("batch_id") if ok else None,
+            "note": "best-effort EOD; market may be closed",
+            "error": data.get("error") if not ok else None,
+        }
+    else:
+        steps["scan_full"] = {
+            "ok": False,
+            "candidates": 0,
+            "batch_id": None,
+            "note": "skip: universe symbols unavailable",
+            "error": "universe symbols unavailable",
+        }
     # Non aggiunge a errors — è best-effort
 
     finished_at = datetime.now(timezone.utc).isoformat()

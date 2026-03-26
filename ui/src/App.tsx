@@ -431,6 +431,8 @@ type ReleaseMdView = { before: string; table: MarkdownTable | null; after: strin
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 /** Profilo attivo — unico punto di modifica per dev/paper/live */
 const ACTIVE_PROFILE = (import.meta.env.VITE_PROFILE as string | undefined) ?? "paper";
+/** Timezone unica di visualizzazione UI (default operatore: Roma). */
+const DISPLAY_TZ = (import.meta.env.VITE_DISPLAY_TZ as string | undefined) ?? "Europe/Rome";
 
 // ── Tooltip dictionary (30+ voci) ─────────────────────────────────────────
 const TOOLTIPS: Record<string, string> = {
@@ -565,13 +567,69 @@ function fmtTs(iso: string): string {
   if (!iso) return "-";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toISOString().replace("T", " ").slice(0, 19) + "Z";
+  return d.toLocaleString("sv-SE", { hour12: false, timeZone: DISPLAY_TZ }).replace("T", " ");
+}
+
+function fmtTsMin(iso: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("sv-SE", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: DISPLAY_TZ,
+  }).replace("T", " ");
+}
+
+function fmtHm(iso: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleTimeString("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: DISPLAY_TZ,
+  });
+}
+
+function explainDatiError(err: string | null | undefined): string {
+  const raw = String(err ?? "").trim();
+  if (!raw) return "Errore non specificato";
+  const up = raw.toUpperCase();
+  if (up.includes("NO MRKT")) {
+    return "NO MRKT: mercato chiuso o feed opzioni non disponibile. Azione: attendere apertura o verificare feed OPRA.";
+  }
+  if (
+    up.includes("IBG NON RAGGIUNGIBILE") ||
+    up.includes("WINERROR 10061") ||
+    up.includes("TWS/GATEWAY NON DISPONIBILE")
+  ) {
+    return "Connessione IBKR assente. Verificare IBWR/TWS/IB Gateway e ripetere il refresh.";
+  }
+  return raw;
+}
+
+function isNoMrktError(err: string | null | undefined): boolean {
+  return String(err ?? "").toUpperCase().includes("NO MRKT");
+}
+
+function mapDatiStatus(status: string | null | undefined, err: string | null | undefined): { label: string; color: string } {
+  const st = String(status ?? "").trim().toLowerCase();
+  if (st === "ok") return { label: "ok", color: "#4ade80" };
+  if (isNoMrktError(err)) return { label: "no mrkt", color: "#fbbf24" };
+  if (st === "partial") return { label: "parz", color: "#fbbf24" };
+  return { label: "ko", color: "#f87171" };
 }
 
 function fmtUnix(ts: number | null): string {
   if (!Number.isFinite(ts ?? NaN)) return "-";
   const d = new Date((ts as number) * 1000);
-  return d.toISOString().replace("T", " ").slice(0, 19) + "Z";
+  return d.toLocaleString("sv-SE", { hour12: false, timeZone: DISPLAY_TZ }).replace("T", " ");
 }
 
 function shortToken(token: string | null): string {
@@ -1203,7 +1261,7 @@ export default function App() {
         apiJson<ReleaseStatusResponse>(`${API_BASE}/opz/release_status`),
         apiJson<PaperSummaryResponse>(`${API_BASE}/opz/paper/summary?profile=${ACTIVE_PROFILE}&window_days=60`),
         apiJson<LastActionsResponse>(`${API_BASE}/opz/last_actions?limit=8`),
-        apiJson<UniverseLatestResponse>(`${API_BASE}/opz/universe/latest`),
+        apiJson<UniverseLatestResponse>(`${API_BASE}/opz/universe/latest?profile=${ACTIVE_PROFILE}`),
         apiJson<UniverseIbkrContext>(`${API_BASE}/opz/universe/ibkr_context${ctxQuery}`),
         apiJson<NarratorTutorialResponse>(`${API_BASE}/opz/narrator/tutorial`),
       ]);
@@ -1600,7 +1658,9 @@ export default function App() {
         await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
         const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${daysBack}`);
         setFeedLog((r2.runs ?? []).filter(run => run.run_date >= f && run.run_date <= t));
-      } catch { /* non critico */ }
+      } catch (e) {
+        setError(`Refresh dati fallito: ${String(e)}`);
+      }
       finally {
         if (datiCdRef.current) { clearInterval(datiCdRef.current); datiCdRef.current = null; }
         setDatiCdSecs(null);
@@ -2033,6 +2093,19 @@ export default function App() {
     : !hasRealData
       ? "Data mode sintetico: blocco in monitoraggio"
       : "Feed reale attivo: blocco operativo";
+  const datiOpsReady = apiOnline && hasRealData && stepDataHealth === "ok";
+  const datiBlockReason = !apiOnline
+    ? "API offline"
+    : !hasRealData
+      ? "data mode non operativo"
+      : `stato DATI ${stepDataStatusLabel}`;
+
+  useEffect(() => {
+    if (!datiOpsReady && (centerPhase !== "ante" || anteSubTab !== "dati")) {
+      setCenterPhase("ante");
+      setAnteSubTab("dati");
+    }
+  }, [datiOpsReady, centerPhase, anteSubTab]);
 
   useEffect(() => {
     if (!message && !error) return;
@@ -2054,8 +2127,8 @@ export default function App() {
 
   useEffect(() => {
     const tick = () => {
-      const t = new Date().toLocaleString("sv-SE", { hour12: false, timeZone: "America/New_York" }).replace("T", " ");
-      setClockText(`${t} EST`);
+      const t = new Date().toLocaleString("sv-SE", { hour12: false, timeZone: DISPLAY_TZ }).replace("T", " ");
+      setClockText(`${t} ${DISPLAY_TZ}`);
     };
     tick();
     const id = window.setInterval(tick, 1000);
@@ -2065,7 +2138,6 @@ export default function App() {
   // On mount: stato IBKR passivo + fetch iniziale di tutti i dati
   useEffect(() => {
     void doCheckIbkr(false);
-    void doFetchIbkrAccount();
     void doFetchSysStatus();
     void doFetchRegimeCurrent();
     void doFetchEquityHistory();
@@ -2292,8 +2364,8 @@ export default function App() {
         kpis: [
           { label: "Scheduler", value: sessionStatus?.enabled ? "ON" : "OFF", tone: sessionStatus?.enabled ? "sev-ok" : "sev-neutral", sub: "session engine" },
           { label: "Running", value: sessionStatus?.running ? "YES" : "NO", tone: sessionStatus?.running ? "sev-warn" : "sev-ok", sub: "stato sessione" },
-          { label: "Last morning", value: sessionStatus?.last_morning ? sessionStatus.last_morning.slice(0, 16) : "N/D", tone: "sev-meta", sub: "UTC" },
-          { label: "Last EOD", value: sessionStatus?.last_eod ? sessionStatus.last_eod.slice(0, 16) : "N/D", tone: "sev-meta", sub: "UTC" },
+          { label: "Last morning", value: sessionStatus?.last_morning ? fmtTsMin(sessionStatus.last_morning) : "N/D", tone: "sev-meta", sub: DISPLAY_TZ },
+          { label: "Last EOD", value: sessionStatus?.last_eod ? fmtTsMin(sessionStatus.last_eod) : "N/D", tone: "sev-meta", sub: DISPLAY_TZ },
         ],
         screenTitle: "session_logs.eod",
         screenLines: [
@@ -2439,7 +2511,7 @@ export default function App() {
                 </div>
                 <div className="left-subbody">
                   <div className="left-kpi-row"><span>Prossima</span><b className="sev-meta" style={{fontSize:"0.6rem"}}>
-                    {sessionStatus?.next_morning ? sessionStatus.next_morning.slice(0,16).replace("T"," ") : "—"}
+                    {sessionStatus?.next_morning ? fmtTsMin(sessionStatus.next_morning) : "—"}
                   </b></div>
                 </div>
                 {sessionLogOpen && (() => {
@@ -2475,7 +2547,7 @@ export default function App() {
                             {[morning, eod].map((sess, si) => sess && (
                               <div key={si} style={{marginBottom:4, paddingLeft:6, borderLeft:"2px solid var(--border)"}}>
                                 <div style={{fontSize:"0.6rem", color:"var(--dim)", marginBottom:2}}>
-                                  {sess.session_type.toUpperCase()} · {sess.started_at?.slice(11,16) ?? "?"} → {sess.finished_at?.slice(11,16) ?? "?"}
+                                  {sess.session_type.toUpperCase()} · {sess.started_at ? fmtHm(sess.started_at) : "?"} → {sess.finished_at ? fmtHm(sess.finished_at) : "?"}
                                   {sess.regime && <span style={{marginLeft:4}} className={sess.regime==="NORMAL"?"sev-ok":sess.regime==="CAUTION"?"sev-warn":"sev-error"}>{sess.regime}</span>}
                                 </div>
                                 {Object.entries(sess.steps ?? {}).map(([stepName, stepData]) => {
@@ -2707,14 +2779,46 @@ export default function App() {
 
           <div className="tabs phase-tabs">
             <button className={`tab ${centerPhase === "ante" ? "active" : ""}`} onClick={() => setCenterPhase("ante")}>ANTE</button>
-            <button className={`tab ${centerPhase === "op" ? "active" : ""}`} onClick={() => setCenterPhase("op")}>OP</button>
-            <button className={`tab ${centerPhase === "post" ? "active" : ""}`} onClick={() => setCenterPhase("post")}>POST</button>
+            <button
+              className={`tab ${centerPhase === "op" ? "active" : ""}`}
+              onClick={() => setCenterPhase("op")}
+              disabled={!datiOpsReady}
+              title={!datiOpsReady ? "DATI non completa: OP bloccato" : ""}
+            >OP</button>
+            <button
+              className={`tab ${centerPhase === "post" ? "active" : ""}`}
+              onClick={() => setCenterPhase("post")}
+              disabled={!datiOpsReady}
+              title={!datiOpsReady ? "DATI non completa: POST bloccato" : ""}
+            >POST</button>
           </div>
           {centerPhase === "ante" && (
             <div className="tabs subtabs">
               <button className={`tab ${anteSubTab === "dati" ? "active" : ""}`} onClick={() => setAnteSubTab("dati")}>DATI</button>
-              <button className={`tab ${anteSubTab === "analisi" ? "active" : ""}`} onClick={() => setAnteSubTab("analisi")}>ANALISI</button>
-              <button className={`tab ${anteSubTab === "briefing" ? "active" : ""}`} onClick={() => setAnteSubTab("briefing")}>BRIEFING</button>
+              <button
+                className={`tab ${anteSubTab === "analisi" ? "active" : ""}`}
+                onClick={() => setAnteSubTab("analisi")}
+                disabled={!datiOpsReady}
+                title={!datiOpsReady ? "Completa prima DATI" : ""}
+              >ANALISI</button>
+              <button
+                className={`tab ${anteSubTab === "briefing" ? "active" : ""}`}
+                onClick={() => setAnteSubTab("briefing")}
+                disabled={!datiOpsReady}
+                title={!datiOpsReady ? "Completa prima DATI" : ""}
+              >BRIEFING</button>
+            </div>
+          )}
+          {!datiOpsReady && (
+            <div style={{
+              margin: "6px 12px 10px",
+              padding: "8px 10px",
+              border: "1px solid var(--amber)",
+              borderRadius: 8,
+              background: "rgba(251,191,36,0.08)",
+              color: "var(--text)"
+            }}>
+              DATI non pronta per operatività: {datiBlockReason}. Restano disponibili solo DATI + monitoraggio.
             </div>
           )}
           {centerPhase === "op" && (
@@ -2852,7 +2956,7 @@ export default function App() {
                         const blockStatus = !hasSnaps ? null : snapsErr === 0 ? "ok" : snapsOk === 0 ? "error" : "partial";
                         const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : blockStatus === "partial" ? "#fbbf24" : "#555";
                         const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : blockStatus === "partial" ? "~ PARZ." : "—";
-                        const lastUpd = symbolSnaps[0]?.updated_at?.slice(11,16) ?? "—";
+                        const lastUpd = symbolSnaps[0]?.updated_at ? fmtHm(symbolSnaps[0].updated_at) : "—";
                         const blockSt = datiBlockStatus[feed] ?? "tutti";
                         const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
                         const rows = symbolSnaps.filter(s => blockSt === "tutti" || (blockSt === "ok" ? !s.error_msg : !!s.error_msg));
@@ -2861,7 +2965,7 @@ export default function App() {
                         const fmtP   = (v: number|null) => v != null ? v.toFixed(2) : "—";
                         const csvDownloadDerivati = () => {
                           if (!rows.length) return;
-                          const cols = ["symbol","underlying","atm_strike","atm_iv","iv_source","atm_delta","atm_gamma","atm_theta","atm_vega","error"];
+                          const cols = ["symbol","underlying","atm_strike","atm_iv","iv_source","atm_delta","atm_gamma","atm_theta","atm_vega","stato","stato_note"];
                           const body = rows.map(s => [
                             s.symbol ?? "",
                             s.underlying != null ? s.underlying.toFixed(2) : "",
@@ -2872,7 +2976,8 @@ export default function App() {
                             s.atm_gamma != null ? s.atm_gamma.toFixed(4) : "",
                             s.atm_theta != null ? s.atm_theta.toFixed(4) : "",
                             s.atm_vega != null ? s.atm_vega.toFixed(4) : "",
-                            s.error_msg ?? "",
+                            mapDatiStatus(s.error_msg ? "error" : "ok", s.error_msg).label,
+                            explainDatiError(s.error_msg),
                           ]);
                           const blob = new Blob(
                             [cols.join(",")+"\n", ...body.map(r => r.map(x => `${x}`).join(",")+"\n")],
@@ -2948,14 +3053,15 @@ export default function App() {
                                 : <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.6rem"}}>
                                     <thead>
                                       <tr style={{borderBottom:"2px solid var(--border)"}}>
-                                        {["Simbolo","Prezzo","Strike ATM","IV ATM","Fonte","Delta","Gamma","Theta","Vega","Errore"].map(h =>
-                                          <th key={h} style={{padding:"4px 8px", textAlign: h==="Simbolo"||h==="Fonte"||h==="Errore" ? "left" : "right", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
+                                        {["Simbolo","Prezzo","Strike ATM","IV ATM","Fonte","Delta","Gamma","Theta","Vega","Stato"].map(h =>
+                                          <th key={h} style={{padding:"4px 8px", textAlign: h==="Simbolo"||h==="Fonte"||h==="Stato" ? "left" : "right", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
                                         )}
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {rows.map((s, i) => {
                                         const hasErr = !!s.error_msg;
+                                        const st = mapDatiStatus(hasErr ? "error" : "ok", s.error_msg);
                                         const ivC = s.atm_iv ? "#4ade80" : "#f87171";
                                         const srcC = s.iv_source === "bs" ? "#fbbf24" : "#4ade80";
                                         return (
@@ -2969,7 +3075,9 @@ export default function App() {
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_gamma, 4)}</td>
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_theta, 4)}</td>
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_vega, 4)}</td>
-                                            <td style={{padding:"4px 8px", color:"#f87171", maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={hasErr ? (s.error_msg??"") : ""}>{hasErr ? (s.error_msg??"") : ""}</td>
+                                            <td style={{padding:"4px 8px"}}>
+                                              <span style={{color: st.color, fontWeight:700}} title={hasErr ? explainDatiError(s.error_msg) : "dati derivati completi"}>{st.label}</span>
+                                            </td>
                                           </tr>
                                         );
                                       })}
@@ -3007,12 +3115,12 @@ export default function App() {
 
                       const csvDownload = () => {
                         if (!rows.length) return;
-                        const cols = "data,attivita,ora,durata_ms,ricevuti,salvati,qualita_pct,simboli,stato,errore";
+                        const cols = "data,attivita,ora,durata_ms,ricevuti,salvati,qualita_pct,simboli,stato,stato_note";
                         const body = rows.map(r => [
-                          r.run_date, feedStepLabel[r.feed] ?? r.feed, r.started_at?.slice(11,19)??"",
+                          r.run_date, feedStepLabel[r.feed] ?? r.feed, r.started_at ? fmtHm(r.started_at) : "",
                           r.duration_ms??"", r.records_in??"", r.records_out??"",
-                          r.quality_pct??"", r.symbols_count??"", r.status,
-                          `"${(r.error_msg??"").replace(/"/g,'""')}"`,
+                          r.quality_pct??"", r.symbols_count??"", mapDatiStatus(r.status, r.error_msg).label,
+                          `"${explainDatiError(r.status !== "ok" ? (r.error_msg ?? "") : "").replace(/"/g,'""')}"`,
                         ].join(",")).join("\n");
                         const blob = new Blob([cols+"\n"+body], {type:"text/csv"});
                         const url = URL.createObjectURL(blob);
@@ -3029,7 +3137,7 @@ export default function App() {
                               <div style={{fontSize:"0.78rem", fontWeight:700, color:"#e2f0e8", letterSpacing:"0.04em"}}>{label}</div>
                               <div style={{fontSize:"0.58rem", color:"#7aaa90", marginTop:2}}>
                                 {lastRun
-                                  ? `ultima esecuzione: ${lastRun.run_date} · ${lastRun.started_at?.slice(11,16)??""}${lastRun.symbols_count != null ? ` · ${lastRun.symbols_count} simboli` : ""}`
+                                  ? `ultima esecuzione: ${lastRun.run_date} · ${lastRun.started_at ? fmtHm(lastRun.started_at) : ""}${lastRun.symbols_count != null ? ` · ${lastRun.symbols_count} simboli` : ""}`
                                   : "Nessuna esecuzione nel periodo"}
                               </div>
                             </div>
@@ -3086,7 +3194,7 @@ export default function App() {
                                     {([
                                       {h:"Giorno / attività",a:"left"},{h:"Ora",a:"left"},{h:"Durata",a:"left"},
                                       {h:"Ricevuti",a:"right"},{h:"Salvati",a:"right"},{h:"Qualità",a:"right"},
-                                      {h:"Simboli",a:"right"},{h:"Stato",a:"left"},{h:"Errore",a:"left"},
+                                      {h:"Simboli",a:"right"},{h:"Stato",a:"left"},
                                     ] as Array<{h:string,a:string}>).map(({h,a}) => (
                                       <th key={h} style={{padding:"4px 8px", textAlign:a as "left"|"right", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
                                     ))}
@@ -3108,11 +3216,12 @@ export default function App() {
                                     const dayQVals = dedupedDay.map(r => r.quality_pct).filter((v): v is number => typeof v === "number");
                                     const dayQ = dayQVals.length ? dayQVals.reduce((s, v) => s + v, 0) / dayQVals.length : null;
                                     const dayStatus = dayErr > 0 ? (dayOk > 0 || dayPar > 0 ? "partial" : "error") : (dayPar > 0 ? "partial" : "ok");
-                                    const dayStatusColor = dayStatus === "ok" ? "#4ade80" : dayStatus === "error" ? "#f87171" : "#fbbf24";
                                     const daySaved = dedupedDay.reduce((s, r) => s + (r.records_out ?? 0), 0);
                                     const dayIn = dedupedDay.reduce((s, r) => s + (r.records_in ?? 0), 0);
                                     const daySymbols = dedupedDay.reduce((s, r) => s + (r.symbols_count ?? 0), 0);
-                                    const firstErr = dedupedDay.find(r => r.status !== "ok" && r.error_msg)?.error_msg ?? "";
+                                    const firstErrRaw = dedupedDay.find(r => r.status !== "ok" && r.error_msg)?.error_msg ?? "";
+                                    const firstErr = explainDatiError(firstErrRaw);
+                                    const daySt = mapDatiStatus(dayStatus, firstErrRaw);
                                     // Dedup: per ogni feed mostra solo la run più recente del giorno
                                     const seenFeeds = new Set<string>();
                                     const dedupedRows = dayRows.filter(r => {
@@ -3121,21 +3230,24 @@ export default function App() {
                                       return true;
                                     });
                                     const detailRows = dayOpen ? dedupedRows.map((r, j) => {
-                                      const stC = r.status==="ok"?"#4ade80":r.status==="error"?"#f87171":"#fbbf24";
-                                      const stL = r.status==="ok"?"✓ ok":r.status==="error"?"✗ errore":"~ parz.";
+                                      const st = mapDatiStatus(r.status, r.error_msg);
+                                      const stTip = r.status !== "ok"
+                                        ? explainDatiError((r.error_msg && r.error_msg.trim()) ? r.error_msg : `stato ${r.status}`)
+                                        : "attivita completata";
                                       const rqC = r.quality_pct!=null?(r.quality_pct>=95?"#4ade80":r.quality_pct>=80?"#fbbf24":"#f87171"):"#888";
                                       const dur = r.duration_ms!=null?(r.duration_ms>=1000?`${(r.duration_ms/1000).toFixed(1)}s`:`${r.duration_ms}ms`):"—";
                                       return (
                                         <tr key={r.run_id} style={{borderBottom:"1px solid var(--border)", background:j%2===0?"rgba(0,255,106,0.02)":"rgba(0,255,106,0.04)"}}>
                                           <td style={{padding:"4px 8px 4px 24px", color:"#cfe7d8", whiteSpace:"nowrap"}}>{feedStepLabel[r.feed] ?? r.feed}</td>
-                                          <td style={{padding:"4px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.started_at?.slice(11,16)??"—"}</td>
+                                          <td style={{padding:"4px 8px", color:"#e2f0e8", whiteSpace:"nowrap"}}>{r.started_at ? fmtHm(r.started_at) : "—"}</td>
                                           <td style={{padding:"4px 8px", color:"#e2f0e8"}}>{dur}</td>
                                           <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_in?.toLocaleString("it-IT")??"—"}</td>
                                           <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.records_out?.toLocaleString("it-IT")??"—"}</td>
                                           <td style={{padding:"4px 8px", color:rqC, fontWeight:600, textAlign:"right"}}>{r.quality_pct!=null?`${r.quality_pct.toFixed(1)}%`:"—"}</td>
                                           <td style={{padding:"4px 8px", color:"#e2f0e8", textAlign:"right"}}>{r.symbols_count??"—"}</td>
-                                          <td style={{padding:"4px 8px"}}><span style={{color:stC, fontWeight:700}}>{stL}</span></td>
-                                          <td style={{padding:"4px 8px", color:"#f87171", maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.status !== "ok" ? (r.error_msg??"") : ""}>{r.status !== "ok" ? (r.error_msg??"") : ""}</td>
+                                          <td style={{padding:"4px 8px"}}>
+                                            <span style={{color:st.color, fontWeight:700}} title={stTip}>{st.label}</span>
+                                          </td>
                                         </tr>
                                       );
                                     }) : [];
@@ -3143,14 +3255,20 @@ export default function App() {
                                       <tr key={dayKey} style={{borderBottom:"1px solid var(--border)", background:"rgba(255,255,255,0.02)", cursor:"pointer"}}
                                         onClick={() => setDatiDayOpen(v => ({...v, [dayKey]: !dayOpen}))}>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", whiteSpace:"nowrap", fontWeight:700}}>{dayOpen ? "▾" : "▸"} {day}</td>
-                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dedupedDay[0]?.started_at?.slice(11,16) ?? "—"}</td>
+                                        <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dedupedDay[0]?.started_at ? fmtHm(dedupedDay[0].started_at) : "—"}</td>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8"}}>{dedupedDay.length} attività</td>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{dayIn.toLocaleString("it-IT")}</td>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{daySaved.toLocaleString("it-IT")}</td>
                                         <td style={{padding:"5px 8px", color:dayQ!=null?(dayQ>=95?"#4ade80":dayQ>=80?"#fbbf24":"#f87171"):"#888", fontWeight:700, textAlign:"right"}}>{dayQ!=null?`${dayQ.toFixed(1)}%`:"—"}</td>
                                         <td style={{padding:"5px 8px", color:"#e2f0e8", textAlign:"right"}}>{daySymbols}</td>
-                                        <td style={{padding:"5px 8px"}}><span style={{color:dayStatusColor, fontWeight:700}}>{dayStatus === "ok" ? "✓ ok" : dayStatus === "error" ? "✗ errore" : "~ parz."}</span></td>
-                                        <td style={{padding:"5px 8px", color:firstErr ? "#f87171" : "#666", maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={firstErr}>{firstErr || `${dayOk} ok · ${dayPar} parziali · ${dayErr} errori`}</td>
+                                        <td style={{padding:"5px 8px"}}>
+                                          <span
+                                            style={{color:daySt.color, fontWeight:700}}
+                                            title={firstErr || `${dayOk} ok · ${dayPar} parziali · ${dayErr} errori`}
+                                          >
+                                            {daySt.label}
+                                          </span>
+                                        </td>
                                       </tr>,
                                       ...detailRows,
                                     ];
@@ -3235,7 +3353,7 @@ export default function App() {
                             <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.58rem", fontFamily:"monospace"}}>
                               <thead>
                                 <tr style={{borderBottom:"1px solid #2a2a2a"}}>
-                                  {["feed","data","stato","qualità","ric","sal","errore"].map(h => (
+                                  {["feed","data","stato","qualità","ric","sal"].map(h => (
                                     <th key={h} style={{padding:"2px 6px", textAlign:"left", color:"#666", fontWeight:600, whiteSpace:"nowrap"}}>{h}</th>
                                   ))}
                                 </tr>
@@ -3245,17 +3363,21 @@ export default function App() {
                                   .sort((a,b) => (b.run_date+b.started_at).localeCompare(a.run_date+a.started_at))
                                   .slice(0, 50)
                                   .map((r, i) => {
-                                    const stCol = r.status === "ok" ? "#4ade80" : r.status === "error" ? "#f87171" : "#fbbf24";
+                                    const st = mapDatiStatus(r.status, r.error_msg);
                                     const qVal = r.quality_pct != null ? `${Math.min(100, r.quality_pct).toFixed(0)}%` : "—";
                                     return (
                                       <tr key={i} style={{borderBottom:"1px solid #1a1a1a"}}>
                                         <td style={{padding:"2px 6px", color:"#aaa"}}>{r.feed}</td>
                                         <td style={{padding:"2px 6px", color:"#888"}}>{r.run_date}</td>
-                                        <td style={{padding:"2px 6px", color:stCol, fontWeight:600}}>{r.status}</td>
+                                        <td
+                                          style={{padding:"2px 6px", color:st.color, fontWeight:600}}
+                                          title={r.status !== "ok" ? explainDatiError((((r.error_msg ?? "").trim()) || `stato ${r.status}`)) : "run completata"}
+                                        >
+                                          {st.label}
+                                        </td>
                                         <td style={{padding:"2px 6px", color:r.quality_pct != null && r.quality_pct >= 95 ? "#4ade80" : r.quality_pct != null && r.quality_pct >= 80 ? "#fbbf24" : "#f87171"}}>{qVal}</td>
                                         <td style={{padding:"2px 6px", color:"#777"}}>{r.records_in ?? "—"}</td>
                                         <td style={{padding:"2px 6px", color:"#777"}}>{r.records_out ?? "—"}</td>
-                                        <td style={{padding:"2px 6px", color:"#f87171", maxWidth:180, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}} title={r.status !== "ok" ? (r.error_msg ?? "") : ""}>{r.status !== "ok" && r.error_msg ? r.error_msg.slice(0, 60) : ""}</td>
                                       </tr>
                                     );
                                   })}
@@ -3452,7 +3574,7 @@ export default function App() {
                       </div>
                       <div className="slide-mini-value" style={{marginTop:6}}>
                         {latestMorning?.started_at && latestMorning?.finished_at
-                          ? `${latestMorning.started_at.slice(11,16)} → ${latestMorning.finished_at.slice(11,16)}`
+                          ? `${fmtHm(latestMorning.started_at)} → ${fmtHm(latestMorning.finished_at)}`
                           : "N/D"}
                       </div>
                       <div className="slide-mini-brief">
@@ -3475,7 +3597,7 @@ export default function App() {
                       </div>
                       <div className="slide-mini-value" style={{marginTop:6}}>
                         {latestEod?.started_at && latestEod?.finished_at
-                          ? `${latestEod.started_at.slice(11,16)} → ${latestEod.finished_at.slice(11,16)}`
+                          ? `${fmtHm(latestEod.started_at)} → ${fmtHm(latestEod.finished_at)}`
                           : "N/D"}
                       </div>
                       <div className="slide-mini-brief">
@@ -3543,8 +3665,8 @@ export default function App() {
                     <div className="lc-screen-row"><span className="lc-dim">regime</span><span className={sevClassForRegime(premarketRegime)}>{premarketRegime}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">segnali_pronti</span><span className="sev-data">{premarketReadyCount}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">kill_switch</span><span className={sysStatus?.kill_switch_active ? "sev-error" : "sev-ok"}>{sysStatus?.kill_switch_active ? "ACTIVE" : "off"}</span></div>
-                    {sessionStatus?.next_morning && <div className="lc-screen-row"><span className="lc-dim">next_morning</span><span className="sev-meta">{sessionStatus.next_morning.replace("T"," ").slice(0,16)}</span></div>}
-                    {sessionStatus?.last_morning && <div className="lc-screen-row"><span className="lc-dim">last_morning</span><span className="sev-meta">{sessionStatus.last_morning.replace("T"," ").slice(0,16)}</span></div>}
+                    {sessionStatus?.next_morning && <div className="lc-screen-row"><span className="lc-dim">next_morning</span><span className="sev-meta">{fmtTsMin(sessionStatus.next_morning)}</span></div>}
+                    {sessionStatus?.last_morning && <div className="lc-screen-row"><span className="lc-dim">last_morning</span><span className="sev-meta">{fmtTsMin(sessionStatus.last_morning)}</span></div>}
                     <div className="lc-screen-section">
                       <div className="lc-screen-row"><span className="lc-dim">NARRATORE</span><span className={briefingPlaying ? "sev-ok" : "sev-neutral"}>{briefingPlaying ? "▶ PLAYING" : "■ STOP"}</span></div>
                       <div className="lc-screen-row"><span className="lc-dim">track</span><span className="sev-meta" style={{fontSize:"0.6rem", maxWidth:"120px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{briefingLabel}</span></div>
@@ -4822,7 +4944,7 @@ export default function App() {
             <div className="lifecycle-panel">
               <div className="lc-header">
                 <span className="lc-step-label">STEP 23 — CHIUSURA</span>
-                <span className="lc-step-sub">{sessionStatus?.running ? "⟳ SESSIONE IN CORSO" : sessionStatus?.last_eod ? `Ultima EOD: ${sessionStatus.last_eod.slice(0,16).replace("T"," ")}` : "Nessuna EOD registrata"}</span>
+                <span className="lc-step-sub">{sessionStatus?.running ? "⟳ SESSIONE IN CORSO" : sessionStatus?.last_eod ? `Ultima EOD: ${fmtTsMin(sessionStatus.last_eod)}` : "Nessuna EOD registrata"}</span>
               </div>
               <div className="lc-body">
                 <div className="lc-panel">
@@ -4836,8 +4958,8 @@ export default function App() {
                     );
                     const eqSnap = paperSummary?.gates.data_points.equity_snapshots ?? 0;
                     const jComp = f6t2Gate ? (f6t2Gate.completeness_ratio * 100) : null;
-                    const nextMorn = sessionStatus?.next_morning ? sessionStatus.next_morning.slice(11,16) : "—";
-                    const nextEod = sessionStatus?.next_eod ? sessionStatus.next_eod.slice(11,16) : "—";
+                    const nextMorn = sessionStatus?.next_morning ? fmtHm(sessionStatus.next_morning) : "—";
+                    const nextEod = sessionStatus?.next_eod ? fmtHm(sessionStatus.next_eod) : "—";
                     return (
                       <div style={{display:"flex", gap:4, marginBottom:8, flexWrap:"wrap"}}>
                         {mc("scheduler", sessionStatus?.enabled ? "ON" : "OFF", sessionStatus?.enabled ? "#4ade80" : "#888", "Scheduler sessioni")}
@@ -4845,8 +4967,8 @@ export default function App() {
                         {mc("compliance", String(paperSummary?.compliance_violations ?? 0), (paperSummary?.compliance_violations ?? 0) > 0 ? "#fbbf24" : "#4ade80", "Compliance violations")}
                         {mc("journal%", jComp != null ? `${jComp.toFixed(0)}%` : "—", jComp != null && jComp >= 95 ? "#4ade80" : "#fbbf24", "Completezza journal")}
                         {mc("eq snap.", String(eqSnap), eqSnap > 0 ? "#4ade80" : "#888", "Equity snapshots registrati")}
-                        {mc("next morn.", nextMorn, "#888", "Prossima sessione morning (UTC ora)")}
-                        {mc("next EOD", nextEod, "#888", "Prossima sessione EOD (UTC ora)")}
+                        {mc("next morn.", nextMorn, "#888", `Prossima sessione morning (${DISPLAY_TZ})`)}
+                        {mc("next EOD", nextEod, "#888", `Prossima sessione EOD (${DISPLAY_TZ})`)}
                         {mc("kill sw.", sysStatus?.kill_switch_active ? "ATTIVO" : "off", sysStatus?.kill_switch_active ? "#f87171" : "#4ade80", "Kill switch stato")}
                       </div>
                     );
@@ -4889,10 +5011,10 @@ export default function App() {
                   <div className="lc-screen-body" style={{display: screenOpen ? "" : "none"}}>
                     <div className="lc-screen-row"><span className="lc-dim">scheduler</span><span className={sessionStatus?.enabled ? "sev-ok" : "sev-warn"}>{sessionStatus?.enabled ? "on" : "off"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">running</span><span className={sessionStatus?.running ? "sev-warn" : "sev-ok"}>{sessionStatus?.running ? "yes" : "no"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">last_morning</span><span className="sev-meta">{sessionStatus?.last_morning ? sessionStatus.last_morning.slice(0,19).replace("T"," ") : "N/D"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">last_eod</span><span className="sev-meta">{sessionStatus?.last_eod ? sessionStatus.last_eod.slice(0,19).replace("T"," ") : "N/D"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">next_morning</span><span className="sev-meta">{sessionStatus?.next_morning ? sessionStatus.next_morning.slice(0,16).replace("T"," ") : "N/D"}</span></div>
-                    <div className="lc-screen-row"><span className="lc-dim">next_eod</span><span className="sev-meta">{sessionStatus?.next_eod ? sessionStatus.next_eod.slice(0,16).replace("T"," ") : "N/D"}</span></div>
+                    <div className="lc-screen-row"><span className="lc-dim">last_morning</span><span className="sev-meta">{sessionStatus?.last_morning ? fmtTs(sessionStatus.last_morning) : "N/D"}</span></div>
+                    <div className="lc-screen-row"><span className="lc-dim">last_eod</span><span className="sev-meta">{sessionStatus?.last_eod ? fmtTs(sessionStatus.last_eod) : "N/D"}</span></div>
+                    <div className="lc-screen-row"><span className="lc-dim">next_morning</span><span className="sev-meta">{sessionStatus?.next_morning ? fmtTsMin(sessionStatus.next_morning) : "N/D"}</span></div>
+                    <div className="lc-screen-row"><span className="lc-dim">next_eod</span><span className="sev-meta">{sessionStatus?.next_eod ? fmtTsMin(sessionStatus.next_eod) : "N/D"}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">equity_snapshots</span><span className="sev-data">{paperSummary?.gates.data_points.equity_snapshots ?? 0}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">compliance_v</span><span className={(paperSummary?.compliance_violations ?? 0) > 0 ? "sev-warn" : "sev-ok"}>{paperSummary?.compliance_violations ?? 0}</span></div>
                     <div className="lc-screen-row"><span className="lc-dim">journal_complete</span><span className={f6t2Gate?.pass ? "sev-ok" : "sev-warn"}>{f6t2Gate ? `${(f6t2Gate.completeness_ratio * 100).toFixed(0)}%` : "N/D"}</span></div>

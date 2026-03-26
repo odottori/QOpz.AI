@@ -716,17 +716,29 @@ def run_universe_scan_from_ibkr_settings(
     return out
 
 
-def fetch_latest_universe_batch() -> dict[str, Any]:
+def fetch_latest_universe_batch(profile: str | None = None) -> dict[str, Any]:
     init_universe_schema()
     con = _connect()
-    row = con.execute(
-        """
-        SELECT batch_id, profile, regime, source, scanner_name, ibkr_settings_path, ibkr_settings_exists, symbols_json, top_n, market_rows_available, filter_fallback, created_at
-        FROM universe_scan_batches
-        ORDER BY created_at DESC
-        LIMIT 1
-        """
-    ).fetchone()
+    if profile:
+        row = con.execute(
+            """
+            SELECT batch_id, profile, regime, source, scanner_name, ibkr_settings_path, ibkr_settings_exists, symbols_json, top_n, market_rows_available, filter_fallback, created_at
+            FROM universe_scan_batches
+            WHERE profile = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (profile,),
+        ).fetchone()
+    else:
+        row = con.execute(
+            """
+            SELECT batch_id, profile, regime, source, scanner_name, ibkr_settings_path, ibkr_settings_exists, symbols_json, top_n, market_rows_available, filter_fallback, created_at
+            FROM universe_scan_batches
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
     if row is None:
         con.close()
         return {

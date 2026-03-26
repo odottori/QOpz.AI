@@ -17,10 +17,10 @@ router = APIRouter()
 
 
 @router.get("/opz/universe/latest")
-def opz_universe_latest() -> Dict[str, Any]:
+def opz_universe_latest(profile: str = "paper") -> Dict[str, Any]:
     from api import opz_api as compat
 
-    return compat.opz_universe_latest()
+    return compat.opz_universe_latest(profile=profile)
 
 
 @router.get("/opz/universe/ibkr_context")
@@ -93,4 +93,3 @@ def opz_universe_backtest(
         "pnl_executed": pnl_executed,
         "rows": rows,
     }
-

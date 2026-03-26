@@ -29,5 +29,6 @@ _SESSION_STATE: dict[str, Any] = {
     "last_result": None,
     "running": False,
     "enabled": False,
+    "scheduler_mode": "internal",
 }
 _SESSION_TASK: Optional[asyncio.Task] = None  # type: ignore[type-arg]

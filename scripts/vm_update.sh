@@ -28,6 +28,7 @@ VENV_DIR="${APP_DIR}/.venv"
 DOCS_PORT=8080
 FASTAPI_PORT=8765
 CRON_FILE="/etc/cron.d/qopz-sessions"
+SESSION_SCHEDULER_MODE="${SESSION_SCHEDULER_MODE:-internal}"  # internal | external
 
 echo ""
 echo -e "${BLUE}============================================================${NC}"
@@ -90,9 +91,10 @@ if systemctl list-units --type=service | grep -q qopz-api.service; then
 fi
 ok "Services reloaded"
 
-# 6) Cron for automatic sessions
-log "6/7 - Update automatic sessions cron..."
-cat > "${CRON_FILE}" << CRON_EOF
+# 6) Automatic sessions scheduling mode
+log "6/7 - Configure automatic sessions mode (${SESSION_SCHEDULER_MODE})..."
+if [ "${SESSION_SCHEDULER_MODE}" = "external" ]; then
+  cat > "${CRON_FILE}" << CRON_EOF
 # QOpz.AI - Automatic sessions (UTC), weekdays only.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -102,8 +104,16 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # EOD - 21:15 UTC (16:15 EST)
 15 21 * * 1-5 curl -s -X POST -H "Content-Type: application/json" -d '{"type":"eod","profile":"paper"}' http://127.0.0.1:${FASTAPI_PORT}/opz/session/run >/var/log/qopz_cron_eod.log 2>&1
 CRON_EOF
-chmod 644 "${CRON_FILE}"
-ok "Cron installed at ${CRON_FILE}"
+  chmod 644 "${CRON_FILE}"
+  ok "External cron installed at ${CRON_FILE}"
+else
+  if [ -f "${CRON_FILE}" ]; then
+    rm -f "${CRON_FILE}"
+    ok "Removed legacy external cron (${CRON_FILE}); internal scheduler will be used"
+  else
+    ok "No external cron file present; internal scheduler remains active"
+  fi
+fi
 
 # 7) Summary
 echo ""
@@ -115,5 +125,6 @@ echo -e "${GREEN} Docs:${NC}    http://127.0.0.1:${DOCS_PORT}"
 echo -e "${GREEN} Docker:${NC}  $(docker --version 2>/dev/null || echo 'installed')"
 echo -e "${GREEN} Git:${NC}     $(git --version 2>/dev/null || echo 'installed')"
 echo -e "${GREEN} Note:${NC} docker group membership is effective after next login"
-echo -e "${GREEN} Cron:${NC} check with 'cat ${CRON_FILE}'"
+echo -e "${GREEN} Scheduler mode:${NC} ${SESSION_SCHEDULER_MODE}"
+echo -e "${GREEN} Cron file:${NC} ${CRON_FILE}"
 echo ""

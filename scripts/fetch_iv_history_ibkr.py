@@ -184,7 +184,7 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
         if underlying and underlying > 0:
             result["underlying_price"] = round(underlying, 4)
         else:
-            result["error"] = "prezzo sottostante non disponibile"
+            result["error"] = "NO MRKT - Prezzo sottostante non disponibile (mercato chiuso o feed non attivo)"
             return result
 
         # ── 3. Catena opzioni ─────────────────────────────────────────────────
@@ -294,7 +294,7 @@ def _snapshot_on_connection(ib: Any, symbol: str) -> dict[str, Any]:
         result["greeks_complete"] = greeks_filled
 
         if result["atm_iv"] is None:
-            result["error"] = "IV ATM non disponibile (no bid/ask e no abbonamento OPRA)"
+            result["error"] = "NO MRKT - IV ATM non disponibile (mercato opzioni chiuso o feed OPRA assente)"
 
         return result
 
