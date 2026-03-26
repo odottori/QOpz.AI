@@ -1047,8 +1047,7 @@ export default function App() {
   const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
   const [feedLogLoading, setFeedLogLoading] = useState(true);
   const todayIso = new Date().toISOString().slice(0, 10);
-  const feedWindowFromIso = new Date(Date.now() - (29 * 86400000)).toISOString().slice(0, 10);
-  const [datiDateFrom, setDatiDateFrom] = useState<string>(feedWindowFromIso);
+  const [datiDateFrom, setDatiDateFrom] = useState<string>(todayIso);
   const [datiDateTo,   setDatiDateTo]   = useState<string>(todayIso);
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
   const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({ derivati: "ok" });
