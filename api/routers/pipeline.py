@@ -367,12 +367,23 @@ def opz_data_refresh(
         _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status,
              chain_err_msg)
 
-        # Regola operativa: titolo valido per i derivati solo se ha 4/4 greche
-        # (delta, gamma, theta, vega) quando la catena opzioni è disponibile.
+        # Regola operativa allineata alla tabella "Dati derivati" (stato OK):
+        # chain presente + prezzo/strike/iv validi + greche complete 4/4 + nessun errore bloccante.
+        def _is_blocking_snapshot_error(msg: Any) -> bool:
+            txt = str(msg or "").upper()
+            if not txt.strip():
+                return False
+            return ("PRE-MKT" not in txt) and ("NO MRKT" not in txt)
+
         symbols_greeks_ok = sum(
             1
             for s in snapshots
-            if int(s.get("contracts_count", 0) or 0) > 0 and int(s.get("greeks_complete", 0) or 0) >= 4
+            if int(s.get("contracts_count", 0) or 0) > 0
+            and float(s.get("underlying_price") or 0.0) > 0.0
+            and float(s.get("atm_strike") or 0.0) > 0.0
+            and float(s.get("atm_iv") or 0.0) > 0.0
+            and int(s.get("greeks_complete", 0) or 0) >= 4
+            and not _is_blocking_snapshot_error(s.get("error"))
         )
         if with_chain <= 0:
             _rec("ibkr_greeks", t0, t1, 0, 0, "error", "Catene opzioni assenti")
@@ -385,7 +396,7 @@ def opz_data_refresh(
                 greek_status = "partial"
             greek_errs: list[str] = []
             if symbols_greeks_ok < with_chain:
-                greek_errs.append(f"greche complete 4/4 su {symbols_greeks_ok}/{with_chain} simboli")
+                greek_errs.append(f"righe derivati valide su {symbols_greeks_ok}/{with_chain} simboli con catena")
             if iv_errs:
                 greek_errs.extend(iv_errs)
             _rec(

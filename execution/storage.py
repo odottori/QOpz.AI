@@ -438,10 +438,12 @@ def save_symbol_snapshots(snapshots: list[dict], profile: str) -> None:
     source_mode = os.environ.get("OPZ_DATA_MODE", "SYNTHETIC_SURFACE_CALIBRATED")
     con = _connect()
     try:
+        current_symbols: set[str] = set()
         for s in snapshots:
             sym = str(s.get("symbol") or "").upper()
             if not sym:
                 continue
+            current_symbols.add(sym)
             # iv_source: ibkr se impliedVolatility restituita da IBKR, bs se calcolata
             iv_source = s.get("iv_source", "ibkr")
             con.execute(
@@ -463,6 +465,14 @@ def save_symbol_snapshots(snapshots: list[dict], profile: str) -> None:
                     s.get("greeks_complete", 0), s.get("contracts_count", 0),
                     s.get("error"), _SOURCE_SYSTEM, source_mode,
                 ],
+            )
+        # Mantieni "latest" coerente con l'ultima run: rimuovi simboli stale
+        # dello stesso profilo non presenti nell'ultimo batch salvato.
+        if current_symbols:
+            placeholders = ",".join(["?"] * len(current_symbols))
+            con.execute(
+                f"DELETE FROM symbol_snapshot_latest WHERE profile = ? AND symbol NOT IN ({placeholders})",
+                [profile, *sorted(current_symbols)],
             )
     except Exception as exc:
         logger.warning("save_symbol_snapshots error: %s", exc)

@@ -2935,15 +2935,13 @@ export default function App() {
                     feed:"yfinance",
                     label:"yfinance integrativa",
                     note:"Backbone storico IV (HV proxy) + dati esclusivi yfinance: macro mercati (VIX/VIX3M, rendimenti 10Y/30Y) e date ex-dividendo.",
-                    feeds:["yfinance_iv_history","yfinance_macro","yfinance_exdiv",
-                           "fred","yfinance"],  // legacy aliases
+                    feeds:["yfinance_iv_history","yfinance_macro","yfinance_exdiv"],
                   },
                   {
                     feed:"calendario",
                     label:"Calendario eventi",
                     note:"Earnings calendar da yfinance: prossime trimestrali per i simboli in universo.",
-                    feeds:["yfinance_calendar",
-                           "events_calendar"],  // legacy alias
+                    feeds:["yfinance_calendar"],
                   },
                   {
                     feed:"derivati",
@@ -2988,12 +2986,24 @@ export default function App() {
                           if (isBlockingDatiError(errRaw)) return { status: "error", note: errRaw || null };
                           const hasChain = Number(s.contracts_count ?? 0) > 0;
                           const greekCount = Number(s.greeks_complete ?? 0);
+                          const hasUnderlying = Number(s.underlying ?? 0) > 0;
+                          const hasStrike = Number(s.atm_strike ?? 0) > 0;
+                          const hasIv = Number(s.atm_iv ?? 0) > 0;
                           if (hasChain && greekCount < 4) {
                             const prefix = errRaw ? `${errRaw} | ` : "";
                             return { status: "partial", note: `${prefix}Greche incomplete ${greekCount}/4` };
                           }
+                          if (!hasChain) {
+                            const prefix = errRaw ? `${errRaw} | ` : "";
+                            return { status: "error", note: `${prefix}Catena opzioni assente` };
+                          }
+                          const rowComplete = hasUnderlying && hasStrike && hasIv && greekCount >= 4;
+                          if (rowComplete) {
+                            // PRE-MKT/NO-MRKT resta informativo, ma la riga è operativamente completa.
+                            return { status: "ok", note: errRaw || null };
+                          }
                           if (errRaw) return { status: "partial", note: errRaw };
-                          return { status: "ok", note: null };
+                          return { status: "partial", note: "Dati derivati incompleti" };
                         };
                         const snapStates = symbolSnaps.map(deriveSnapState);
                         const snapsOk = snapStates.filter(s => s.status === "ok").length;
