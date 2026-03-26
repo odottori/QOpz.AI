@@ -256,6 +256,7 @@ def opz_data_refresh(
     try:
         from execution.ibkr_connection import get_manager
         from api.opz_api import opz_ibkr_account
+        from scripts.fetch_iv_history import load_iv_history
         from scripts.fetch_iv_history_ibkr import capture_ibkr_universe_snapshot, merge_today_iv_point
         mgr = get_manager()
     except Exception as exc:
@@ -313,6 +314,34 @@ def opz_data_refresh(
                 yfin_price_ok = len(yfin_prices)
                 logger.info("data_refresh: yfinance price fallback applied ok=%s/%s", yfin_price_ok, len(symbols))
 
+        # Fallback locale IV per tabella "Dati derivati":
+        # se ATM IV non arriva da IBKR, usa l'ultimo punto storico yfinance.
+        yfin_iv_ok = 0
+        yfin_iv_errs: list[str] = []
+        for snap in snapshots:
+            if snap.get("atm_iv") is not None:
+                continue
+            sym = str(snap.get("symbol") or "").upper()
+            if not sym:
+                continue
+            try:
+                hist = load_iv_history(sym)
+                if hist:
+                    last_iv = float(hist[-1] or 0.0)
+                    if last_iv > 0:
+                        snap["atm_iv"] = round(last_iv, 6)
+                        snap["iv_source"] = "yfinance"
+                        if snap.get("error"):
+                            snap["error"] = f"{snap.get('error')} | fallback IV=yfinance"
+                        yfin_iv_ok += 1
+                        continue
+                yfin_iv_errs.append(f"{sym}: iv_history yfinance assente")
+            except Exception as exc:
+                yfin_iv_errs.append(f"{sym}: {type(exc).__name__}")
+
+        if yfin_iv_ok > 0:
+            logger.info("data_refresh: yfinance iv fallback applied ok=%s/%s", yfin_iv_ok, len(symbols))
+
         # Errori separati per tipo: prices/chain vs IV/greeks - evita contaminazione error_msg
         price_errs = [f"{s.get('symbol')}: {s['error']}" for s in snapshots
                       if s.get("error") and float(s.get("underlying_price") or 0.0) <= 0]
@@ -338,16 +367,36 @@ def opz_data_refresh(
         _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status,
              chain_err_msg)
 
-        # greeks_complete=0 con catene catturate = mercato chiuso, non un errore
-        # records_in = simboli_ok * 4 (4 campi greek per simbolo: delta,gamma,theta,vega)
-        max_greeks = symbols_ok * 4
-        if greeks_complete == 0 and with_chain > 0:
-            greek_status = "ok"
-            _rec("ibkr_greeks", t0, t1, 0, 0, "ok", None)
+        # Regola operativa: titolo valido per i derivati solo se ha 4/4 greche
+        # (delta, gamma, theta, vega) quando la catena opzioni è disponibile.
+        symbols_greeks_ok = sum(
+            1
+            for s in snapshots
+            if int(s.get("contracts_count", 0) or 0) > 0 and int(s.get("greeks_complete", 0) or 0) >= 4
+        )
+        if with_chain <= 0:
+            _rec("ibkr_greeks", t0, t1, 0, 0, "error", "Catene opzioni assenti")
         else:
-            greek_status = "ok" if max_greeks > 0 and greeks_complete >= max_greeks * 0.75 else ("partial" if greeks_complete > 0 else "error")
-            _rec("ibkr_greeks", t0, t1, max_greeks, greeks_complete, greek_status,
-                 "; ".join(_unique_errs(iv_errs, 3)) if iv_errs else None)
+            if symbols_greeks_ok == with_chain:
+                greek_status = "ok"
+            elif symbols_greeks_ok == 0:
+                greek_status = "error"
+            else:
+                greek_status = "partial"
+            greek_errs: list[str] = []
+            if symbols_greeks_ok < with_chain:
+                greek_errs.append(f"greche complete 4/4 su {symbols_greeks_ok}/{with_chain} simboli")
+            if iv_errs:
+                greek_errs.extend(iv_errs)
+            _rec(
+                "ibkr_greeks",
+                t0,
+                t1,
+                with_chain,
+                symbols_greeks_ok,
+                greek_status,
+                "; ".join(_unique_errs(greek_errs, 3)) if greek_errs else None,
+            )
 
         t2 = datetime.now(timezone.utc)
         iv_ok_ibkr = 0
@@ -356,19 +405,46 @@ def opz_data_refresh(
             try:
                 atm_iv = snap.get("atm_iv")
                 sym = str(snap.get("symbol") or "")
-                if sym and atm_iv is not None:
+                iv_src = str(snap.get("iv_source") or "ibkr").strip().lower()
+                if sym and atm_iv is not None and iv_src != "yfinance":
                     merge_today_iv_point(sym, float(atm_iv))
                     iv_ok_ibkr += 1
             except Exception as exc:
                 iv_err_ibkr.append(f"{snap.get('symbol')}: {exc}")
         t3 = datetime.now(timezone.utc)
-        # iv_ok_ibkr=0 con snapshots catturati = mercato chiuso, non un errore
-        if iv_ok_ibkr == 0 and symbols_ok > 0 and not iv_err_ibkr:
-            _rec("ibkr_iv_history", t2, t3, 0, 0, "ok", None)
+        iv_err_all = _unique_errs(iv_err_ibkr + iv_errs + ibkr_errs, 3)
+        if symbols_ok <= 0:
+            _rec(
+                "ibkr_iv_history",
+                t2,
+                t3,
+                0,
+                0,
+                "error",
+                "; ".join(iv_err_all) if iv_err_all else "IBKR snapshot assente",
+            )
+        elif iv_ok_ibkr == symbols_ok:
+            _rec("ibkr_iv_history", t2, t3, symbols_ok, iv_ok_ibkr, "ok", None)
+        elif iv_ok_ibkr > 0:
+            _rec(
+                "ibkr_iv_history",
+                t2,
+                t3,
+                symbols_ok,
+                iv_ok_ibkr,
+                "partial",
+                "; ".join(iv_err_all) if iv_err_all else None,
+            )
         else:
-            iv_status_ibkr = "ok" if iv_ok_ibkr == symbols_ok and symbols_ok > 0 else ("partial" if iv_ok_ibkr > 0 else "error")
-            _rec("ibkr_iv_history", t2, t3, symbols_ok, iv_ok_ibkr, iv_status_ibkr,
-                 "; ".join(_unique_errs(iv_err_ibkr or ibkr_errs, 3)) if (iv_err_ibkr or ibkr_errs) else None)
+            _rec(
+                "ibkr_iv_history",
+                t2,
+                t3,
+                symbols_ok,
+                0,
+                "partial",
+                "; ".join(iv_err_all) if iv_err_all else "NO MRKT - IV ATM non disponibile per i simboli correnti",
+            )
 
         # Persiste snapshot IV/greeks per-simbolo (quarta griglia DATI tab)
         try:

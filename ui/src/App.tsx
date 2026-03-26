@@ -989,11 +989,10 @@ export default function App() {
   const [feedLog, setFeedLog] = useState<FeedRun[]>([]);
   const [feedLogLoading, setFeedLogLoading] = useState(true);
   const todayIso = new Date().toISOString().slice(0, 10);
-  const minus6Iso = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
-  const [datiDateFrom, setDatiDateFrom] = useState<string>(minus6Iso);
+  const [datiDateFrom, setDatiDateFrom] = useState<string>(todayIso);
   const [datiDateTo,   setDatiDateTo]   = useState<string>(todayIso);
   const [datiBlockFiltersOpen, setDatiBlockFiltersOpen] = useState<Record<string,boolean>>({});
-  const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({});
+  const [datiBlockStatus, setDatiBlockStatus] = useState<Record<string,string>>({ derivati: "ok" });
   const [datiDayOpen, setDatiDayOpen] = useState<Record<string,boolean>>({});
   const [datiDumpOpen, setDatiDumpOpen] = useState(false);
   const [datiDumpSrcOpen, setDatiDumpSrcOpen] = useState(true);
@@ -1008,6 +1007,7 @@ export default function App() {
     greeks_complete: number|null; contracts_count: number|null; error_msg: string|null;
   };
   const [symbolSnaps, setSymbolSnaps] = useState<SymbolSnap[]>([]);
+  const REFRESH_CONTROLS_ENABLED = false; // flusso operativo auto on-connect + hard reload (Ctrl+F5)
 
   const parsedPayload = useMemo(() => {
     try {
@@ -1647,7 +1647,7 @@ export default function App() {
     } catch { /* non critico */ }
   }
 
-  async function doFetchFeedLog(from?: string, to?: string, triggerRefresh = false) {
+  async function doFetchFeedLog(from?: string, to?: string, triggerRefresh = false, autoContinue = false) {
     const f = from ?? datiDateFrom;
     const t = to   ?? datiDateTo;
     const daysBack = Math.max(1, Math.ceil((Date.now() - new Date(f).getTime()) / 86400000) + 1);
@@ -1677,8 +1677,21 @@ export default function App() {
       }, 1000);
       try {
         await apiJson(`${API_BASE}/opz/data/refresh?profile=${ACTIVE_PROFILE}`, { method: "POST" });
+        if (autoContinue) {
+          await doRunSession("morning"); // prosegue autonomamente: forecast + briefing scheduler chain
+          await Promise.allSettled([
+            doFetchSessionStatus(),
+            doFetchSessionLogs(),
+            doFetchExitCandidates(),
+            doFetchBriefingList(),
+          ]);
+        }
         const r2 = await apiJson<{ runs: FeedRun[] }>(`${API_BASE}/opz/pipeline/feed_log?profile=${ACTIVE_PROFILE}&days_back=${daysBack}`);
         setFeedLog((r2.runs ?? []).filter(run => run.run_date >= f && run.run_date <= t));
+        try {
+          const snaps2 = await apiJson<{items: SymbolSnap[]}>(`${API_BASE}/opz/universe/symbol_snapshots?profile=${ACTIVE_PROFILE}`);
+          setSymbolSnaps(snaps2.items ?? []);
+        } catch { /* non critico */ }
       } catch (e) {
         setError(`Refresh dati fallito: ${String(e)}`);
       }
@@ -2139,14 +2152,6 @@ export default function App() {
   }, [message, error]);
 
   useEffect(() => {
-    const init = async () => {
-      await refreshAll();
-    };
-    void init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     const tick = () => {
       const t = new Date().toLocaleString("sv-SE", { hour12: false, timeZone: DISPLAY_TZ }).replace("T", " ");
       setClockText(`${t} ${DISPLAY_TZ}`);
@@ -2167,7 +2172,7 @@ export default function App() {
     void doFetchSessionStatus();
     void doFetchSessionLogs();
     void doFetchControlStatus();
-    void doFetchFeedLog(undefined, undefined, true);
+    void doFetchFeedLog(undefined, undefined, true, true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Heartbeat ogni 5 minuti — solo status leggeri e letture passive
@@ -2469,7 +2474,11 @@ export default function App() {
           <Tooltip text={apiOnline ? TOOLTIPS.ibkr_connected : TOOLTIPS.ibkr_disconnected}>
             <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API LIVE" : "API DOWN"}</span>
           </Tooltip>
-          <button className="btn btn-primary" onClick={refreshAll} disabled={busy}>{busy ? "REFRESHING" : "REFRESH"}</button>
+          {REFRESH_CONTROLS_ENABLED ? (
+            <button className="btn btn-primary" onClick={refreshAll} disabled={busy}>{busy ? "REFRESHING" : "REFRESH"}</button>
+          ) : (
+            <span className="top-mini" title="Aggiornamento automatico attivo. Per reset completo usa Ctrl+F5.">AUTO FLOW · CTRL+F5</span>
+          )}
           <a className="btn btn-ghost" href={`${API_BASE}/guide`} target="_blank" rel="noreferrer">GUIDA</a>
           <a className="btn btn-ghost" href={`${API_BASE}/health`} target="_blank" rel="noreferrer">API /HEALTH</a>
           <button
@@ -2636,8 +2645,10 @@ export default function App() {
                   ))}
                 </div>
                 <div className="syslog-toolbar">
-                  <button className="btn btn-ghost syslog-btn" disabled={!apiOnline}
-                    onClick={() => void doFetchSysLog()}>⟳ aggiorna</button>
+                  {REFRESH_CONTROLS_ENABLED && (
+                    <button className="btn btn-ghost syslog-btn" disabled={!apiOnline}
+                      onClick={() => void doFetchSysLog()}>⟳ aggiorna</button>
+                  )}
                   <button className="btn btn-ghost syslog-btn"
                     onClick={() => {
                       const txt = sysLog.map(r => `${r.ts} [${r.level}] ${r.name}: ${r.msg}`).join("\n");
@@ -2885,15 +2896,17 @@ export default function App() {
                   style={{fontSize:"0.6rem", padding:"1px 4px", borderRadius:3, width:110,
                     border:"1px solid var(--border)", background:"var(--p2)", color:"var(--text)",
                     colorScheme:"dark", cursor:"pointer"}} />
-                <button className="btn btn-ghost"
-                  style={{fontSize:"0.55rem", padding:"1px 6px",
-                    minWidth:36, fontVariantNumeric:"tabular-nums",
-                    opacity: (feedLogLoading || datiCdSecs !== null) ? 0.45 : 1}}
-                  onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)}
-                  disabled={feedLogLoading || datiCdSecs !== null}
-                  title={datiCdSecs !== null ? `Aggiornamento in corso… ${datiCdSecs}s` : "Aggiorna dati"}>
-                  {feedLogLoading ? "…" : datiCdSecs !== null ? `${datiCdSecs}s` : "⟳"}
-                </button>
+                {REFRESH_CONTROLS_ENABLED && (
+                  <button className="btn btn-ghost"
+                    style={{fontSize:"0.55rem", padding:"1px 6px",
+                      minWidth:36, fontVariantNumeric:"tabular-nums",
+                      opacity: (feedLogLoading || datiCdSecs !== null) ? 0.45 : 1}}
+                    onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)}
+                    disabled={feedLogLoading || datiCdSecs !== null}
+                    title={datiCdSecs !== null ? `Aggiornamento in corso… ${datiCdSecs}s` : "Aggiorna dati"}>
+                    {feedLogLoading ? "…" : datiCdSecs !== null ? `${datiCdSecs}s` : "⟳"}
+                  </button>
+                )}
               </div>
 
               {/* ══ Loading bar ══ */}
@@ -2915,14 +2928,14 @@ export default function App() {
                   {
                     feed:"ibkr",
                     label:"IBKR primaria",
-                    note:"Fonte primaria operativa. * IV history ATM: per i primi 90 giorni la serie storica è costruita da yfinance (HV proxy) come backbone; IBKR sovrascrive il punto giornaliero con IV reale. Dopo 90 run consecutivi la serie è interamente da IBKR.",
-                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_iv_history","ibkr_account","ibkr_positions"],
+                    note:"Fonte primaria operativa per prezzi, catene, greche e conto. L'IV mostrata nei derivati può essere IBKR o fallback calcolato/storico.",
+                    feeds:["ibkr_prices","ibkr_chain","ibkr_greeks","ibkr_account","ibkr_positions"],
                   },
                   {
                     feed:"yfinance",
                     label:"yfinance integrativa",
-                    note:"Dati esclusivi yfinance: macro mercati (VIX/VIX3M, rendimenti 10Y/30Y) e date ex-dividendo. Non coperti da IBKR.",
-                    feeds:["yfinance_macro","yfinance_exdiv",
+                    note:"Backbone storico IV (HV proxy) + dati esclusivi yfinance: macro mercati (VIX/VIX3M, rendimenti 10Y/30Y) e date ex-dividendo.",
+                    feeds:["yfinance_iv_history","yfinance_macro","yfinance_exdiv",
                            "fred","yfinance"],  // legacy aliases
                   },
                   {
@@ -2943,7 +2956,7 @@ export default function App() {
                   ibkr_prices:        "Prezzi sottostante",
                   ibkr_chain:         "Catene opzioni",
                   ibkr_greeks:        "Greche complete",
-                  ibkr_iv_history:    "IV history ATM *",
+                  ibkr_iv_history:    "IV history writeback (interno)",
                   ibkr_account:       "Conto",
                   ibkr_positions:     "Posizioni",
                   yfinance_iv_history:"IV — serie storica (HV proxy)",
@@ -2970,14 +2983,24 @@ export default function App() {
                       // ── Blocco 4: Dati derivati (symbol snapshots) ─────────────────
                       if (feed === "derivati") {
                         const hasSnaps = symbolSnaps.length > 0;
-                        const snapsFullOk = symbolSnaps.filter(s => !String(s.error_msg ?? "").trim()).length;
-                        const snapsWarn = symbolSnaps.filter(s => {
-                          const e = String(s.error_msg ?? "").trim();
-                          return !!e && !isBlockingDatiError(e);
-                        }).length;
-                        const snapsErr = symbolSnaps.filter(s => isBlockingDatiError(s.error_msg)).length;
-                        const snapsOk = snapsFullOk + snapsWarn;
+                        const deriveSnapState = (s: SymbolSnap): { status: "ok" | "partial" | "error"; note: string | null } => {
+                          const errRaw = String(s.error_msg ?? "").trim();
+                          if (isBlockingDatiError(errRaw)) return { status: "error", note: errRaw || null };
+                          const hasChain = Number(s.contracts_count ?? 0) > 0;
+                          const greekCount = Number(s.greeks_complete ?? 0);
+                          if (hasChain && greekCount < 4) {
+                            const prefix = errRaw ? `${errRaw} | ` : "";
+                            return { status: "partial", note: `${prefix}Greche incomplete ${greekCount}/4` };
+                          }
+                          if (errRaw) return { status: "partial", note: errRaw };
+                          return { status: "ok", note: null };
+                        };
+                        const snapStates = symbolSnaps.map(deriveSnapState);
+                        const snapsOk = snapStates.filter(s => s.status === "ok").length;
+                        const snapsWarn = snapStates.filter(s => s.status === "partial").length;
+                        const snapsErr = snapStates.filter(s => s.status === "error").length;
                         const ibkrCount = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "ibkr").length;
+                        const yfinCount = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "yfinance").length;
                         const bsCount   = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "bs").length;
                         const blockStatus = !hasSnaps
                           ? null
@@ -2993,10 +3016,10 @@ export default function App() {
                         const lastUpd = symbolSnaps[0]?.updated_at ? fmtHm(symbolSnaps[0].updated_at) : "—";
                         const blockSt = datiBlockStatus[feed] ?? "tutti";
                         const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
-                        const rows = symbolSnaps.filter(s => {
+                        const rows = symbolSnaps.filter((_, idx) => {
+                          const st = snapStates[idx]?.status ?? "ok";
                           if (blockSt === "tutti") return true;
-                          if (blockSt === "ok") return !isBlockingDatiError(s.error_msg);
-                          return isBlockingDatiError(s.error_msg);
+                          return st === blockSt;
                         });
                         const fmtPct = (v: number|null) => v != null ? `${(v*100).toFixed(1)}%` : "—";
                         const fmtN   = (v: number|null, d=4) => v != null ? v.toFixed(d) : "—";
@@ -3014,11 +3037,12 @@ export default function App() {
                             s.atm_gamma != null ? s.atm_gamma.toFixed(4) : "",
                             s.atm_theta != null ? s.atm_theta.toFixed(4) : "",
                             s.atm_vega != null ? s.atm_vega.toFixed(4) : "",
-                            mapDatiStatus(
-                              isBlockingDatiError(s.error_msg) ? "error" : (s.error_msg ? "partial" : "ok"),
-                              s.error_msg,
-                            ).label,
-                            explainDatiError(s.error_msg),
+                            (() => {
+                              const rs = deriveSnapState(s);
+                              const st = mapDatiStatus(rs.status, rs.note ?? s.error_msg);
+                              return st.label;
+                            })(),
+                            explainDatiError(deriveSnapState(s).note ?? s.error_msg),
                           ]);
                           const blob = new Blob(
                             [cols.join(",")+"\n", ...body.map(r => r.map(x => `${x}`).join(",")+"\n")],
@@ -3051,9 +3075,10 @@ export default function App() {
                             <div style={{display:"flex", gap:6, padding:"8px 12px", flexWrap:"wrap"}}>
                               {([
                                 {lbl:"Simboli", val:String(symbolSnaps.length), col:symbolSnaps.length>0?"#e2f0e8":"#555"},
-                                {lbl:"OK",      val:String(snapsOk),           col:snapsErr===0&&snapsOk>0?"#4ade80":snapsOk>0?"#fbbf24":"#f87171"},
+                                {lbl:"OK",      val:String(snapsOk),           col:snapsErr===0&&snapsWarn===0&&snapsOk>0?"#4ade80":snapsOk>0?"#fbbf24":"#f87171"},
                                 {lbl:"Errori",  val:String(snapsErr),          col:snapsErr===0?"#4ade80":"#f87171"},
                                 {lbl:"Fonte IBKR", val:String(ibkrCount),      col:"#4ade80"},
+                                {lbl:"Fonte YF",   val:String(yfinCount),      col:"#60a5fa"},
                                 {lbl:"Fonte BS",   val:String(bsCount),        col:"#fbbf24"},
                               ] as Array<{lbl:string,val:string,col:string}>).map(({lbl,val,col}) => (
                                 <div key={lbl} style={{flex:"1 1 72px", background:"var(--p1)", border:"1px solid var(--border)", borderRadius:4, padding:"5px 8px", minWidth:68}}>
@@ -3077,6 +3102,7 @@ export default function App() {
                                   {([
                                     {id:"tutti",   label:"TUTTI",    col:"#888"},
                                     {id:"ok",      label:"OK",       col:"#4ade80"},
+                                    {id:"partial", label:"PARZIALE", col:"#fbbf24"},
                                     {id:"error",   label:"ERRORE",   col:"#f87171"},
                                   ] as Array<{id:string,label:string,col:string}>).map(({id,label,col}) => (
                                     <button key={id} onClick={() => setDatiBlockStatus(v => ({...v, [feed]: id}))} style={fBtnSt(blockSt === id, col)}>{label}</button>
@@ -3101,13 +3127,14 @@ export default function App() {
                                     </thead>
                                     <tbody>
                                       {rows.map((s, i) => {
-                                        const hasErr = !!String(s.error_msg ?? "").trim();
-                                        const hasBlockingErr = isBlockingDatiError(s.error_msg);
-                                        const st = mapDatiStatus(hasBlockingErr ? "error" : (hasErr ? "partial" : "ok"), s.error_msg);
+                                        const snapState = deriveSnapState(s);
+                                        const hasErr = snapState.status !== "ok";
+                                        const st = mapDatiStatus(snapState.status, snapState.note ?? s.error_msg);
                                         const ivC = s.atm_iv
                                           ? "#4ade80"
                                           : (isPreMrktError(s.error_msg) || isNoMrktError(s.error_msg) ? "#fbbf24" : "#f87171");
-                                        const srcC = s.iv_source === "bs" ? "#fbbf24" : "#4ade80";
+                                        const src = String(s.iv_source ?? "").toLowerCase();
+                                        const srcC = src === "bs" ? "#fbbf24" : src === "yfinance" ? "#60a5fa" : "#4ade80";
                                         return (
                                           <tr key={s.symbol} style={{borderBottom:"1px solid var(--border)", background: i%2===0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)"}}>
                                             <td style={{padding:"4px 8px", fontWeight:700, color:"var(--fg)"}}>{s.symbol}</td>
@@ -3120,7 +3147,7 @@ export default function App() {
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_theta, 4)}</td>
                                             <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_vega, 4)}</td>
                                             <td style={{padding:"4px 8px"}}>
-                                              <span style={{color: st.color, fontWeight:700}} title={hasErr ? explainDatiError(s.error_msg) : "dati derivati completi"}>{st.label}</span>
+                                              <span style={{color: st.color, fontWeight:700}} title={hasErr ? explainDatiError(snapState.note ?? s.error_msg) : "dati derivati completi"}>{st.label}</span>
                                             </td>
                                           </tr>
                                         );
@@ -3372,14 +3399,16 @@ export default function App() {
                             <div className="lc-screen-row"><span className="lc-dim">period_to</span><span className="sev-data">{datiDateTo}</span></div>
                             <div className="lc-screen-row"><span className="lc-dim">runs_loaded</span><span className="sev-data">{feedLog.length}</span></div>
                             <div className="lc-screen-row"><span className="lc-dim">feeds_distinct</span><span className="sev-data">{[...new Set(feedLog.map(r => r.feed))].length}</span></div>
-                            <div style={{marginTop:8}}>
-                              <button className="btn btn-ghost" style={{fontSize:"0.6rem",
-                                opacity: (feedLogLoading || datiCdSecs !== null) ? 0.45 : 1}}
-                                onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)}
-                                disabled={feedLogLoading || datiCdSecs !== null}>
-                                {datiCdSecs !== null ? `⟳ ${datiCdSecs}s` : "⟳ refresh"}
-                              </button>
-                            </div>
+                            {REFRESH_CONTROLS_ENABLED && (
+                              <div style={{marginTop:8}}>
+                                <button className="btn btn-ghost" style={{fontSize:"0.6rem",
+                                  opacity: (feedLogLoading || datiCdSecs !== null) ? 0.45 : 1}}
+                                  onClick={() => void doFetchFeedLog(datiDateFrom, datiDateTo, true)}
+                                  disabled={feedLogLoading || datiCdSecs !== null}>
+                                  {datiCdSecs !== null ? `⟳ ${datiCdSecs}s` : "⟳ refresh"}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
