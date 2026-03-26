@@ -601,6 +601,12 @@ function explainDatiError(err: string | null | undefined): string {
   const raw = String(err ?? "").trim();
   if (!raw) return "Errore non specificato";
   const up = raw.toUpperCase();
+  if (up.includes("10089")) {
+    return "KO FEED: IBKR market data API non abilitato per lo strumento richiesto (codice 10089).";
+  }
+  if (up.includes("ERROR 300") || up.includes("ERR 300")) {
+    return "KO FEED: richiesta market data IBKR non risolta (codice 300), spesso conseguenza di feed non disponibile.";
+  }
   if (up.includes("NO MRKT")) {
     return "NO MRKT: mercato chiuso o feed opzioni non disponibile. Azione: attendere apertura o verificare feed OPRA.";
   }
