@@ -892,6 +892,14 @@ export default function App() {
   };
   const [sessionLogs, setSessionLogs] = useState<SessionLogEntry[]>([]);
   const [sessionLogOpen, setSessionLogOpen] = useState(false);
+  const latestMorning = useMemo(() => {
+    const items = sessionLogs.filter(l => l.session_type === "morning");
+    return items.length > 0 ? items[0] : null;
+  }, [sessionLogs]);
+  const latestEod = useMemo(() => {
+    const items = sessionLogs.filter(l => l.session_type === "eod");
+    return items.length > 0 ? items[0] : null;
+  }, [sessionLogs]);
 
   type FeedRun = {
     run_id: string; feed: string; run_date: string;
@@ -1435,15 +1443,9 @@ export default function App() {
   async function doCheckIbkr(tryConnect = false) {
     setIbkrChecking(true);
     try {
-      let r = await apiJson<IbkrStatusResponse>(
+      const r = await apiJson<IbkrStatusResponse>(
         `${API_BASE}/opz/ibkr/status?try_connect=${tryConnect}`
       );
-      // Auto-recovery: se il poll passivo vede disconnected, tenta una reconnessione.
-      if (!r.connected && !tryConnect) {
-        r = await apiJson<IbkrStatusResponse>(
-          `${API_BASE}/opz/ibkr/status?try_connect=true`
-        );
-      }
       setIbkrStatus(r);
       setMessage(r.message);
       // Aggiorna account solo se connesso
@@ -2060,9 +2062,9 @@ export default function App() {
     return () => window.clearInterval(id);
   }, []);
 
-  // On mount: connessione IBKR + fetch iniziale di tutti i dati
+  // On mount: stato IBKR passivo + fetch iniziale di tutti i dati
   useEffect(() => {
-    void doCheckIbkr(true);
+    void doCheckIbkr(false);
     void doFetchIbkrAccount();
     void doFetchSysStatus();
     void doFetchRegimeCurrent();
@@ -2075,12 +2077,13 @@ export default function App() {
     void doFetchFeedLog(undefined, undefined, true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Heartbeat ogni 5 minuti — solo status leggeri (nessun dato daily ridondante)
+  // Heartbeat ogni 5 minuti — solo status leggeri e letture passive
   useEffect(() => {
     const id = window.setInterval(() => {
-      void doCheckIbkr(false);   // TCP probe IBG — rileva disconnessioni
+      void doCheckIbkr(false);   // stato IBKR passivo, senza reconnessioni automatiche
       void doFetchSysStatus();   // 1 query DuckDB — kill switch, kelly, data_mode
       void doFetchSessionStatus(); // stato scheduler sessioni
+      void doFetchSessionLogs(); // storico sessioni → aggiorna card morning/EOD
       void doFetchControlStatus(); // observer + ibwr + control plane
       void doFetchActivityStream(); // activity stream — refresh ogni 5 min
       void doFetchSysLog();         // system log — refresh ogni 5 min
@@ -2843,35 +2846,115 @@ export default function App() {
                       if (feed === "derivati") {
                         const hasSnaps = symbolSnaps.length > 0;
                         const snapsOk = symbolSnaps.filter(s => !s.error_msg).length;
-                        const snapsPar = symbolSnaps.filter(s => s.error_msg).length;
-                        const blockC = !hasSnaps ? "#555" : snapsPar > 0 ? "#fbbf24" : "#4ade80";
-                        const blockL = !hasSnaps ? "—" : snapsPar > 0 ? `~ ${snapsOk}/${symbolSnaps.length} OK` : `✓ OK`;
+                        const snapsErr = symbolSnaps.filter(s => s.error_msg).length;
+                        const ibkrCount = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "ibkr").length;
+                        const bsCount   = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "bs").length;
+                        const blockStatus = !hasSnaps ? null : snapsErr === 0 ? "ok" : snapsOk === 0 ? "error" : "partial";
+                        const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : blockStatus === "partial" ? "#fbbf24" : "#555";
+                        const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : blockStatus === "partial" ? "~ PARZ." : "—";
                         const lastUpd = symbolSnaps[0]?.updated_at?.slice(11,16) ?? "—";
+                        const blockSt = datiBlockStatus[feed] ?? "tutti";
+                        const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
+                        const rows = symbolSnaps.filter(s => blockSt === "tutti" || (blockSt === "ok" ? !s.error_msg : !!s.error_msg));
                         const fmtPct = (v: number|null) => v != null ? `${(v*100).toFixed(1)}%` : "—";
                         const fmtN   = (v: number|null, d=4) => v != null ? v.toFixed(d) : "—";
                         const fmtP   = (v: number|null) => v != null ? v.toFixed(2) : "—";
+                        const csvDownloadDerivati = () => {
+                          if (!rows.length) return;
+                          const cols = ["symbol","underlying","atm_strike","atm_iv","iv_source","atm_delta","atm_gamma","atm_theta","atm_vega","error"];
+                          const body = rows.map(s => [
+                            s.symbol ?? "",
+                            s.underlying != null ? s.underlying.toFixed(2) : "",
+                            s.atm_strike != null ? s.atm_strike.toFixed(2) : "",
+                            s.atm_iv != null ? (s.atm_iv*100).toFixed(2)+"%" : "",
+                            s.iv_source ?? "",
+                            s.atm_delta != null ? s.atm_delta.toFixed(3) : "",
+                            s.atm_gamma != null ? s.atm_gamma.toFixed(4) : "",
+                            s.atm_theta != null ? s.atm_theta.toFixed(4) : "",
+                            s.atm_vega != null ? s.atm_vega.toFixed(4) : "",
+                            s.error_msg ?? "",
+                          ]);
+                          const blob = new Blob(
+                            [cols.join(",")+"\n", ...body.map(r => r.map(x => `${x}`).join(",")+"\n")],
+                            { type: "text/csv;charset=utf-8" }
+                          );
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `dati_derivati_${new Date().toISOString().slice(0,10)}.csv`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          URL.revokeObjectURL(url);
+                        };
                         return (
                           <div key="derivati" style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", minWidth:0}}>
-                            {/* Header */}
-                            <div style={{display:"flex", alignItems:"center", padding:"10px 14px 6px", gap:8, borderBottom:"1px solid var(--border)"}}>
-                              <span style={{fontSize:"0.72rem", fontWeight:700, color:"var(--fg)", flex:1}}>{label}</span>
-                              <span style={{fontSize:"0.6rem", color:"#888"}}>agg. {lastUpd} · {symbolSnaps.length} simboli</span>
-                              <span style={{fontSize:"0.65rem", fontWeight:700, color:blockC}}>{blockL}</span>
+                            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
+                              padding:"10px 14px", background:"rgba(0,255,106,0.04)", borderBottom:"1px solid var(--border)"}}>
+                              <div>
+                                <div style={{fontSize:"0.78rem", fontWeight:700, color:"#e2f0e8", letterSpacing:"0.04em"}}>{label}</div>
+                                <div style={{fontSize:"0.58rem", color:"#7aaa90", marginTop:2}}>
+                                  {hasSnaps ? `ultima esecuzione: ${lastUpd} · ${symbolSnaps.length} simboli` : "Nessun dato disponibile"}
+                                </div>
+                              </div>
+                              <div style={{textAlign:"right"}}>
+                                <div style={{fontSize:"1.15rem", fontWeight:700, color:mainCol, letterSpacing:"0.02em"}}>{stLabel}</div>
+                                <div style={{fontSize:"0.55rem", color:"#666", marginTop:1}}>{symbolSnaps.length} simboli · {snapsOk} ok</div>
+                              </div>
                             </div>
-                            {/* Tabella */}
+                            <div style={{display:"flex", gap:6, padding:"8px 12px", flexWrap:"wrap"}}>
+                              {([
+                                {lbl:"Simboli", val:String(symbolSnaps.length), col:symbolSnaps.length>0?"#e2f0e8":"#555"},
+                                {lbl:"OK",      val:String(snapsOk),           col:snapsErr===0&&snapsOk>0?"#4ade80":snapsOk>0?"#fbbf24":"#f87171"},
+                                {lbl:"Errori",  val:String(snapsErr),          col:snapsErr===0?"#4ade80":"#f87171"},
+                                {lbl:"Fonte IBKR", val:String(ibkrCount),      col:"#4ade80"},
+                                {lbl:"Fonte BS",   val:String(bsCount),        col:"#fbbf24"},
+                              ] as Array<{lbl:string,val:string,col:string}>).map(({lbl,val,col}) => (
+                                <div key={lbl} style={{flex:"1 1 72px", background:"var(--p1)", border:"1px solid var(--border)", borderRadius:4, padding:"5px 8px", minWidth:68}}>
+                                  <div style={{fontSize:"0.5rem", color:"#7aaa90", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:2}}>{lbl}</div>
+                                  <div style={{fontSize:"0.85rem", fontWeight:700, color:col}}>{val}</div>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{padding:"0 12px 4px"}}>
+                              <div style={{display:"flex", alignItems:"center", gap:5, cursor:"pointer", padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: filtersOpen ? 6 : 0}}
+                                onClick={() => setDatiBlockFiltersOpen(v => ({...v, [feed]: !filtersOpen}))}>
+                                <span style={{fontSize:"0.62rem", color:"#888"}}>🔍</span>
+                                <span style={{fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", flex:1, color: (blockSt!=="tutti") ? "#60a5fa" : "#555", fontWeight: (blockSt!=="tutti") ? 600 : 400}}>
+                                  FILTRI{blockSt!=="tutti" ? " · 1 attivo" : ""}
+                                </span>
+                                <span style={{fontSize:"0.5rem", color:"#777"}}>{filtersOpen ? "▾" : "▸"}</span>
+                              </div>
+                              {filtersOpen && (
+                                <div style={{display:"flex", alignItems:"center", gap:4, marginBottom:6, flexWrap:"wrap"}}>
+                                  <span style={{fontSize:"0.5rem", color:"#888", textTransform:"uppercase", letterSpacing:"0.06em", minWidth:32, flexShrink:0}}>stato:</span>
+                                  {([
+                                    {id:"tutti",   label:"TUTTI",    col:"#888"},
+                                    {id:"ok",      label:"OK",       col:"#4ade80"},
+                                    {id:"error",   label:"ERRORE",   col:"#f87171"},
+                                  ] as Array<{id:string,label:string,col:string}>).map(({id,label,col}) => (
+                                    <button key={id} onClick={() => setDatiBlockStatus(v => ({...v, [feed]: id}))} style={fBtnSt(blockSt === id, col)}>{label}</button>
+                                  ))}
+                                  <button className="btn btn-ghost" style={{fontSize:"0.55rem", padding:"1px 7px", marginLeft:"auto"}}
+                                    onClick={csvDownloadDerivati} disabled={rows.length===0} title="Scarica CSV dati derivati">
+                                    ⬇ CSV
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                             <div style={{overflowX:"auto"}}>
-                              {!hasSnaps
+                              {!rows.length
                                 ? <div style={{padding:"16px 14px", fontSize:"0.6rem", color:"#666"}}>Nessun dato — esegui un aggiornamento IBKR</div>
                                 : <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.6rem"}}>
                                     <thead>
-                                      <tr style={{borderBottom:"1px solid var(--border)", background:"rgba(255,255,255,0.03)"}}>
+                                      <tr style={{borderBottom:"2px solid var(--border)"}}>
                                         {["Simbolo","Prezzo","Strike ATM","IV ATM","Fonte","Delta","Gamma","Theta","Vega","Errore"].map(h =>
-                                          <th key={h} style={{padding:"4px 8px", color:"#888", fontWeight:600, textAlign: h==="Simbolo"||h==="Fonte"||h==="Errore" ? "left" : "right", whiteSpace:"nowrap"}}>{h}</th>
+                                          <th key={h} style={{padding:"4px 8px", textAlign: h==="Simbolo"||h==="Fonte"||h==="Errore" ? "left" : "right", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
                                         )}
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {symbolSnaps.map((s, i) => {
+                                      {rows.map((s, i) => {
                                         const hasErr = !!s.error_msg;
                                         const ivC = s.atm_iv ? "#4ade80" : "#f87171";
                                         const srcC = s.iv_source === "bs" ? "#fbbf24" : "#4ade80";
@@ -2894,8 +2977,7 @@ export default function App() {
                                   </table>
                               }
                             </div>
-                            {/* Note */}
-                            <div style={{padding:"6px 14px", fontSize:"0.55rem", color:"#666", borderTop:"1px solid var(--border)"}}>{note}</div>
+                            <div style={{padding:"6px 14px 8px", borderTop:"1px solid var(--border)", fontSize:"0.55rem", color:"#666"}}>{note}</div>
                           </div>
                         );
                       }
@@ -3362,6 +3444,54 @@ export default function App() {
                       </div>
                     );
                   })()}
+                  <div className="adaptive-grid">
+                    <div className="slide-mini-card">
+                      <div className="slide-mini-headline">
+                        <span>Morning auto</span>
+                        <span className="slide-mini-chevron">›</span>
+                      </div>
+                      <div className="slide-mini-value" style={{marginTop:6}}>
+                        {latestMorning?.started_at && latestMorning?.finished_at
+                          ? `${latestMorning.started_at.slice(11,16)} → ${latestMorning.finished_at.slice(11,16)}`
+                          : "N/D"}
+                      </div>
+                      <div className="slide-mini-brief">
+                        {latestMorning
+                          ? `${(latestMorning.errors ?? []).length === 0 ? "OK" : "ERR " + (latestMorning.errors ?? []).length} · ${latestMorning.session_date}`
+                          : "Nessuna sessione registrata"}
+                      </div>
+                      {latestMorning && (
+                        <div className="slide-mini-detail">
+                          <div>regime: {latestMorning.regime ?? "?"}</div>
+                          <div>simboli: {latestMorning.n_symbols ?? "?"}</div>
+                          <div>trigger: {latestMorning.trigger}</div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="slide-mini-card">
+                      <div className="slide-mini-headline">
+                        <span>EOD auto</span>
+                        <span className="slide-mini-chevron">›</span>
+                      </div>
+                      <div className="slide-mini-value" style={{marginTop:6}}>
+                        {latestEod?.started_at && latestEod?.finished_at
+                          ? `${latestEod.started_at.slice(11,16)} → ${latestEod.finished_at.slice(11,16)}`
+                          : "N/D"}
+                      </div>
+                      <div className="slide-mini-brief">
+                        {latestEod
+                          ? `${(latestEod.errors ?? []).length === 0 ? "OK" : "ERR " + (latestEod.errors ?? []).length} · ${latestEod.session_date}`
+                          : "Nessuna sessione registrata"}
+                      </div>
+                      {latestEod && (
+                        <div className="slide-mini-detail">
+                          <div>regime: {latestEod.regime ?? "?"}</div>
+                          <div>equity: {latestEod.equity != null ? latestEod.equity.toLocaleString("it-IT",{maximumFractionDigits:0}) : "N/D"}</div>
+                          <div>trigger: {latestEod.trigger}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div className="lc-panel-title">Checklist apertura</div>
                   <ul className="lc-checklist">
                     <li className={`lc-check-item ${sessionStatus?.enabled ? "pass" : "fail"}`}>

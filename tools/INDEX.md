@@ -33,7 +33,8 @@
 | `fix_portable_snapshot.py` | Applica la policy `.gitattributes` (no text normalization) e la whitelist `.gitignore` |
 | `hf_progress_tracking_alignment.py` | Inserisce idempotentemente F1-T2 nella lista steps_completed del state file |
 | `hf_release_plan_go_nogo.py` | Aggiorna la sezione GO/NO-GO in `.canonici/04_APPENDICI.md` leggendo `release_plan_go_nogo.json` |
-| `opz_env_setup.py` | Setup ambiente Python Windows: crea `.venv` e installa i requirements (idempotente) |
+| `opz_env_setup.py` | Setup ambiente Python Windows: crea il venv scelto (`--venv-name`, default `.venv`) e installa i requirements (idempotente) |
+| `opz_protected_validate.py` | Validazione pre-rilascio in ambiente protetto isolato (`.venv_protected`): repo sync, planner guard, test core, VM dry-run opzionale e gates |
 | `opz_f3_t1_runner.py` | Runner F3-T1 full (logica di connettività IBKR con retry e report strutturato) |
 | `opz_f3_t2_runner.py` | Runner F3-T2 full (smoke test combo IBKR con ciclo send/modify/cancel/fill e P&L simulato) |
 | `opz_state_normalize.py` | Normalizza lo schema di `.qoaistate.json`: unifica progress, migra chiavi legacy root |
@@ -65,6 +66,7 @@
 
 ### Setup / ambiente / patch
 - `opz_env_setup.py` — setup venv + requirements (Windows)
+- `opz_protected_validate.py` — pre-release validation in isolated protected venv
 - `apply_patch.py` — applicazione PATCH_*.zip
 - `apply_qopz_002_cleanup.py` — cleanup script legacy e PATCH_NOTES
 - `apply_qopz_004_ui.py` — rimozione node_modules stale

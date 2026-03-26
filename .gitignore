@@ -13,6 +13,7 @@ db/*
 !db/.gitkeep
 
 # Python
+_drops
 __pycache__/
 _repo_cache/
 *.pyc

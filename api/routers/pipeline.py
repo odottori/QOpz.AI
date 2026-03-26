@@ -55,8 +55,8 @@ def opz_data_refresh(
 ) -> Dict[str, Any]:
     """Aggiorna i dati di mercato (yfinance) e registra ogni fonte in ingestion_runs.
 
-    Eseguito automaticamente all'apertura della UI se il feed_log è vuoto.
-    Idempotente: il backend skippa la scrittura se i dati sono già freschi.
+    Eseguito automaticamente all'apertura della UI se il feed_log e vuoto.
+    Idempotente: il backend skippa la scrittura se i dati sono gia freschi.
     """
     from execution.storage import record_ingestion_run, list_ingestion_runs
     from api.opz_api import opz_universe_latest
@@ -79,9 +79,9 @@ def opz_data_refresh(
             import logging
             logging.getLogger(__name__).warning("record_ingestion_run(%s): %s", feed, exc)
 
-    # ── 1. Universe symbols ───────────────────────────────────────────────────
+    # 1) Universe symbols
     # I simboli vengono SEMPRE dall'universe scan. Nessun fallback hardcoded:
-    # se l'universo è vuoto si esegue una scan automatica; se anche quella
+    # se l'universo e vuoto si esegue una scan automatica; se anche quella
     # fallisce si restituisce errore esplicito al chiamante.
     symbols: list[str] = []
     try:
@@ -89,9 +89,9 @@ def opz_data_refresh(
         items = uni.get("items", []) or []
         symbols = list({r.get("symbol") for r in items if r.get("symbol")})
         if not symbols:
-            # Universo vuoto → scan automatica da impostazioni IBKR
+            # Universo vuoto -> scan automatica da impostazioni IBKR
             import logging as _log
-            _log.getLogger(__name__).info("Universe vuoto — eseguo scan automatica prima del refresh")
+            _log.getLogger(__name__).info("Universe vuoto - eseguo scan automatica prima del refresh")
             from execution.universe import run_universe_scan_from_ibkr_settings
             run_universe_scan_from_ibkr_settings(profile=profile, top_n=20)
             uni2 = opz_universe_latest()
@@ -102,10 +102,10 @@ def opz_data_refresh(
         _log.getLogger(__name__).error("Errore recupero simboli universo: %s", exc)
 
     if not symbols:
-        results["error"] = "Universo simboli non disponibile — eseguire prima una scan"
+        results["error"] = "Universo simboli non disponibile - eseguire prima una scan"
         return results
 
-    # ── 2. yfinance — IV history ATM ─────────────────────────────────────────
+    # 2) yfinance - IV history ATM
     t0 = datetime.now(timezone.utc)
     iv_ok = 0
     iv_err: list[str] = []
@@ -126,7 +126,7 @@ def opz_data_refresh(
          "; ".join(iv_err[:3]) if iv_err else None)
     results["yfinance_iv_history"] = {"ok": iv_ok, "total": len(symbols), "errors": len(iv_err)}
 
-    # ── 3a. yfinance — earnings calendar ──────────────────────────────────────
+    # 3a) yfinance - earnings calendar
     t0 = datetime.now(timezone.utc)
     cal_ok = 0
     cal_err: list[str] = []
@@ -146,7 +146,7 @@ def opz_data_refresh(
          "; ".join(cal_err[:3]) if cal_err else None)
     results["yfinance_calendar"] = {"ok": cal_ok, "total": len(symbols), "errors": len(cal_err)}
 
-    # ── 3b. yfinance — ex-dividend dates ──────────────────────────────────────
+    # 3b) yfinance - ex-dividend dates
     t0 = datetime.now(timezone.utc)
     div_ok = 0
     div_err: list[str] = []
@@ -166,7 +166,7 @@ def opz_data_refresh(
          "; ".join(div_err[:3]) if div_err else None)
     results["yfinance_exdiv"] = {"ok": div_ok, "total": len(symbols), "errors": len(div_err)}
 
-    # ── 4. yfinance — macro indicators (VIX, VIX3M, 10Y/30Y) ────────────────
+    # 4) yfinance - macro indicators (VIX, VIX3M, 10Y/30Y)
     t0 = datetime.now(timezone.utc)
     macro_n_in, macro_n_out, macro_status, macro_err = 0, 0, "error", None
     try:
@@ -192,16 +192,28 @@ def opz_data_refresh(
     results["events_calendar"] = results["yfinance_calendar"]
     results["fred"] = results["yfinance_macro"]
 
-    # ── 5. IBKR — ingest reale (prezzi, chain, greeks, IV history, account) ─
+    # 5) IBKR - ingest reale (prezzi, chain, greeks, IV history, account)
+    mgr = None
     try:
+        from execution.ibkr_connection import get_manager
         from api.opz_api import opz_ibkr_account
         from scripts.fetch_iv_history_ibkr import capture_ibkr_universe_snapshot, merge_today_iv_point
+        mgr = get_manager()
     except Exception as exc:
         t0 = datetime.now(timezone.utc)
         t1 = datetime.now(timezone.utc)
         msg = f"Import IBKR fallito: {exc}"
         for _feed in ("ibkr_prices", "ibkr_chain", "ibkr_greeks", "ibkr_iv_history", "ibkr_account", "ibkr_positions"):
             _rec(_feed, t0, t1, len(symbols) if _feed != "ibkr_account" else 1, 0, "error", msg)
+        try:
+            from execution.storage import save_symbol_snapshots
+            snapshots = [{"symbol": s, "underlying_price": None, "atm_strike": None, "atm_iv": None,
+                          "atm_call_iv": None, "atm_put_iv": None, "iv_source": "ibkr",
+                          "atm_delta": None, "atm_gamma": None, "atm_theta": None, "atm_vega": None,
+                          "greeks_complete": 0, "contracts_count": 0, "error": msg} for s in symbols]
+            save_symbol_snapshots(snapshots, profile=profile)
+        except Exception:
+            pass
         results["ibkr"] = {"status": "error", "error": msg}
     else:
         ibkr_errs: list[str] = []
@@ -224,7 +236,7 @@ def opz_data_refresh(
         with_price = sum(1 for s in snapshots if float(s.get("underlying_price") or 0.0) > 0)
         with_chain = sum(1 for s in snapshots if int(s.get("contracts_count", 0) or 0) > 0)
 
-        # Errori separati per tipo: prices/chain vs IV/greeks — evita contaminazione error_msg
+        # Errori separati per tipo: prices/chain vs IV/greeks - evita contaminazione error_msg
         price_errs = [f"{s.get('symbol')}: {s['error']}" for s in snapshots
                       if s.get("error") and float(s.get("underlying_price") or 0.0) <= 0]
         chain_errs = [f"{s.get('symbol')}: {s['error']}" for s in snapshots
@@ -235,11 +247,12 @@ def opz_data_refresh(
 
         price_status = "ok" if with_price == len(symbols) and len(symbols) > 0 else ("partial" if with_price > 0 else "error")
         chain_status = "ok" if with_chain == len(symbols) and len(symbols) > 0 else ("partial" if with_chain > 0 else "error")
+        chain_err_msg = "; ".join((chain_errs or ibkr_errs)[:3]) if (chain_errs or (with_chain < len(symbols) and ibkr_errs)) else None
 
         _rec("ibkr_prices", t0, t1, len(symbols), with_price, price_status,
              "; ".join((price_errs or ibkr_errs)[:3]) if (price_errs or (with_price < len(symbols) and ibkr_errs)) else None)
         _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status,
-             "; ".join((chain_errs or ibkr_errs)[:3]) if (chain_errs or (with_chain < len(symbols) and ibkr_errs)) else None)
+             chain_err_msg)
 
         # greeks_complete=0 con catene catturate = mercato chiuso, non un errore
         # records_in = simboli_ok * 4 (4 campi greek per simbolo: delta,gamma,theta,vega)
@@ -310,8 +323,16 @@ def opz_data_refresh(
             "iv_history_ok": iv_ok_ibkr,
             "positions": positions_out,
         }
+    finally:
+        if mgr is not None:
+            try:
+                mgr.disconnect()
+            except Exception as _disc_exc:
+                import logging as _log
 
-    # ── Totale runs registrate oggi ───────────────────────────────────────────
+                _log.getLogger(__name__).debug("IBKR disconnect after data refresh skipped: %s", _disc_exc)
+
+    # Totale runs registrate oggi
     total_runs = list_ingestion_runs(profile=profile, days_back=1)
     return {
         "ok": True,
@@ -320,4 +341,3 @@ def opz_data_refresh(
         "feeds": results,
         "runs_today": len(total_runs),
     }
-

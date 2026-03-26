@@ -19,3 +19,9 @@ def opz_ibkr_account():
 
     return compat.opz_ibkr_account()
 
+
+@router.post("/opz/ibkr/disconnect")
+def opz_ibkr_disconnect():
+    from api import opz_api as compat
+
+    return compat.opz_ibkr_disconnect()

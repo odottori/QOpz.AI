@@ -349,6 +349,75 @@ app.include_router(sessions_router.router)
 # Se si vuole esporre FastAPI standalone, aggiungere HTTPBasic o API-key middleware.
 
 
+def _load_api_token() -> Optional[str]:
+    tok = os.environ.get("OPZ_API_TOKEN")
+    if tok:
+        return tok.strip()
+    # fallback: file env creato da vm_setup.sh
+    try:
+        p = Path("/etc/qopz-api.env")
+        if p.exists():
+            for line in p.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("OPZ_API_TOKEN="):
+                    return line.split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return None
+
+
+def opz_vm_update(x_api_key: str, dry_run: bool = False) -> Dict[str, Any]:
+    """Esegue scripts/vm_update.sh lato VM, protetto da API token.
+    Richiede nginx/front auth + header X-API-Key uguale a OPZ_API_TOKEN."""
+    expected = _load_api_token()
+    if not expected:
+        raise HTTPException(status_code=503, detail="API token non configurato su server")
+    if not x_api_key or x_api_key.strip() != expected:
+        raise HTTPException(status_code=401, detail="API key non valida")
+    script = ROOT / "scripts" / "vm_update.sh"
+    if not script.exists():
+        raise HTTPException(status_code=404, detail="vm_update.sh non trovato sul server")
+    try:
+        if dry_run:
+            # Check sintassi bash
+            proc = subprocess.run(
+                ["bash", "-n", str(script)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(ROOT),
+                text=True,
+                timeout=60,
+            )
+            return {
+                "ok": proc.returncode == 0,
+                "dry_run": True,
+                "returncode": proc.returncode,
+                "stdout_tail": (proc.stdout or "")[-600:],
+                "stderr_tail": (proc.stderr or "")[-600:],
+            }
+        # Run reale
+        proc = subprocess.run(
+            ["bash", str(script)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(ROOT),
+            text=True,
+            timeout=1800,
+        )
+        return {
+            "ok": proc.returncode == 0,
+            "dry_run": False,
+            "returncode": proc.returncode,
+            "stdout_tail": (proc.stdout or "")[-1600:],
+            "stderr_tail": (proc.stderr or "")[-1600:],
+        }
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="vm_update.sh timeout")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 @app.exception_handler(Exception)
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
@@ -2211,6 +2280,27 @@ def opz_ibkr_status(try_connect: bool = False) -> IbkrStatusOut:
     }
 
 
+def opz_ibkr_disconnect() -> Dict[str, Any]:
+    """Disconnette esplicitamente il manager IBKR singleton."""
+    from execution.ibkr_connection import get_manager, IBKR_PORTS
+
+    mgr = get_manager()
+    was_connected = bool(mgr.is_connected)
+    mgr.disconnect()
+    info = mgr.connection_info()
+    return {
+        "ok": True,
+        "connected": bool(info["connected"]),
+        "host": info["host"],
+        "port": info["port"],
+        "client_id": info["client_id"],
+        "source_system": info["source_system"],
+        "connected_at": info["connected_at"],
+        "ports_probed": IBKR_PORTS,
+        "message": "IBKR disconnesso" if was_connected else "IBKR già disconnesso",
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # DB helper — context manager per connessioni read-only DuckDB
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2374,6 +2464,10 @@ def opz_ibkr_account() -> IbkrAccountOut:
                 ib.RequestTimeout = prev_timeout
         except (AttributeError, RuntimeError, TypeError) as exc:
             logger.debug("IBKR account timeout restore skipped: %s", exc)
+        try:
+            mgr.disconnect()
+        except Exception as exc:
+            logger.debug("IBKR disconnect after account fetch skipped: %s", exc)
 
 
 def opz_regime_current(window: int = 20) -> RegimeCurrentOut:
@@ -3709,4 +3803,3 @@ def opz_system_log(n: int = 150) -> Dict[str, Any]:
         "n": len(records),
         "records": records,
     }
-

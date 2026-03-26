@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 
 from api.models import IbwrServiceRequest, ObserverSwitchRequest
 
@@ -30,3 +30,11 @@ def opz_control_status() -> Dict[str, Any]:
 
     return compat.opz_control_status()
 
+@router.post("/opz/admin/vm_update")
+def opz_admin_vm_update(
+    x_api_key: str = Header(default=""),
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    from api import opz_api as compat
+
+    return compat.opz_vm_update(x_api_key, dry_run)
