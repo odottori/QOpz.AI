@@ -906,6 +906,7 @@ export default function App() {
   const [opSubTab, setOpSubTab] = useState<OpSubTab>("trading");
   const [postSubTab, setPostSubTab] = useState<PostSubTab>("chiusura");
   const [clockText, setClockText] = useState<string>("");
+  const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now());
   const [universeLatest, setUniverseLatest] = useState<UniverseLatestResponse | null>(null);
   const [universeSymbols, setUniverseSymbols] = useState<string>("SPY,QQQ,IWM,AAPL,MSFT,NVDA,AMZN,META,TSLA,AMD");
   const [universeTopN, setUniverseTopN] = useState<string>("6");
@@ -2357,6 +2358,24 @@ export default function App() {
     : briefingBlockers.length > 0
       ? `blocchi non OK: ${briefingBlockersLabel}`
       : "";
+  const countdownTo = (iso: string | null | undefined): string => {
+    const raw = String(iso ?? "").trim();
+    if (!raw) return "—";
+    const targetMs = Date.parse(raw);
+    if (!Number.isFinite(targetMs)) return "—";
+    let delta = Math.max(0, targetMs - clockNowMs);
+    const days = Math.floor(delta / 86_400_000);
+    delta -= days * 86_400_000;
+    const hours = Math.floor(delta / 3_600_000);
+    delta -= hours * 3_600_000;
+    const mins = Math.floor(delta / 60_000);
+    delta -= mins * 60_000;
+    const secs = Math.floor(delta / 1000);
+    const hh = String(hours).padStart(2, "0");
+    const mm = String(mins).padStart(2, "0");
+    const ss = String(secs).padStart(2, "0");
+    return days > 0 ? `${days}g ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+  };
 
   useEffect(() => {
     if (!datiOpsReady && (centerPhase !== "ante" || anteSubTab !== "dati")) {
@@ -2379,6 +2398,7 @@ export default function App() {
     const tick = () => {
       const t = new Date().toLocaleString("sv-SE", { hour12: false, timeZone: DISPLAY_TZ }).replace("T", " ");
       setClockText(`${t} ${DISPLAY_TZ}`);
+      setClockNowMs(Date.now());
     };
     tick();
     const id = window.setInterval(tick, 1000);
@@ -5651,6 +5671,35 @@ export default function App() {
               </section>
             );
           })()}
+          <section className="rp-section" style={{borderBottom:"1px solid var(--border)", paddingBottom:8, marginBottom:4}}>
+            <div className="rp-title">SESSIONI AUTO</div>
+            <div style={{display:"flex", flexDirection:"column", gap:4}}>
+              {([
+                { key: "morning", label: "Morning", next: sessionStatus?.next_morning, last: sessionStatus?.last_morning },
+                { key: "eod", label: "EOD", next: sessionStatus?.next_eod, last: sessionStatus?.last_eod },
+              ] as Array<{ key: string; label: string; next: string | null | undefined; last: string | null | undefined }>).map((row) => {
+                const cd = countdownTo(row.next);
+                const active = cd !== "—" && cd !== "00:00:00";
+                return (
+                  <div key={row.key} style={{background:"var(--p2)", border:`1px solid ${active ? "#4ade80" : "#2a2a2a"}`, borderRadius:3, padding:"6px 8px"}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:6}}>
+                      <span style={{fontSize:"0.55rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.05em"}}>{row.label}</span>
+                      <span className={active ? "sev-ok" : "sev-neutral"} style={{fontSize:"0.55rem"}}>{active ? "COUNTDOWN" : "N/D"}</span>
+                    </div>
+                    <div style={{fontSize:"0.92rem", fontWeight:700, color:active ? "#4ade80" : "#888", lineHeight:1.1, marginTop:2}}>
+                      {cd}
+                    </div>
+                    <div style={{fontSize:"0.55rem", color:"#888", marginTop:2}}>
+                      next: {row.next ? fmtTsMin(row.next) : "—"}
+                    </div>
+                    <div style={{fontSize:"0.55rem", color:"#666"}}>
+                      last: {row.last ? fmtTsMin(row.last) : "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
           <section className="rp-section">
             <div className="rp-title">KPI MONITOR</div>
             <div className="checklist-item"><span className="ci-label">trades</span><span className="sev-data">{paperSummary?.trades ?? "-"}</span></div>
