@@ -2137,11 +2137,14 @@ export default function App() {
   const ibkrBlock = summarizeFeedBlock(DATA_FEED_GROUPS.ibkr);
   const yfinanceBlock = summarizeFeedBlock(DATA_FEED_GROUPS.yfinance);
   const calendarioBlock = summarizeFeedBlock(DATA_FEED_GROUPS.calendario);
-  const derivatiSnapStates = symbolSnaps.map(deriveSnapState);
-  const derivatiOkCount = derivatiSnapStates.filter((s) => s.status === "ok").length;
-  const derivatiPartialCount = derivatiSnapStates.filter((s) => s.status === "partial").length;
-  const derivatiErrorCount = derivatiSnapStates.filter((s) => s.status === "error").length;
-  const derivatiBlockStatus: DataBlockStatus = symbolSnaps.length === 0
+  const symbolSnapsInRange = symbolSnaps
+    .filter((s) => (s.run_date || "") >= datiDateFrom && (s.run_date || "") <= datiDateTo)
+    .sort((a, b) => `${b.run_date}${b.updated_at}`.localeCompare(`${a.run_date}${a.updated_at}`));
+  const derivatiSnapRows = symbolSnapsInRange.map((snap) => ({ snap, state: deriveSnapState(snap) }));
+  const derivatiOkCount = derivatiSnapRows.filter((r) => r.state.status === "ok").length;
+  const derivatiPartialCount = derivatiSnapRows.filter((r) => r.state.status === "partial").length;
+  const derivatiErrorCount = derivatiSnapRows.filter((r) => r.state.status === "error").length;
+  const derivatiBlockStatus: DataBlockStatus = symbolSnapsInRange.length === 0
     ? null
     : derivatiOkCount > 0
       ? "ok"
@@ -2156,6 +2159,41 @@ export default function App() {
   const opsBlockers = opsRequiredBlocks.filter((key) => dataBlockStatusMap[key] !== "ok");
   const formatBlockName = (key: DataBlockKey): string => key;
   const opsBlockersLabel = opsBlockers.map(formatBlockName).join(", ");
+  const feedRunTsIso = (r: FeedRun): string | null => {
+    const raw = String(r.started_at ?? "").trim();
+    if (!raw) return null;
+    const direct = new Date(raw);
+    if (!Number.isNaN(direct.getTime())) return direct.toISOString();
+    const combo = new Date(`${r.run_date}T${raw}`);
+    if (!Number.isNaN(combo.getTime())) return combo.toISOString();
+    return null;
+  };
+  const latestFeedTsIso = (feeds: string[]): string | null => {
+    let best: string | null = null;
+    for (const r of feedLog) {
+      if (!feeds.includes(r.feed)) continue;
+      const ts = feedRunTsIso(r);
+      if (!ts) continue;
+      if (!best || ts > best) best = ts;
+    }
+    return best;
+  };
+  const derivatiLatestTsIso = (() => {
+    const raw = String(symbolSnapsInRange[0]?.updated_at ?? "").trim();
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  })();
+  const datiOperativeSinceIso = (() => {
+    const required = [
+      latestFeedTsIso(DATA_FEED_GROUPS.ibkr),
+      latestFeedTsIso(DATA_FEED_GROUPS.yfinance),
+      latestFeedTsIso(DATA_FEED_GROUPS.calendario),
+      derivatiLatestTsIso,
+    ].filter((v): v is string => Boolean(v));
+    if (required.length < 4) return null;
+    return required.sort((a, b) => a.localeCompare(b))[required.length - 1];
+  })();
   const analysisLevel: AnalysisLevel = (() => {
     const mode = tierInfo?.active_mode;
     if (mode === "ADVANCED" || mode === "MEDIUM") return "L3";
@@ -3044,6 +3082,18 @@ export default function App() {
               DATI non pronta per operatività: {datiBlockReason}. Restano disponibili solo DATI + monitoraggio.
             </div>
           )}
+          {datiOpsReady && (
+            <div style={{
+              margin: "6px 12px 10px",
+              padding: "8px 10px",
+              border: "1px solid #14532d",
+              borderRadius: 8,
+              background: "rgba(34,197,94,0.10)",
+              color: "var(--text)"
+            }}>
+              DATI pronta per operatività{datiOperativeSinceIso ? ` dalle ${fmtTsMin(datiOperativeSinceIso)}` : ""}.
+            </div>
+          )}
           {centerPhase === "op" && (
             <div className="tabs subtabs">
               <button className={`tab ${opSubTab === "trading" ? "active" : ""}`} onClick={() => setOpSubTab("trading")}>TRADING</button>
@@ -3171,47 +3221,54 @@ export default function App() {
                     {sources.map(({ feed, label, note, feeds }) => {
                       // ── Blocco 4: Dati derivati (symbol snapshots) ─────────────────
                       if (feed === "derivati") {
-                        const hasSnaps = symbolSnaps.length > 0;
-                        const snapStates = derivatiSnapStates;
+                        const hasSnaps = symbolSnapsInRange.length > 0;
                         const snapsOk = derivatiOkCount;
                         const snapsWarn = derivatiPartialCount;
                         const snapsErr = derivatiErrorCount;
-                        const ibkrCount = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "ibkr").length;
-                        const yfinCount = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "yfinance").length;
-                        const bsCount   = symbolSnaps.filter(s => (s.iv_source ?? "").toLowerCase() === "bs").length;
+                        const ibkrCount = symbolSnapsInRange.filter(s => (s.iv_source ?? "").toLowerCase() === "ibkr").length;
+                        const yfinCount = symbolSnapsInRange.filter(s => (s.iv_source ?? "").toLowerCase() === "yfinance").length;
+                        const bsCount   = symbolSnapsInRange.filter(s => (s.iv_source ?? "").toLowerCase() === "bs").length;
                         const blockStatus = derivatiBlockStatus;
                         const mainCol = blockStatus === "ok" ? "#4ade80" : blockStatus === "error" ? "#f87171" : "#555";
                         const stLabel = blockStatus === "ok" ? "✓ OK" : blockStatus === "error" ? "✗ ERRORE" : "—";
-                        const lastUpd = symbolSnaps[0]?.updated_at ? fmtHm(symbolSnaps[0].updated_at) : "—";
+                        const lastSnap = symbolSnapsInRange[0];
+                        const lastUpd = lastSnap?.updated_at ? `${lastSnap.run_date} · ${fmtHm(lastSnap.updated_at)}` : "—";
                         const blockSt = datiBlockStatus[feed] ?? "tutti";
                         const filtersOpen = datiBlockFiltersOpen[feed] ?? false;
-                        const rows = symbolSnaps.filter((_, idx) => {
-                          const st = snapStates[idx]?.status ?? "ok";
+                        const rows = derivatiSnapRows.filter((r) => {
+                          const st = r.state.status;
                           if (blockSt === "tutti") return true;
                           return st === blockSt;
                         });
+                        const groupedRows = Object.entries(
+                          rows.reduce((acc, row) => {
+                            const day = (row.snap.run_date || "").trim() || "N/D";
+                            (acc[day] ??= []).push(row);
+                            return acc;
+                          }, {} as Record<string, Array<{ snap: SymbolSnap; state: { status: "ok" | "partial" | "error"; note: string | null } }>>)
+                        ).sort((a, b) => b[0].localeCompare(a[0]));
                         const fmtPct = (v: number|null) => v != null ? `${(v*100).toFixed(1)}%` : "—";
                         const fmtN   = (v: number|null, d=4) => v != null ? v.toFixed(d) : "—";
                         const fmtP   = (v: number|null) => v != null ? v.toFixed(2) : "—";
                         const csvDownloadDerivati = () => {
                           if (!rows.length) return;
-                          const cols = ["symbol","underlying","atm_strike","atm_iv","iv_source","atm_delta","atm_gamma","atm_theta","atm_vega","stato","stato_note"];
-                          const body = rows.map(s => [
-                            s.symbol ?? "",
-                            s.underlying != null ? s.underlying.toFixed(2) : "",
-                            s.atm_strike != null ? s.atm_strike.toFixed(2) : "",
-                            s.atm_iv != null ? (s.atm_iv*100).toFixed(2)+"%" : "",
-                            s.iv_source ?? "",
-                            s.atm_delta != null ? s.atm_delta.toFixed(3) : "",
-                            s.atm_gamma != null ? s.atm_gamma.toFixed(4) : "",
-                            s.atm_theta != null ? s.atm_theta.toFixed(4) : "",
-                            s.atm_vega != null ? s.atm_vega.toFixed(4) : "",
+                          const cols = ["data","symbol","underlying","atm_strike","atm_iv","iv_source","atm_delta","atm_gamma","atm_theta","atm_vega","stato","stato_note"];
+                          const body = rows.map(({ snap, state }) => [
+                            snap.run_date ?? "",
+                            snap.symbol ?? "",
+                            snap.underlying != null ? snap.underlying.toFixed(2) : "",
+                            snap.atm_strike != null ? snap.atm_strike.toFixed(2) : "",
+                            snap.atm_iv != null ? (snap.atm_iv*100).toFixed(2)+"%" : "",
+                            snap.iv_source ?? "",
+                            snap.atm_delta != null ? snap.atm_delta.toFixed(3) : "",
+                            snap.atm_gamma != null ? snap.atm_gamma.toFixed(4) : "",
+                            snap.atm_theta != null ? snap.atm_theta.toFixed(4) : "",
+                            snap.atm_vega != null ? snap.atm_vega.toFixed(4) : "",
                             (() => {
-                              const rs = deriveSnapState(s);
-                              const st = mapDatiStatus(rs.status, rs.note ?? s.error_msg);
+                              const st = mapDatiStatus(state.status, state.note ?? snap.error_msg);
                               return st.label;
                             })(),
-                            explainDatiError(deriveSnapState(s).note ?? s.error_msg),
+                            explainDatiError(state.note ?? snap.error_msg),
                           ]);
                           const blob = new Blob(
                             [cols.join(",")+"\n", ...body.map(r => r.map(x => `${x}`).join(",")+"\n")],
@@ -3233,17 +3290,17 @@ export default function App() {
                               <div>
                                 <div style={{fontSize:"0.78rem", fontWeight:700, color:"#e2f0e8", letterSpacing:"0.04em"}}>{label}</div>
                                 <div style={{fontSize:"0.58rem", color:"#7aaa90", marginTop:2}}>
-                                  {hasSnaps ? `ultima esecuzione: ${lastUpd} · ${symbolSnaps.length} simboli` : "Nessun dato disponibile"}
+                                  {hasSnaps ? `ultima esecuzione: ${lastUpd} · ${symbolSnapsInRange.length} simboli` : "Nessun dato nel periodo selezionato"}
                                 </div>
                               </div>
                               <div style={{textAlign:"right"}}>
                                 <div style={{fontSize:"1.15rem", fontWeight:700, color:mainCol, letterSpacing:"0.02em"}}>{stLabel}</div>
-                                <div style={{fontSize:"0.55rem", color:"#666", marginTop:1}}>{symbolSnaps.length} simboli · {snapsOk} ok</div>
+                                <div style={{fontSize:"0.55rem", color:"#666", marginTop:1}}>{symbolSnapsInRange.length} simboli · {snapsOk} ok</div>
                               </div>
                             </div>
                             <div style={{display:"flex", gap:6, padding:"8px 12px", flexWrap:"wrap"}}>
                               {([
-                                {lbl:"Simboli", val:String(symbolSnaps.length), col:symbolSnaps.length>0?"#e2f0e8":"#555"},
+                                {lbl:"Simboli", val:String(symbolSnapsInRange.length), col:symbolSnapsInRange.length>0?"#e2f0e8":"#555"},
                                 {lbl:"OK",      val:String(snapsOk),           col:snapsErr===0&&snapsWarn===0&&snapsOk>0?"#4ade80":snapsOk>0?"#fbbf24":"#f87171"},
                                 {lbl:"Errori",  val:String(snapsErr),          col:snapsErr===0?"#4ade80":"#f87171"},
                                 {lbl:"Fonte IBKR", val:String(ibkrCount),      col:"#4ade80"},
@@ -3289,57 +3346,76 @@ export default function App() {
                                 : <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.6rem"}}>
                                     <thead>
                                       <tr style={{borderBottom:"2px solid var(--border)"}}>
-                                        {["Simbolo","Prezzo","Strike ATM","IV ATM","Fonte","Delta","Gamma","Theta","Vega","Stato"].map(h =>
-                                          <th key={h} style={{padding:"4px 8px", textAlign: h==="Simbolo"||h==="Fonte"||h==="Stato" ? "left" : "right", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
+                                        {["Giorno / simbolo","Prezzo","Strike ATM","IV ATM","Fonte","Delta","Gamma","Theta","Vega","Stato"].map(h =>
+                                          <th key={h} style={{padding:"4px 8px", textAlign: h==="Giorno / simbolo"||h==="Fonte"||h==="Stato" ? "left" : "right", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap", fontSize:"0.6rem", letterSpacing:"0.03em"}}>{h}</th>
                                         )}
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {rows.map((s, i) => {
-                                        const snapState = deriveSnapState(s);
-                                        const hasErr = snapState.status !== "ok";
-                                        const st = mapDatiStatus(snapState.status, snapState.note ?? s.error_msg);
-                                        const trendDir = String(s.trend_dir ?? "").toLowerCase();
-                                        const trendArrow = trendDir === "up"
-                                          ? "↑"
-                                          : trendDir === "down"
-                                            ? "↓"
-                                            : trendDir === "flat"
-                                              ? "↔"
-                                              : "";
-                                        const trendColor = trendDir === "up" ? "#4ade80" : trendDir === "down" ? "#f87171" : "#888";
-                                        const trendNote = (s.trend_note && String(s.trend_note).trim()) ? String(s.trend_note) : "trend non disponibile";
-                                        const ivC = s.atm_iv
-                                          ? "#4ade80"
-                                          : (isPreMrktError(s.error_msg) || isNoMrktError(s.error_msg) ? "#fbbf24" : "#f87171");
-                                        const src = String(s.iv_source ?? "").toLowerCase();
-                                        const srcC = src === "bs" ? "#fbbf24" : src === "yfinance" ? "#60a5fa" : "#4ade80";
-                                        return (
-                                          <tr key={s.symbol} style={{borderBottom:"1px solid var(--border)", background: i%2===0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)"}}>
-                                            <td style={{padding:"4px 8px", fontWeight:700, color:"var(--fg)"}}>{s.symbol}</td>
-                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtP(s.underlying)}</td>
-                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtP(s.atm_strike)}</td>
-                                            <td style={{padding:"4px 8px", textAlign:"right", color:ivC, fontWeight:600}}>
-                                              <span style={{display:"inline-flex", alignItems:"center", gap:4, justifyContent:"flex-end"}}>
-                                                <span>{fmtPct(s.atm_iv)}</span>
-                                                {trendArrow && <span style={{color: trendColor, fontWeight:700}} title={trendNote}>{trendArrow}</span>}
-                                              </span>
+                                      {groupedRows.flatMap(([day, dayRows], i) => {
+                                        const dayKey = `${feed}|${day}`;
+                                        const dayOpen = datiDayOpen[dayKey] ?? i === 0;
+                                        const dayOk = dayRows.filter((r) => r.state.status === "ok").length;
+                                        const dayErr = dayRows.filter((r) => r.state.status === "error").length;
+                                        const dayPar = dayRows.filter((r) => r.state.status === "partial").length;
+                                        const dayStatus = dayOk > 0 ? "ok" : "error";
+                                        const daySt = mapDatiStatus(dayStatus, dayErr > 0 ? `${dayErr} errori` : `${dayOk} ok`);
+                                        const daySrcIbkr = dayRows.filter((r) => (r.snap.iv_source ?? "").toLowerCase() === "ibkr").length;
+                                        const daySrcYf = dayRows.filter((r) => (r.snap.iv_source ?? "").toLowerCase() === "yfinance").length;
+                                        const daySrcBs = dayRows.filter((r) => (r.snap.iv_source ?? "").toLowerCase() === "bs").length;
+                                        const detailRows = dayOpen
+                                          ? dayRows.map(({ snap, state }, j) => {
+                                              const hasErr = state.status !== "ok";
+                                              const st = mapDatiStatus(state.status, state.note ?? snap.error_msg);
+                                              const trendDir = String(snap.trend_dir ?? "").toLowerCase();
+                                              const trendArrow = trendDir === "up" ? "↑" : trendDir === "down" ? "↓" : trendDir === "flat" ? "↔" : "";
+                                              const trendColor = trendDir === "up" ? "#4ade80" : trendDir === "down" ? "#f87171" : "#888";
+                                              const trendNote = (snap.trend_note && String(snap.trend_note).trim()) ? String(snap.trend_note) : "trend non disponibile";
+                                              const ivC = snap.atm_iv
+                                                ? "#4ade80"
+                                                : (isPreMrktError(snap.error_msg) || isNoMrktError(snap.error_msg) ? "#fbbf24" : "#f87171");
+                                              const src = String(snap.iv_source ?? "").toLowerCase();
+                                              const srcC = src === "bs" ? "#fbbf24" : src === "yfinance" ? "#60a5fa" : "#4ade80";
+                                              return (
+                                                <tr key={`${day}-${snap.symbol}`} style={{borderBottom:"1px solid var(--border)", background: j%2===0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)"}}>
+                                                  <td style={{padding:"4px 8px 4px 24px", fontWeight:700, color:"var(--fg)"}}>{snap.symbol}</td>
+                                                  <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtP(snap.underlying)}</td>
+                                                  <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtP(snap.atm_strike)}</td>
+                                                  <td style={{padding:"4px 8px", textAlign:"right", color:ivC, fontWeight:600}}>
+                                                    <span style={{display:"inline-flex", alignItems:"center", gap:4, justifyContent:"flex-end"}}>
+                                                      <span>{fmtPct(snap.atm_iv)}</span>
+                                                      {trendArrow && <span style={{color: trendColor, fontWeight:700}} title={trendNote}>{trendArrow}</span>}
+                                                    </span>
+                                                  </td>
+                                                  <td style={{padding:"4px 8px", color:srcC, fontWeight:600, fontSize:"0.55rem", textTransform:"uppercase"}}>{snap.iv_source ?? "—"}</td>
+                                                  <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(snap.atm_delta, 3)}</td>
+                                                  <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(snap.atm_gamma, 4)}</td>
+                                                  <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(snap.atm_theta, 4)}</td>
+                                                  <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(snap.atm_vega, 4)}</td>
+                                                  <td style={{padding:"4px 8px"}}>
+                                                    <span
+                                                      style={{display:"inline-flex", alignItems:"center", gap:4, color: st.color, fontWeight:700}}
+                                                      title={hasErr ? explainDatiError(state.note ?? snap.error_msg) : "dati derivati completi"}
+                                                    >
+                                                      <span>{st.label}</span>
+                                                    </span>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })
+                                          : [];
+                                        return [
+                                          <tr key={dayKey} style={{borderBottom:"1px solid var(--border)", background:"rgba(255,255,255,0.02)", cursor:"pointer"}}
+                                            onClick={() => setDatiDayOpen(v => ({...v, [dayKey]: !dayOpen}))}>
+                                            <td colSpan={10} style={{padding:"5px 8px", color:"#e2f0e8", whiteSpace:"nowrap", fontWeight:700}}>
+                                              {dayOpen ? "▾" : "▸"} {day} · {dayRows.length} simboli · ok {dayOk} · parz {dayPar} · err {dayErr}
+                                              {" "}· src ibkr {daySrcIbkr} / yf {daySrcYf} / bs {daySrcBs}
+                                              {" "}· ultimo {dayRows[0]?.snap.updated_at ? fmtHm(dayRows[0].snap.updated_at) : "—"}
+                                              {" "}· <span style={{color:daySt.color}}>{daySt.label}</span>
                                             </td>
-                                            <td style={{padding:"4px 8px", color:srcC, fontWeight:600, fontSize:"0.55rem", textTransform:"uppercase"}}>{s.iv_source ?? "—"}</td>
-                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_delta, 3)}</td>
-                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_gamma, 4)}</td>
-                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_theta, 4)}</td>
-                                            <td style={{padding:"4px 8px", textAlign:"right", color:"#e2f0e8"}}>{fmtN(s.atm_vega, 4)}</td>
-                                            <td style={{padding:"4px 8px"}}>
-                                              <span
-                                                style={{display:"inline-flex", alignItems:"center", gap:4, color: st.color, fontWeight:700}}
-                                                title={hasErr ? explainDatiError(snapState.note ?? s.error_msg) : "dati derivati completi"}
-                                              >
-                                                <span>{st.label}</span>
-                                              </span>
-                                            </td>
-                                          </tr>
-                                        );
+                                          </tr>,
+                                          ...detailRows,
+                                        ];
                                       })}
                                     </tbody>
                                   </table>
@@ -3739,7 +3815,7 @@ export default function App() {
                         <span className="btn btn-ghost" style={{fontSize:"0.58rem", padding:"2px 8px", cursor:"pointer"}}>info</span>
                       </Tooltip>
                     </div>
-                    <div style={{display:"grid", gridTemplateColumns:"repeat(3,minmax(0,1fr))", gap:8}}>
+                    <div style={{display:"flex", flexWrap:"nowrap", gap:8, minWidth:0, overflowX:"auto", paddingBottom:2}}>
                       {contextRows.map((row) => {
                         const info = row.info;
                         const reg = info?.regime ?? "UNKNOWN";
@@ -3756,7 +3832,7 @@ export default function App() {
                               : TOOLTIPS.analysis_ctx_paper_trade;
                         const records = info?.records ?? [];
                         return (
-                          <div key={`${row.key}-table`} style={{border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", background:isResolved ? "rgba(0,255,106,0.05)" : "rgba(255,255,255,0.01)"}}>
+                          <div key={`${row.key}-table`} style={{flex:"1 1 0", minWidth:0, border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", background:isResolved ? "rgba(0,255,106,0.05)" : "rgba(255,255,255,0.01)"}}>
                             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", borderBottom:"1px solid var(--border)"}}>
                               <span style={{fontSize:"0.63rem", color:"#9ac4af", textTransform:"uppercase", letterSpacing:"0.05em"}} title={sourceTip}>
                                 {row.label}{isResolved ? " · source" : ""}
@@ -3767,7 +3843,7 @@ export default function App() {
                                 <span style={{color:statusCol, fontWeight:700}} title={TOOLTIPS.analysis_ctx_status}>{status}</span>
                               </span>
                             </div>
-                            <div style={{maxHeight:170, overflowY:"auto"}}>
+                            <div style={{maxHeight:170, overflowY:"auto", overflowX:"auto"}}>
                               <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.58rem"}}>
                                 <thead>
                                   <tr style={{borderBottom:"1px solid var(--border)", color:"#7c8f84", textTransform:"uppercase", letterSpacing:"0.04em"}}>

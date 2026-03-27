@@ -376,13 +376,29 @@ def opz_data_refresh(
             price_errs = [f"IBKR prezzo non disponibile - fallback yfinance {yfin_price_ok}/{len(symbols)}"] + price_errs
             if yfin_price_errs:
                 price_errs.extend(yfin_price_errs[:2])
-        chain_status = "ok" if with_chain == len(symbols) and len(symbols) > 0 else ("partial" if with_chain > 0 else "error")
-        chain_err_msg = "; ".join(_unique_errs(chain_errs or ibkr_errs, 3)) if (chain_errs or (with_chain < len(symbols) and ibkr_errs)) else None
+        # Allineamento operativo con "Greche complete":
+        # se esiste almeno 1 catena usabile la riga e operativa (OK),
+        # altrimenti ERRORE. Il denominatore usa i simboli realmente usabili.
+        chain_status = "ok" if with_chain > 0 else "error"
+        chain_records_in = with_chain if with_chain > 0 else len(symbols)
+        chain_err_msg = (
+            "; ".join(_unique_errs(chain_errs or ibkr_errs, 3))
+            if (with_chain <= 0 and (chain_errs or ibkr_errs))
+            else None
+        )
 
         _rec("ibkr_prices", t0, t1, len(symbols), with_price, price_status,
              "; ".join(_unique_errs(price_errs or ibkr_errs, 3)) if (price_errs or (with_price < len(symbols) and ibkr_errs)) else None)
-        _rec("ibkr_chain", t0, t1, len(symbols), with_chain, chain_status,
-             chain_err_msg)
+        _rec(
+            "ibkr_chain",
+            t0,
+            t1,
+            chain_records_in,
+            with_chain,
+            chain_status,
+            chain_err_msg,
+            symbols_count=with_chain,
+        )
 
         # Regola operativa allineata alla tabella "Dati derivati" (stato OK):
         # chain presente + prezzo/strike/iv validi + greche complete 4/4 + nessun errore bloccante.
