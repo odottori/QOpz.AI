@@ -576,6 +576,7 @@ const TOOLTIPS: Record<string, string> = {
   analysis_ctx_universe: "Campioni dal motore Universe scan (copertura ampia dei simboli).",
   analysis_ctx_opportunity: "Campioni dal motore Opportunity scan (shortlist con scoring strategico).",
   analysis_ctx_paper_trade: "Campioni dal journal paper trades (regime al momento dell'ingresso trade).",
+  analysis_regime_policy: "Regola canonica regime: avvio rapido su FAST(window=30), conferma su BASE(window=90). Se BASE non pronto = stato provvisorio. Se FAST e BASE divergono = CAUTION fino a riallineamento.",
 };
 
 // ── Tooltip component ──────────────────────────────────────────────────────
@@ -1017,6 +1018,7 @@ export default function App() {
   const [sysStatus, setSysStatus] = useState<SystemStatusResponse | null>(null);
   const [regimeCurrent, setRegimeCurrent] = useState<RegimeCurrentResponse | null>(null);
   const [regimeContext, setRegimeContext] = useState<RegimeContextResponse | null>(null);
+  const [regimeContextBase, setRegimeContextBase] = useState<RegimeContextResponse | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityHistoryResponse | null>(null);
   const [exitCandidates, setExitCandidates] = useState<ExitCandidatesResponse | null>(null);
   const [activityStream, setActivityStream] = useState<ActivityStreamResponse | null>(null);
@@ -1765,6 +1767,14 @@ export default function App() {
     } catch (e) { markFetchErr("regimeContext"); }
   }
 
+  async function doFetchRegimeContextBase() {
+    try {
+      const r = await apiJson<RegimeContextResponse>(`${API_BASE}/opz/regime/context?window=90`);
+      setRegimeContextBase(r);
+      clearFetchErr("regimeContextBase");
+    } catch (e) { markFetchErr("regimeContextBase"); }
+  }
+
   async function doFetchUniverseLatest() {
     try {
       const r = await apiJson<UniverseLatestResponse>(`${API_BASE}/opz/universe/latest?profile=${ACTIVE_PROFILE}`);
@@ -2132,6 +2142,24 @@ export default function App() {
   const premarketSource = premarketUsesScanFull ? "scan_full" : (universeLatest?.source ?? "universe_latest");
   const regimeSources = regimeContext?.sources ?? null;
   const regimeResolved = regimeContext?.resolved ?? null;
+  const regimeResolvedBase = regimeContextBase?.resolved ?? null;
+  const regimeFastLabel = String(regimeResolved?.regime ?? premarketRegime ?? "UNKNOWN").toUpperCase();
+  const regimeFastSamples = Number(regimeResolved?.sample_count ?? 0);
+  const regimeBaseLabel = String(regimeResolvedBase?.regime ?? "UNKNOWN").toUpperCase();
+  const regimeBaseSamples = Number(regimeResolvedBase?.sample_count ?? 0);
+  const regimeBaseReady = regimeBaseSamples > 0 && regimeBaseLabel !== "UNKNOWN";
+  const regimePolicyState: "PROVVISORIO" | "CONFERMATO" | "DIVERGENTE" = !regimeBaseReady
+    ? "PROVVISORIO"
+    : regimeFastLabel === regimeBaseLabel
+      ? "CONFERMATO"
+      : "DIVERGENTE";
+  const regimePolicyColor = regimePolicyState === "CONFERMATO" ? "#4ade80" : regimePolicyState === "DIVERGENTE" ? "#fbbf24" : "#facc15";
+  const regimePolicyText =
+    regimePolicyState === "CONFERMATO"
+      ? "FAST(30) e BASE(90) allineati: regime confermato."
+      : regimePolicyState === "DIVERGENTE"
+        ? "FAST(30) diverso da BASE(90): trattare la sessione come CAUTION finché non converge."
+        : "BASE(90) non ancora pronto: regime provvisorio su FAST(30).";
   const contextRows = [
     { key: "universe", label: "Universe", info: regimeSources?.universe ?? null },
     { key: "opportunity", label: "Opportunity", info: regimeSources?.opportunity ?? null },
@@ -2526,6 +2554,7 @@ export default function App() {
     void doFetchSysStatus();
     void doFetchRegimeCurrent();
     void doFetchRegimeContext();
+    void doFetchRegimeContextBase();
     void doFetchUniverseLatest();
     void doFetchEquityHistory();
     void doFetchExitCandidates();
@@ -2543,6 +2572,7 @@ export default function App() {
       void doCheckIbkr(false);   // stato IBKR passivo, senza reconnessioni automatiche
       void doFetchSysStatus();   // 1 query DuckDB — kill switch, kelly, data_mode
       void doFetchRegimeContext(); // contesto regime per fonte (opportunity/universe/paper)
+      void doFetchRegimeContextBase(); // regime base (window 90) per conferma operativa
       void doFetchUniverseLatest(); // ultimo scan operativo universe (analisi -> segnali)
       void doFetchSessionStatus(); // stato scheduler sessioni
       void doFetchSessionLogs(); // storico sessioni → aggiorna card morning/EOD
@@ -3220,18 +3250,6 @@ export default function App() {
               DATI non pronta per operatività: {datiBlockReason}. Restano disponibili solo DATI + monitoraggio.
             </div>
           )}
-          {datiOpsReady && (
-            <div style={{
-              margin: "6px 12px 10px",
-              padding: "8px 10px",
-              border: "1px solid #14532d",
-              borderRadius: 8,
-              background: "rgba(34,197,94,0.10)",
-              color: "var(--text)"
-            }}>
-              DATI pronta per operatività{datiOperativeSinceIso ? ` dalle ${fmtTsMin(datiOperativeSinceIso)}` : ""}.
-            </div>
-          )}
           {centerPhase === "op" && (
             <div className="tabs subtabs">
               <button className={`tab ${opSubTab === "trading" ? "active" : ""}`} onClick={() => setOpSubTab("trading")}>TRADING</button>
@@ -3252,16 +3270,18 @@ export default function App() {
 
           {/* ── ANTE / DATI ── Steps 1-2: Ingest + Consolidamento ──────── */}
           {centerPhase === "ante" && anteSubTab === "dati" && (
-            <div className="lifecycle-panel" style={{maxWidth:"100%", overflow:"hidden"}}>
+            <div className="lifecycle-panel" style={{maxWidth:"100%", overflow:"hidden", paddingTop:10, gap:8}}>
               <div className="lc-header">
                 <span className="lc-step-label">STEP 1–2 — DATI</span>
                 {premarketScanAt && <span className="lc-step-sub">Aggiornato: {fmtTs(premarketScanAt)}</span>}
               </div>
 
+              <div className="lc-body" style={{gap:8}}>
+                <div className="lc-panel" style={{padding:"10px 12px"}}>
 
               {/* ══ Barra periodo ══ */}
               <div style={{display:"flex", alignItems:"center", gap:6, padding:"6px 12px 4px",
-                borderTop:"1px solid var(--border)"}}>
+                borderTop:"none", marginBottom:2}}>
                 <span style={{fontSize:"0.6rem", color:"var(--dim)", fontWeight:600, whiteSpace:"nowrap"}}>Periodo:</span>
                 <span style={{fontSize:"0.58rem", color:"#888"}}>dal</span>
                 <input type="date" value={datiDateFrom} max={datiDateTo}
@@ -3355,7 +3375,7 @@ export default function App() {
                   transition:"all 0.15s",
                 });
                 return (
-                  <div style={{padding:"8px 12px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, minWidth:0, overflow:"hidden"}}>
+                  <div style={{padding:"4px 10px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, minWidth:0, overflow:"hidden"}}>
                     {sources.map(({ feed, label, note, feeds }) => {
                       // ── Blocco 4: Dati derivati (symbol snapshots) ─────────────────
                       if (feed === "derivati") {
@@ -3867,6 +3887,8 @@ export default function App() {
                   )}
                 </div>
               </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -3882,6 +3904,22 @@ export default function App() {
                   <div style={{marginBottom:8, border:"1px solid #0ea5e9", borderRadius:6, padding:"6px 8px", background:"rgba(14,165,233,0.10)"}}>
                     <div style={{fontSize:"0.6rem", color:"#7dd3fc", textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:700}}>Decision Engine (ANALISI)</div>
                     <div style={{fontSize:"0.62rem", color:"#cfefff"}}>Elabora DATI + regole modello e produce scelta strategica motivata (non esecutiva).</div>
+                  </div>
+                  <div style={{marginBottom:8, border:`1px solid ${regimePolicyColor}`, borderRadius:6, padding:"6px 8px", background:"rgba(250,204,21,0.08)"}}>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:8}}>
+                      <div style={{fontSize:"0.6rem", color:"#fef08a", textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:700}}>
+                        REGOLA REGIME OPERATIVA (CANONICA)
+                      </div>
+                      <div style={{fontSize:"0.62rem", color:regimePolicyColor, fontWeight:700}}>
+                        {regimePolicyState}
+                      </div>
+                    </div>
+                    <div style={{fontSize:"0.6rem", color:"#fef9c3", marginTop:2}} title={TOOLTIPS.analysis_regime_policy}>
+                      Boot: FAST window 30 · Conferma: BASE window 90 · Divergenza FAST/BASE porta CAUTION.
+                    </div>
+                    <div style={{fontSize:"0.58rem", color:"#fde68a", marginTop:3}}>
+                      Stato ora: FAST <span style={{fontWeight:700}}>{regimeFastLabel}</span> ({regimeFastSamples}) · BASE <span style={{fontWeight:700}}>{regimeBaseLabel}</span> ({regimeBaseSamples}) · {regimePolicyText}
+                    </div>
                   </div>
                   {/* ── micro-card strip ── */}
                   {(() => {

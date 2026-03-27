@@ -648,6 +648,20 @@ Se `capital_tier > validated_tier` → il sistema mostra warning operatore: "Cap
 
 ---
 
+## Addendum v.T.11.15 - Regime Dual Window (FAST/BASE)
+
+Regola operativa canonica per evitare decisioni fragili su campioni troppo corti:
+
+- `FAST` = finestra `window=30` (reattiva, usata per avvio rapido UI/modello).
+- `BASE` = finestra `window=90` (stabile, usata per conferma regime).
+- Se `BASE` non e disponibile: stato `PROVVISORIO` (si mostra FAST ma non e confermato).
+- Se `FAST != BASE`: stato `DIVERGENTE` e trattamento operativo `CAUTION` fino a convergenza.
+- Se `FAST == BASE`: stato `CONFERMATO` (regime validato su finestra estesa).
+
+Nota: la UI deve esporre sempre in evidenza lo stato `PROVVISORIO/CONFERMATO/DIVERGENTE` con i due conteggi campione (30 e 90), per evitare ambiguita operative.
+
+---
+
 ### Chiarimento: sizing in DEV con DATA_MODE sintetico (engineering-only)
 
 Per `DATA_MODE != VENDOR_REAL_CHAIN` alcune funzioni di sizing (es. `adaptive_fixed_fractional`) possono restituire `0.0` **per evitare qualsiasi interpretazione economica** di performance su dati sintetici.
