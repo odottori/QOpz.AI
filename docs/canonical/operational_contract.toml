@@ -1,0 +1,39 @@
+version = "1.0.0"
+updated_utc = "2026-03-27T15:00:00Z"
+scope = "operational-parameters"
+
+[authority]
+runtime_is_source_of_truth = true
+runtime_sources = [
+  "strategy/scoring.py",
+  "strategy/opportunity_scanner.py",
+  "api/models.py",
+]
+docs_parent = "docs/PROJECT_OPZ_COMPLETE_V2.md"
+docs_guide = "docs/guide/*"
+
+[score]
+canonical_scale = "0-100"
+presentation_min = 60.0
+high_conviction_min = 75.0
+scale_10_presentation_min = 6.0
+scale_10_high_conviction_min = 7.5
+scale_1_presentation_min = 0.60
+scale_1_high_conviction_min = 0.75
+
+[filters]
+spread_pct_max = 10.0
+ivr_min = 20.0
+dte_hard_min = 14
+dte_hard_max = 60
+dte_preferred_min = 20
+dte_preferred_max = 45
+oi_hard_min = 100
+oi_strict_min_paper_live = 500
+
+[semantics]
+notes = [
+  "DTE 14-60 and OI>=100 are hard bounds.",
+  "DTE 20-45 and OI>=500 (paper/live) are stricter operational preferences.",
+  "Tutorial and visual docs may show derived scales, but must always label scale explicitly.",
+]

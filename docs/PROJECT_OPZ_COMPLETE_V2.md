@@ -1,9 +1,9 @@
 # QOpz.AI — Documento di Progetto Completo v2.0
 
 > **Versione:** v2.0 | **Data:** 2026-03-14
-> **Stato:** LIVING DOCUMENT — aggiornare ad ogni milestone completata
+> **Stato:** LIVING DOCUMENT — aggiornare ad ogni milestone completata (narrativa e contesto)
 > **Nota:** Questo documento integra e supera la visione originale v11.1 con il modulo Opportunity Scanner.
-> I file in `.canonici/` restano immutabili (fonte normativa); questo documento è la fonte operativa evolutiva.
+> **Gerarchia anti-drift:** parametri operativi numerici = codice runtime (`strategy/scoring.py`, `strategy/opportunity_scanner.py`, `api/models.py`) + contratto canonico [`docs/canonical/operational_contract.toml`]. Questo documento e la guida devono restare coerenti con quel contratto.
 
 ---
 
@@ -35,6 +35,14 @@ Il sistema deve essere capace di:
 | No market orders | SEMPRE limit + combo nativo IBKR |
 | Event trail | Ogni transizione ordine → riga `order_events` |
 | Kill switch | `ops/kill_switch.trigger` → arresto immediato |
+
+---
+
+### 0.1 Gerarchia delle Fonti Operative
+
+1. Runtime code (fonte tecnica primaria per soglie e logica operativa).
+2. [`docs/canonical/operational_contract.toml`] (contratto documentale dei parametri runtime).
+3. Questo documento + `docs/guide/*` (spiegazione operativa, senza introdurre soglie divergenti).
 
 ---
 
@@ -98,7 +106,7 @@ Step 2: OPTION CHAIN FETCH
 
 Step 3: FILTRI HARD (eliminazione automatica)
   → spread_pct > 10% del mid → SCARTA
-  → OI < 100 contratti → SCARTA (hard filter canonico; documento Opp.Scanner suggerisce 500 — applicare 500 in paper/live)
+  → OI < 100 contratti → SCARTA (hard filter canonico). In `paper/live` si applica filtro operativo più stretto: OI >= 500.
   → DTE < 14 o > 60 giorni → SCARTA (canonico); range ottimale opportunità: 20–45
   → delta fuori range 0.15–0.50 (long direz.) o 0.12–0.30 (credit spread) → SCARTA
   → volume < 10 contratti → SCARTA
@@ -559,7 +567,7 @@ Ogni record DuckDB deve avere i 5 campi di provenance:
 | Filtro | Soglia | Nota |
 |---|---|---|
 | Spread bid-ask | > 10% mid → SCARTA | Ideale < 5% ATM |
-| Open Interest | < 100 (canonico) / < 500 (paper+) | 100 per DEV, 500 per paper/live |
+| Open Interest | < 100 → SCARTA (hard) | DEV: 100 minimo; paper/live: 500 minimo operativo |
 | DTE | < 14 o > 60 → SCARTA | Range ottimale operativo: 20–45 |
 | Earnings | < 2 giorni → BLOCCO | 3–7 giorni → FLAG |
 | IVR | < 20 → SCARTA | Edge nullo |

@@ -655,7 +655,7 @@
       <div class="panel">
         <div class="panel-title">Risultato scoring pre-market</div>
         <div class="description">
-          Il motore scansiona 1.247 candidati. Dopo i filtri duri restano 91 opportunità, di cui 8 superano la soglia score 6.5. Sono ordinate per rank e pronte per essere presentate all'operatore non appena i mercati apriranno.
+          Il motore scansiona 1.247 candidati. Dopo i filtri duri restano 91 opportunità, di cui 8 superano la soglia score 60/100. Sono ordinate per rank e pronte per essere presentate all'operatore non appena i mercati apriranno.
         </div>
         <div class="data-grid">
           <div class="data-item">
@@ -669,14 +669,14 @@
             <div class="data-sub">ammessi allo scoring</div>
           </div>
           <div class="data-item">
-            <div class="data-label">Score &#x2265; 6.5</div>
+            <div class="data-label">Score &#x2265; 60</div>
             <div class="data-value ok">8</div>
             <div class="data-sub">da presentare</div>
           </div>
           <div class="data-item full">
             <div class="data-label">Top segnale</div>
             <div class="data-value orange">SPY 490/485P</div>
-            <div class="data-sub">score 7.82 &#x2014; IVR=42, DTE=35</div>
+            <div class="data-sub">score 78.2/100 &#x2014; IVR=42, DTE=35</div>
           </div>
         </div>
       </div>
@@ -689,11 +689,11 @@
 <span class="dim">[09:01:01.001]</span> <span class="hlg">INFO</span>  scoring run &#x2014; 1247 candidates<br>
 <span class="dim">[09:01:01.891]</span> <span class="hlg">INFO</span>  hard filter: <span class="hlr">1156 eliminati</span><br>
 <span class="dim">[09:01:01.892]</span> <span class="hlg">INFO</span>  scoring: 91 valutati<br>
-<span class="dim">[09:01:01.944]</span> <span class="hlg">INFO</span>  soglia 6.5: <span class="hlg">8 opportunit&#xe0;</span><br>
+<span class="dim">[09:01:01.944]</span> <span class="hlg">INFO</span>  soglia 60/100: <span class="hlg">8 opportunit&#xe0;</span><br>
 <br>
-<span class="dim">[09:01:01.950]</span> <span class="hl">RANK</span>  #1 SPY 490/485P  score=<span class="hlg">7.82</span><br>
-<span class="dim">[09:01:01.951]</span> <span class="hl">RANK</span>  #2 SPY 485/480P  score=<span class="hlg">7.41</span><br>
-<span class="dim">[09:01:01.952]</span> <span class="hl">RANK</span>  #3 QQQ 440/435P  score=<span class="hlg">6.93</span><br>
+<span class="dim">[09:01:01.950]</span> <span class="hl">RANK</span>  #1 SPY 490/485P  score=<span class="hlg">78.2</span><br>
+<span class="dim">[09:01:01.951]</span> <span class="hl">RANK</span>  #2 SPY 485/480P  score=<span class="hlg">74.1</span><br>
+<span class="dim">[09:01:01.952]</span> <span class="hl">RANK</span>  #3 QQQ 440/435P  score=<span class="hlg">69.3</span><br>
           <div class="section">
             <div class="row"><span>Segnali pronti</span><span class="hlg">8</span></div>
             <div class="row"><span>Prossima fase</span><span class="hl">briefing operatore</span></div>
@@ -764,7 +764,7 @@
 <span class="dim">[09:20:14]</span> <span class="hl">NARRATORE</span>  briefing generato &#x2713;<br>
 <span class="dim hlt">&nbsp;&nbsp;&#x25b6;  "Regime stabile. 8 opportunit&#xe0;.</span><br>
 <span class="dim hlt">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Top: SPY put spread 490/485,</span><br>
-<span class="dim hlt">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;score 7.82. IVR=42, DTE=35."</span><br>
+<span class="dim hlt">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;score 78.2/100. IVR=42, DTE=35."</span><br>
           <div class="section">
             <div class="row"><span>Posizioni aperte</span><span class="hlt">3</span></div>
             <div class="row"><span>P&amp;L aperto</span><span class="hlg">+$312</span></div>
@@ -1011,33 +1011,33 @@
       <div class="panel">
         <div class="panel-title">Valutazione 4 pilastri</div>
         <div class="description">
-          Ogni pilastro vale fino a 10 punti. Il punteggio finale è la media pesata. Solo le opportunità sopra 6.5 vengono presentate all'operatore.
+          Ogni pilastro vale fino a 100 punti. Il punteggio finale è la media pesata. Solo le opportunità sopra 60 vengono presentate all'operatore.
         </div>
         <div class="data-grid">
           <div class="data-item">
             <div class="data-label">P1 — Qualità volatilità</div>
-            <div class="data-value ok">8.4</div>
+            <div class="data-value ok">84.0</div>
             <div class="data-sub">IVR=42, premio elevato</div>
           </div>
           <div class="data-item">
             <div class="data-label">P2 — Qualità spread</div>
-            <div class="data-value ok">7.9</div>
+            <div class="data-value ok">79.0</div>
             <div class="data-sub">OI alto, spread stretto</div>
           </div>
           <div class="data-item">
             <div class="data-label">P3 — Posizione delta</div>
-            <div class="data-value warn">6.8</div>
+            <div class="data-value warn">68.0</div>
             <div class="data-sub">delta –0.18, ok</div>
           </div>
           <div class="data-item">
             <div class="data-label">P4 — Allineamento regime</div>
-            <div class="data-value ok">8.2</div>
+            <div class="data-value ok">82.0</div>
             <div class="data-sub">NORMAL, piena operatività</div>
           </div>
           <div class="data-item full">
             <div class="data-label">Punteggio finale</div>
-            <div class="data-value ok" style="font-size:28px">7.8 / 10</div>
-            <div class="data-sub">soglia minima 6.5 — SUPERA ✓ — rank #3 su 86 candidati</div>
+            <div class="data-value ok" style="font-size:28px">78.2 / 100</div>
+            <div class="data-sub">soglia minima 60 — SUPERA ✓ — rank #3 su 86 candidati</div>
           </div>
         </div>
       </div>
@@ -1048,22 +1048,22 @@
         </div>
         <div class="screen-body">
 <span class="dim">pillar_1_vol_quality</span>:<br>
-<span class="dim">  ivr=42  →  score =</span> <span class="hlg">8.4</span><br>
+<span class="dim">  ivr=42  →  score =</span> <span class="hlg">84.0</span><br>
 <span class="dim">  weight = 0.30</span><br>
 <br>
 <span class="dim">pillar_2_spread_quality</span>:<br>
-<span class="dim">  oi=1240, spread=4%  →  score =</span> <span class="hlg">7.9</span><br>
+<span class="dim">  oi=1240, spread=4%  →  score =</span> <span class="hlg">79.0</span><br>
 <span class="dim">  weight = 0.25</span><br>
 <br>
 <span class="dim">pillar_3_delta_position</span>:<br>
-<span class="dim">  delta=-0.18  →  score =</span> <span class="hly">6.8</span><br>
+<span class="dim">  delta=-0.18  →  score =</span> <span class="hly">68.0</span><br>
 <span class="dim">  weight = 0.20</span><br>
 <br>
 <span class="dim">pillar_4_regime_align</span>:<br>
-<span class="dim">  regime=NORMAL  →  score =</span> <span class="hlg">8.2</span><br>
+<span class="dim">  regime=NORMAL  →  score =</span> <span class="hlg">82.0</span><br>
 <span class="dim">  weight = 0.25</span><br>
 <br>
-<span class="hlg">FINAL = 7.82  →  RANK #3 / 86</span><br>
+<span class="hlg">FINAL = 78.2  →  RANK #3 / 86</span><br>
         </div>
       </div>
     </div>
@@ -1194,7 +1194,7 @@
         <div class="screen-body">
           <div class="section">
             <div class="row"><span class="hl">SPY 490/485 Put Spread</span><span class="badge orange">RANK #3</span></div>
-            <div class="row"><span class="dim">Score</span><span class="hlg">7.82 / 10</span></div>
+            <div class="row"><span class="dim">Score</span><span class="hlg">78.2 / 100</span></div>
             <div class="row"><span class="dim">Regime</span><span class="badge normal">NORMAL</span></div>
           </div>
           <div class="section">

@@ -7,6 +7,14 @@ Definire in modo univoco:
 - quali output producono,
 - quali gate sbloccano i tab successivi.
 
+## 1.1) Fonte canonica parametri operativi
+Per evitare drift tra documentazione e runtime, i parametri numerici operativi
+(soglie score, DTE, OI, IVR, spread) sono normati in:
+- `docs/canonical/operational_contract.toml`
+
+Le guide narrative (`docs/guide/*`) e il documento progetto devono restare coerenti
+con questo contratto, che riflette i valori del codice runtime.
+
 ## 2) Catena logica (end-to-end)
 1. **Sorgenti esterne**
    - IBKR (conto, posizioni, chain, prezzi, greche)

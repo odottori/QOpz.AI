@@ -79,7 +79,7 @@ Vai in **OPPORTUNITY** → scheda **OPP SCAN**:
 
 Il sistema mostra i candidati ordinati per score. Ogni candidato ha:
 - **Symbol / Strategy / Expiry** — cosa stai guardando
-- **Score** — da 0 a 1, quanto il sistema lo considera buono
+- **Score** — da 0 a 100 (scala composita dei 4 pilastri)
 - **EV / Premium** — valore atteso e premio incassato
 - **Kelly fraction** — sizing suggerito (solo con DATA_MODE reale)
 
@@ -93,7 +93,7 @@ Guarda:
 - **IVR** — deve essere ≥ 20 (volatilità storicamente alta → vendi volatilità)
 - **Spread %** — deve essere < 10% (liquidità accettabile)
 - **DTE** — tra 14 e 60 giorni
-- **Score** — sopra 0.6 per considerarlo seriamente
+- **Score** — almeno 60/100 per considerarlo seriamente (≥ 75/100 = alta qualità)
 
 Se qualcosa non torna, passa al candidato successivo. Il sistema ne mostra 5-10 — non sei obbligato a prendere il primo.
 

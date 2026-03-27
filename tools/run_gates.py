@@ -40,6 +40,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="run_gates")
     p.add_argument("--skip-planner", action="store_true")
     p.add_argument("--skip-unittest", action="store_true")
+    p.add_argument("--skip-docs-contract", action="store_true")
     p.add_argument("--skip-manifest", action="store_true")
     p.add_argument("--skip-certify", action="store_true")
     p.add_argument("--skip-preflight", action="store_true")
@@ -166,6 +167,9 @@ def main(argv: list[str] | None = None) -> int:
     if not args.skip_planner:
         planner_cmd = [py_exec, "tools/planner_guard.py", "check", "--check-target", "index"]
         stages.append(("PLANNER_GUARD", planner_cmd))
+
+    if not args.skip_docs_contract:
+        stages.append(("DOCS_CONTRACT", [py_exec, "tools/docs_contract_check.py"]))
 
     if not args.skip_unittest:
         stages.append(("UNITTEST", [py_exec, "-m", "unittest", "-q"]))
