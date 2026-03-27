@@ -1765,6 +1765,16 @@ export default function App() {
     } catch (e) { markFetchErr("regimeContext"); }
   }
 
+  async function doFetchUniverseLatest() {
+    try {
+      const r = await apiJson<UniverseLatestResponse>(`${API_BASE}/opz/universe/latest?profile=${ACTIVE_PROFILE}`);
+      setUniverseLatest(r);
+      clearFetchErr("universeLatest");
+    } catch {
+      markFetchErr("universeLatest");
+    }
+  }
+
   async function doFetchEquityHistory() {
     try {
       const url = `${API_BASE}/opz/paper/equity_history?profile=${ACTIVE_PROFILE}&limit=60`;
@@ -1829,6 +1839,7 @@ export default function App() {
         const snaps = await apiJson<{items: SymbolSnap[]}>(`${API_BASE}/opz/universe/symbol_snapshots?profile=${ACTIVE_PROFILE}`);
         setSymbolSnaps(snaps.items ?? []);
       } catch { /* non critico */ }
+      void doFetchUniverseLatest();
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
     // Refresh: conta i secondi mentre aspetta la risposta
@@ -1874,6 +1885,7 @@ export default function App() {
           const snaps2 = await apiJson<{items: SymbolSnap[]}>(`${API_BASE}/opz/universe/symbol_snapshots?profile=${ACTIVE_PROFILE}`);
           setSymbolSnaps(snaps2.items ?? []);
         } catch { /* non critico */ }
+        void doFetchUniverseLatest();
       } catch (e) {
         setError(`Refresh dati fallito: ${String(e)}`);
       }
@@ -2514,6 +2526,7 @@ export default function App() {
     void doFetchSysStatus();
     void doFetchRegimeCurrent();
     void doFetchRegimeContext();
+    void doFetchUniverseLatest();
     void doFetchEquityHistory();
     void doFetchExitCandidates();
     void doFetchActivityStream();
@@ -2530,6 +2543,7 @@ export default function App() {
       void doCheckIbkr(false);   // stato IBKR passivo, senza reconnessioni automatiche
       void doFetchSysStatus();   // 1 query DuckDB — kill switch, kelly, data_mode
       void doFetchRegimeContext(); // contesto regime per fonte (opportunity/universe/paper)
+      void doFetchUniverseLatest(); // ultimo scan operativo universe (analisi -> segnali)
       void doFetchSessionStatus(); // stato scheduler sessioni
       void doFetchSessionLogs(); // storico sessioni → aggiorna card morning/EOD
       void doFetchControlStatus(); // observer + ibwr + control plane
