@@ -2520,7 +2520,8 @@ export default function App() {
     void doFetchSessionStatus();
     void doFetchSessionLogs();
     void doFetchControlStatus();
-    void doFetchFeedLog(undefined, undefined, true, true);
+    // refresh dati all'apertura UI, ma senza forzare run sessione fuori scheduler
+    void doFetchFeedLog(undefined, undefined, true, false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Heartbeat ogni 5 minuti — solo status leggeri e letture passive

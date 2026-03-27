@@ -23,8 +23,11 @@ _JSONL_LOCK = threading.Lock()  # serializza scritture su operator_previews/conf
 
 _SESSION_STATE: dict[str, Any] = {
     "last_morning": None,
+    "last_morning_post": None,
     "last_eod": None,
     "next_morning": None,
+    "next_morning_primary": None,
+    "next_morning_post": None,
     "next_eod": None,
     "last_result": None,
     "running": False,

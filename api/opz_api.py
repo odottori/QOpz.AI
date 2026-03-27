@@ -36,21 +36,29 @@ class _MemoryLogHandler(logging.Handler):
     """Handler che accumula record nel buffer circolare _LOG_BUFFER."""
     def emit(self, record: logging.LogRecord) -> None:
         try:
+            dedupe_window_sec = 180.0
             ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%H:%M:%S")
             level = record.levelname
             name = record.name.split(".")[-1]
             msg = self.format(record)
-            if _LOG_BUFFER:
-                last = _LOG_BUFFER[-1]
+            created = float(record.created)
+
+            # comprime anche ripetizioni non consecutive (tipiche del feed IBKR)
+            for i in range(len(_LOG_BUFFER) - 1, -1, -1):
+                prev = _LOG_BUFFER[i]
+                prev_created = float(prev.get("created", 0.0))
+                if created - prev_created > dedupe_window_sec:
+                    break
                 if (
-                    last.get("level") == level
-                    and last.get("name") == name
-                    and last.get("msg_raw") == msg
+                    prev.get("level") == level
+                    and prev.get("name") == name
+                    and prev.get("msg_raw") == msg
                 ):
-                    rep = int(last.get("repeat", 1)) + 1
-                    last["repeat"] = rep
-                    last["ts"] = ts
-                    last["msg"] = f"{msg} (x{rep})"
+                    rep = int(prev.get("repeat", 1)) + 1
+                    prev["repeat"] = rep
+                    prev["ts"] = ts
+                    prev["created"] = created
+                    prev["msg"] = f"{msg} (x{rep})"
                     return
             _LOG_BUFFER.append({
                 "ts": ts,
@@ -59,6 +67,7 @@ class _MemoryLogHandler(logging.Handler):
                 "msg": msg,
                 "msg_raw": msg,
                 "repeat": 1,
+                "created": created,
             })
         except Exception:
             pass
@@ -162,6 +171,8 @@ def _load_sessions_config() -> dict[str, Any]:
         "enabled": False,
         "scheduler_mode": "internal",
         "morning_time": "09:00",
+        "morning_post_open_enabled": True,
+        "morning_post_open_time": "10:30",
         "eod_time": "16:30",
         "timezone": "America/New_York",
         "duration_max_min": 10,
@@ -258,6 +269,7 @@ async def _scheduler_loop(cfg: dict[str, Any]) -> None:
     """Loop infinito che dorme fino alla prossima sessione e la esegue."""
     try:
         morning_t = _parse_session_time(cfg.get("morning_time", "09:00"), cfg.get("timezone", "America/New_York"))
+        morning_post_t = _parse_session_time(cfg.get("morning_post_open_time", "10:30"), cfg.get("timezone", "America/New_York"))
         eod_t     = _parse_session_time(cfg.get("eod_time", "16:30"),    cfg.get("timezone", "America/New_York"))
     except Exception as exc:
         logger.critical("SESSION_SCHEDULER cannot parse times — scheduler disabled: %s", exc)
@@ -280,16 +292,23 @@ async def _scheduler_loop(cfg: dict[str, Any]) -> None:
 
     skip_weekends = _as_bool(cfg.get("skip_weekends"), True)
     skip_holidays = _as_bool(cfg.get("skip_holidays"), True)
+    morning_post_enabled = _as_bool(cfg.get("morning_post_open_enabled"), True)
     tz_name = str(cfg.get("timezone", "America/New_York") or "America/New_York")
 
-    logger.info("SESSION_SCHEDULER started | morning=%s eod=%s tz=%s",
-                cfg.get("morning_time"), cfg.get("eod_time"), cfg.get("timezone"))
+    logger.info(
+        "SESSION_SCHEDULER started | morning=%s morning_post=%s(%s) eod=%s tz=%s",
+        cfg.get("morning_time"),
+        cfg.get("morning_post_open_time"),
+        "on" if morning_post_enabled else "off",
+        cfg.get("eod_time"),
+        cfg.get("timezone"),
+    )
 
     while True:
         try:
             now = datetime.now(timezone.utc)
             try:
-                next_morning, _ = _next_session_dt(
+                next_morning_primary, _ = _next_session_dt(
                     now,
                     morning_t,
                     eod_t,
@@ -298,6 +317,17 @@ async def _scheduler_loop(cfg: dict[str, Any]) -> None:
                     skip_holidays=skip_holidays,
                     preferred_type="morning",
                 )
+                next_morning_post = None
+                if morning_post_enabled:
+                    next_morning_post, _ = _next_session_dt(
+                        now,
+                        morning_post_t,
+                        eod_t,
+                        tz_name,
+                        skip_weekends=skip_weekends,
+                        skip_holidays=skip_holidays,
+                        preferred_type="morning",
+                    )
                 next_eod, _ = _next_session_dt(
                     now,
                     morning_t,
@@ -313,19 +343,28 @@ async def _scheduler_loop(cfg: dict[str, Any]) -> None:
                 _SESSION_STATE["enabled"] = False
                 _SESSION_STATE["running"] = False
                 _SESSION_STATE["next_morning"] = None
+                _SESSION_STATE["next_morning_primary"] = None
+                _SESSION_STATE["next_morning_post"] = None
                 _SESSION_STATE["next_eod"] = None
                 _SESSION_STATE["last_result"] = {"ok": False, "reason": reason}
                 return
 
-            _SESSION_STATE["next_morning"] = next_morning.isoformat()
+            nearest_morning = next_morning_primary
+            if next_morning_post is not None and next_morning_post < nearest_morning:
+                nearest_morning = next_morning_post
+            _SESSION_STATE["next_morning"] = nearest_morning.isoformat()
+            _SESSION_STATE["next_morning_primary"] = next_morning_primary.isoformat()
+            _SESSION_STATE["next_morning_post"] = next_morning_post.isoformat() if next_morning_post else None
             _SESSION_STATE["next_eod"] = next_eod.isoformat()
-            if next_morning <= next_eod:
-                next_dt, session_type = next_morning, "morning"
-            else:
-                next_dt, session_type = next_eod, "eod"
+            candidates: list[tuple[datetime, str, str]] = [(next_morning_primary, "morning", "morning_primary")]
+            if next_morning_post is not None:
+                candidates.append((next_morning_post, "morning", "morning_post_open"))
+            candidates.append((next_eod, "eod", "eod"))
+            candidates.sort(key=lambda x: x[0])
+            next_dt, session_type, slot_name = candidates[0]
             sleep_sec = max(1.0, (next_dt.astimezone(timezone.utc) - now).total_seconds())
-            logger.info("SESSION_SCHEDULER sleeping %.0fs until %s (%s)",
-                        sleep_sec, next_dt.isoformat(), session_type)
+            logger.info("SESSION_SCHEDULER sleeping %.0fs until %s (%s/%s)",
+                        sleep_sec, next_dt.isoformat(), session_type, slot_name)
 
             try:
                 await asyncio.sleep(sleep_sec)
@@ -335,10 +374,13 @@ async def _scheduler_loop(cfg: dict[str, Any]) -> None:
 
             # Esegui sessione
             _SESSION_STATE["running"] = True
-            logger.info("SESSION_SCHEDULER launching %s session", session_type)
+            logger.info("SESSION_SCHEDULER launching %s session (%s)", session_type, slot_name)
             try:
                 result = await _run_session_subprocess(session_type, cfg)
                 _SESSION_STATE[f"last_{session_type}"] = datetime.now(timezone.utc).isoformat()
+                if slot_name == "morning_post_open":
+                    _SESSION_STATE["last_morning_post"] = _SESSION_STATE.get("last_morning")
+                result["scheduler_slot"] = slot_name
                 _SESSION_STATE["last_result"] = result
                 ok_str = "OK" if result.get("ok") else "WARN"
                 logger.info("SESSION_%s %s errors=%s", session_type.upper(), ok_str,
@@ -3643,8 +3685,11 @@ def opz_session_status() -> Dict[str, Any]:
         "scheduler_mode": _SESSION_STATE.get("scheduler_mode", "internal"),
         "running": _SESSION_STATE.get("running", False),
         "last_morning": _SESSION_STATE.get("last_morning"),
+        "last_morning_post": _SESSION_STATE.get("last_morning_post"),
         "last_eod": _SESSION_STATE.get("last_eod"),
         "next_morning": _SESSION_STATE.get("next_morning"),
+        "next_morning_primary": _SESSION_STATE.get("next_morning_primary"),
+        "next_morning_post": _SESSION_STATE.get("next_morning_post"),
         "next_eod": _SESSION_STATE.get("next_eod"),
         "last_result": _SESSION_STATE.get("last_result"),
     }

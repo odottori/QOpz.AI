@@ -50,6 +50,8 @@ active_mode  = "MICRO"
 # Sessioni automatiche morning + EOD — attive in paper trading
 enabled          = true
 morning_time     = "09:00"           # orario locale EST (America/New_York)
+morning_post_open_enabled = true
+morning_post_open_time    = "10:30"  # +1h da apertura cash USA (09:30 ET)
 eod_time         = "16:30"           # orario locale EST
 timezone         = "America/New_York"
 duration_max_min = 10                # timeout massimo per sessione (minuti)
