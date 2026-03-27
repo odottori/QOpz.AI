@@ -64,3 +64,7 @@ ui/node_modules/
 ui/dist/
 ui/.vite/
 make_repo_zip.bat
+
+# Planner runtime state (local-only)
+planner/active_step.json
+planner/maintenance_steps.json
