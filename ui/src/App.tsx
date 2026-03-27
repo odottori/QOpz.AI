@@ -652,6 +652,76 @@ function fmtHm(iso: string): string {
   });
 }
 
+type MarketOpenDef = {
+  id: string;
+  label: string;
+  tz: string;
+  hour: number;
+  minute: number;
+  weekdays: number[]; // 0=Sun ... 6=Sat (local market timezone)
+};
+
+const WEEKDAY_MAP: Record<string, number> = {
+  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+};
+
+function zonedParts(date: Date, tz: string): { year: number; month: number; day: number; hour: number; minute: number; second: number; weekday: number } | null {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      weekday: "short",
+    });
+    const p = Object.fromEntries(fmt.formatToParts(date).map((x) => [x.type, x.value]));
+    const weekday = WEEKDAY_MAP[String(p.weekday ?? "")];
+    if (weekday === undefined) return null;
+    return {
+      year: Number(p.year),
+      month: Number(p.month),
+      day: Number(p.day),
+      hour: Number(p.hour),
+      minute: Number(p.minute),
+      second: Number(p.second),
+      weekday,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function tzOffsetMs(date: Date, tz: string): number {
+  const p = zonedParts(date, tz);
+  if (!p) return 0;
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return asUtc - date.getTime();
+}
+
+function zonedDateToUtcMs(y: number, m: number, d: number, hour: number, minute: number, tz: string): number {
+  let ms = Date.UTC(y, m - 1, d, hour, minute, 0);
+  for (let i = 0; i < 3; i += 1) {
+    ms = Date.UTC(y, m - 1, d, hour, minute, 0) - tzOffsetMs(new Date(ms), tz);
+  }
+  return ms;
+}
+
+function nextOpenIso(def: MarketOpenDef, nowMs: number): string | null {
+  for (let dayOffset = 0; dayOffset < 10; dayOffset += 1) {
+    const probe = new Date(nowMs + dayOffset * 86_400_000);
+    const zp = zonedParts(probe, def.tz);
+    if (!zp) continue;
+    if (!def.weekdays.includes(zp.weekday)) continue;
+    const tsMs = zonedDateToUtcMs(zp.year, zp.month, zp.day, def.hour, def.minute, def.tz);
+    if (tsMs > nowMs + 1000) return new Date(tsMs).toISOString();
+  }
+  return null;
+}
+
 function explainDatiError(err: string | null | undefined): string {
   const raw = String(err ?? "").trim();
   if (!raw) return "Errore non specificato";
@@ -907,6 +977,7 @@ export default function App() {
   const [postSubTab, setPostSubTab] = useState<PostSubTab>("chiusura");
   const [clockText, setClockText] = useState<string>("");
   const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now());
+  const [marketHorizonHours, setMarketHorizonHours] = useState<6 | 12 | 24>(12);
   const [universeLatest, setUniverseLatest] = useState<UniverseLatestResponse | null>(null);
   const [universeSymbols, setUniverseSymbols] = useState<string>("SPY,QQQ,IWM,AAPL,MSFT,NVDA,AMZN,META,TSLA,AMD");
   const [universeTopN, setUniverseTopN] = useState<string>("6");
@@ -2376,26 +2447,27 @@ export default function App() {
     const ss = String(secs).padStart(2, "0");
     return days > 0 ? `${days}g ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
   };
-  const upcomingDailyDeadlines = useMemo(() => {
-    const out: Array<{ kind: "morning" | "eod"; ts: string }> = [];
-    const addSeries = (kind: "morning" | "eod", seedIso: string | null | undefined) => {
-      const raw = String(seedIso ?? "").trim();
-      if (!raw) return;
-      let tsMs = Date.parse(raw);
-      if (!Number.isFinite(tsMs)) return;
-      for (let i = 0; i < 7; i += 1) {
-        if (tsMs >= clockNowMs - 1000) {
-          out.push({ kind, ts: new Date(tsMs).toISOString() });
-        }
-        tsMs += 24 * 60 * 60 * 1000;
-      }
-    };
-    addSeries("morning", sessionStatus?.next_morning);
-    addSeries("eod", sessionStatus?.next_eod);
-    return out
-      .sort((a, b) => a.ts.localeCompare(b.ts))
-      .slice(0, 10);
-  }, [sessionStatus?.next_morning, sessionStatus?.next_eod, clockNowMs]);
+  const upcomingMarketOpenings = useMemo(() => {
+    const defs: MarketOpenDef[] = [
+      { id: "us_equities", label: "Azioni USA (NYSE/NASDAQ)", tz: "America/New_York", hour: 9, minute: 30, weekdays: [1, 2, 3, 4, 5] },
+      { id: "eu_equities", label: "Azioni Europa (Milano/Francoforte)", tz: "Europe/Rome", hour: 9, minute: 0, weekdays: [1, 2, 3, 4, 5] },
+      { id: "uk_equities", label: "Azioni UK (LSE)", tz: "Europe/London", hour: 8, minute: 0, weekdays: [1, 2, 3, 4, 5] },
+      { id: "index_cash_us", label: "Indici cash USA", tz: "America/New_York", hour: 9, minute: 30, weekdays: [1, 2, 3, 4, 5] },
+      { id: "index_fut_cme", label: "Indici futures CME (re-open)", tz: "America/New_York", hour: 18, minute: 0, weekdays: [0, 1, 2, 3, 4] },
+      { id: "commod_cme", label: "Materie prime CME (re-open)", tz: "America/New_York", hour: 18, minute: 0, weekdays: [0, 1, 2, 3, 4] },
+    ];
+    const horizonMs = marketHorizonHours * 3_600_000;
+    return defs
+      .map((def) => {
+        const nextIso = nextOpenIso(def, clockNowMs);
+        if (!nextIso) return null;
+        const deltaMs = Date.parse(nextIso) - clockNowMs;
+        if (!Number.isFinite(deltaMs) || deltaMs < 0 || deltaMs > horizonMs) return null;
+        return { ...def, nextIso };
+      })
+      .filter((x): x is (MarketOpenDef & { nextIso: string }) => Boolean(x))
+      .sort((a, b) => a.nextIso.localeCompare(b.nextIso));
+  }, [clockNowMs, marketHorizonHours]);
 
   useEffect(() => {
     if (!datiOpsReady && (centerPhase !== "ante" || anteSubTab !== "dati")) {
@@ -5720,16 +5792,37 @@ export default function App() {
               })}
             </div>
             <div style={{marginTop:6, borderTop:"1px solid var(--border)", paddingTop:6}}>
-              <div style={{fontSize:"0.55rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4}}>Log scadenze</div>
-              {upcomingDailyDeadlines.length === 0 ? (
-                <div style={{fontSize:"0.58rem", color:"#666"}}>Nessuna scadenza disponibile</div>
+              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:6, marginBottom:4}}>
+                <div style={{fontSize:"0.55rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.05em"}}>Log aperture mercato</div>
+                <div style={{display:"flex", gap:3}}>
+                  {([6, 12, 24] as Array<6 | 12 | 24>).map((h) => (
+                    <button
+                      key={h}
+                      onClick={() => setMarketHorizonHours(h)}
+                      style={{
+                        fontSize:"0.52rem",
+                        padding:"1px 5px",
+                        borderRadius:3,
+                        cursor:"pointer",
+                        border:`1px solid ${marketHorizonHours === h ? "#60a5fa" : "#2a2a2a"}`,
+                        background: marketHorizonHours === h ? "rgba(96,165,250,0.15)" : "transparent",
+                        color: marketHorizonHours === h ? "#60a5fa" : "#777",
+                      }}
+                    >
+                      {h}h
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {upcomingMarketOpenings.length === 0 ? (
+                <div style={{fontSize:"0.58rem", color:"#666"}}>Nessuna apertura nei prossimi {marketHorizonHours}h</div>
               ) : (
                 <div style={{display:"flex", flexDirection:"column", gap:3}}>
-                  {upcomingDailyDeadlines.map((it, idx) => (
-                    <div key={`${it.kind}-${it.ts}-${idx}`} style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:6, fontSize:"0.58rem", borderBottom:"1px solid #1f2a24", paddingBottom:2}}>
-                      <span style={{color:"#9ac4af", minWidth:52}}>{it.kind === "morning" ? "Morning" : "EOD"}</span>
-                      <span className="sev-meta" style={{flex:1, textAlign:"left"}}>{fmtTsMin(it.ts)}</span>
-                      <span className="sev-ok" style={{fontVariantNumeric:"tabular-nums"}}>{countdownTo(it.ts)}</span>
+                  {upcomingMarketOpenings.map((it) => (
+                    <div key={`${it.id}-${it.nextIso}`} style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:6, fontSize:"0.58rem", borderBottom:"1px solid #1f2a24", paddingBottom:2}}>
+                      <span style={{color:"#9ac4af", minWidth:86}}>{it.label}</span>
+                      <span className="sev-meta" style={{flex:1, textAlign:"left"}}>{fmtTsMin(it.nextIso)}</span>
+                      <span className="sev-ok" style={{fontVariantNumeric:"tabular-nums"}}>{countdownTo(it.nextIso)}</span>
                     </div>
                   ))}
                 </div>
