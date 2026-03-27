@@ -2125,6 +2125,17 @@ export default function App() {
     { key: "opportunity", label: "Opportunity", info: regimeSources?.opportunity ?? null },
     { key: "paper_trade", label: "Paper trade", info: regimeSources?.paper_trade ?? null },
   ] as const;
+  const universeOperationalItems = universeLatest?.items ?? [];
+  const universeOperationalTotal = universeOperationalItems.length;
+  const universeOperationalReady = universeOperationalItems.filter(
+    (it) => it.score >= 0.55 && it.spread_pct <= 0.10 && (it.open_interest ?? 0) > 0
+  ).length;
+  const avgValue = (vals: number[]): number | null =>
+    vals.length > 0 ? vals.reduce((acc, x) => acc + x, 0) / vals.length : null;
+  const universeOperationalAvgScore = avgValue(universeOperationalItems.map((it) => it.score));
+  const universeOperationalAvgIvr = avgValue(universeOperationalItems.map((it) => it.iv_rank));
+  const universeOperationalAvgSpread = avgValue(universeOperationalItems.map((it) => it.spread_pct));
+  const universeOperationalAvgLiq = avgValue(universeOperationalItems.map((it) => it.liquidity_score));
   const pipelineRecords = universeLatest?.market_rows_available ?? 0;
   const pipelineBatch = universeLatest?.batch_id ?? "N/D";
   const pipelineLatencyState = fetchErrors.size > 0 ? "STALE" : "FRESH";
@@ -3943,6 +3954,7 @@ export default function App() {
                               ? TOOLTIPS.analysis_ctx_opportunity
                               : TOOLTIPS.analysis_ctx_paper_trade;
                         const records = info?.records ?? [];
+                        const universeRows = universeOperationalItems.slice(0, 12);
                         return (
                           <div key={`${row.key}-table`} style={{flex:"1 1 0", minWidth:0, border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", background:isResolved ? "rgba(0,255,106,0.05)" : "rgba(255,255,255,0.01)"}}>
                             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 8px", borderBottom:"1px solid var(--border)"}}>
@@ -3985,6 +3997,92 @@ export default function App() {
                             <div style={{padding:"5px 8px", borderTop:"1px solid var(--border)", fontSize:"0.57rem", color:"var(--dim)"}}>
                               ult: {info?.last_ts ? fmtTsMin(info.last_ts) : "N/D"} · usable {samples > 0 ? "yes" : "no"}
                             </div>
+                            {row.key === "universe" && (
+                              <div style={{padding:"6px 8px", borderTop:"1px solid var(--border)", background:"rgba(0,180,120,0.04)"}}>
+                                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+                                  <span style={{fontSize:"0.58rem", color:"#88aa99", textTransform:"uppercase", letterSpacing:"0.05em"}}>Last scan operativo</span>
+                                  <span className={universeOperationalTotal > 0 ? "sev-ok" : "sev-error"} style={{fontSize:"0.58rem", fontWeight:700}}>
+                                    {universeOperationalTotal > 0 ? "dati presenti" : "nessun item"}
+                                  </span>
+                                </div>
+                                <div style={{display:"flex", gap:10, flexWrap:"wrap", fontSize:"0.55rem", color:"#9ac4af", marginBottom:5}}>
+                                  <span>ts: {universeLatest?.created_at_utc ? fmtTsMin(universeLatest.created_at_utc) : "N/D"}</span>
+                                  <span>source: {String(universeLatest?.source ?? "N/D")}</span>
+                                  <span>scanner: {String(universeLatest?.scanner_name ?? "N/D")}</span>
+                                  <span>market rows: {universeLatest?.market_rows_available ?? 0}</span>
+                                  <span>liq media: {universeOperationalAvgLiq != null ? `${(universeOperationalAvgLiq <= 1 ? universeOperationalAvgLiq * 100 : universeOperationalAvgLiq).toFixed(0)}%` : "N/D"}</span>
+                                </div>
+                                <div style={{display:"grid", gridTemplateColumns:"repeat(4,minmax(0,1fr))", gap:4, marginBottom:6}}>
+                                  <div style={{border:"1px solid #204634", borderRadius:4, padding:"3px 5px"}}>
+                                    <div style={{fontSize:"0.5rem", color:"#6f8a7c", textTransform:"uppercase"}}>ready</div>
+                                    <div style={{fontSize:"0.7rem", color:"#4ade80", fontWeight:700}}>{universeOperationalReady}/{universeOperationalTotal}</div>
+                                  </div>
+                                  <div style={{border:"1px solid #204634", borderRadius:4, padding:"3px 5px"}}>
+                                    <div style={{fontSize:"0.5rem", color:"#6f8a7c", textTransform:"uppercase"}}>score medio</div>
+                                    <div style={{fontSize:"0.7rem", color:"#9ac4af", fontWeight:700}}>
+                                      {universeOperationalAvgScore != null ? `${(universeOperationalAvgScore * 100).toFixed(0)}%` : "N/D"}
+                                    </div>
+                                  </div>
+                                  <div style={{border:"1px solid #204634", borderRadius:4, padding:"3px 5px"}}>
+                                    <div style={{fontSize:"0.5rem", color:"#6f8a7c", textTransform:"uppercase"}}>spread medio</div>
+                                    <div style={{fontSize:"0.7rem", color:"#9ac4af", fontWeight:700}}>
+                                      {universeOperationalAvgSpread != null ? `${(universeOperationalAvgSpread * 100).toFixed(2)}%` : "N/D"}
+                                    </div>
+                                  </div>
+                                  <div style={{border:"1px solid #204634", borderRadius:4, padding:"3px 5px"}}>
+                                    <div style={{fontSize:"0.5rem", color:"#6f8a7c", textTransform:"uppercase"}}>IVR medio</div>
+                                    <div style={{fontSize:"0.7rem", color:"#9ac4af", fontWeight:700}}>
+                                      {universeOperationalAvgIvr != null ? `${(universeOperationalAvgIvr * 100).toFixed(0)}%` : "N/D"}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{maxHeight:170, overflowY:"auto", overflowX:"auto", border:"1px solid #1f3a2c", borderRadius:4}}>
+                                  <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.56rem"}}>
+                                    <thead>
+                                      <tr style={{borderBottom:"1px solid #1f3a2c", color:"#7c8f84", textTransform:"uppercase"}}>
+                                        <th style={{textAlign:"left", padding:"3px 5px"}}>sym</th>
+                                        <th style={{textAlign:"right", padding:"3px 5px"}}>score</th>
+                                        <th style={{textAlign:"right", padding:"3px 5px"}}>ivr</th>
+                                        <th style={{textAlign:"right", padding:"3px 5px"}}>spr</th>
+                                        <th style={{textAlign:"right", padding:"3px 5px"}}>oi</th>
+                                        <th style={{textAlign:"right", padding:"3px 5px"}}>vol</th>
+                                        <th style={{textAlign:"right", padding:"3px 5px"}}>liq</th>
+                                        <th style={{textAlign:"right", padding:"3px 5px"}}>stato</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {universeRows.length > 0 ? universeRows.map((it) => {
+                                        const rowReady = it.score >= 0.55 && it.spread_pct <= 0.10 && (it.open_interest ?? 0) > 0;
+                                        const liqValue = Number.isFinite(it.liquidity_score)
+                                          ? (it.liquidity_score <= 1 ? it.liquidity_score * 100 : it.liquidity_score)
+                                          : null;
+                                        return (
+                                          <tr key={`u-op-${it.rank}-${it.symbol}`} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                                            <td style={{padding:"3px 5px", color:"#9ac4af", fontWeight:700}}>{it.symbol}</td>
+                                            <td style={{padding:"3px 5px", textAlign:"right", color:"#9ac4af"}}>{(it.score * 100).toFixed(0)}%</td>
+                                            <td style={{padding:"3px 5px", textAlign:"right", color:"#9ac4af"}}>{(it.iv_rank * 100).toFixed(0)}%</td>
+                                            <td style={{padding:"3px 5px", textAlign:"right", color:"#9ac4af"}}>{(it.spread_pct * 100).toFixed(2)}%</td>
+                                            <td style={{padding:"3px 5px", textAlign:"right", color:"#9ac4af"}}>{it.open_interest ?? 0}</td>
+                                            <td style={{padding:"3px 5px", textAlign:"right", color:"#9ac4af"}}>{it.volume ?? 0}</td>
+                                            <td style={{padding:"3px 5px", textAlign:"right", color:"#9ac4af"}}>{liqValue != null ? `${liqValue.toFixed(0)}%` : "N/D"}</td>
+                                            <td style={{padding:"3px 5px", textAlign:"right", color:rowReady ? "#4ade80" : "#fbbf24", fontWeight:700}}>
+                                              {rowReady ? "ok" : "watch"}
+                                            </td>
+                                          </tr>
+                                        );
+                                      }) : (
+                                        <tr>
+                                          <td colSpan={8} style={{padding:"6px 5px", color:"#7c8f84"}}>Nessun item universe disponibile.</td>
+                                        </tr>
+                                      )}
+                                    </tbody>
+                                  </table>
+                                </div>
+                                <div style={{marginTop:4, fontSize:"0.54rem", color:"#7c8f84"}}>
+                                  Criterio ready: score ≥ 55%, spread ≤ 10%, OI {'>'} 0.
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
