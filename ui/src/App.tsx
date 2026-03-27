@@ -2376,6 +2376,26 @@ export default function App() {
     const ss = String(secs).padStart(2, "0");
     return days > 0 ? `${days}g ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
   };
+  const upcomingDailyDeadlines = useMemo(() => {
+    const out: Array<{ kind: "morning" | "eod"; ts: string }> = [];
+    const addSeries = (kind: "morning" | "eod", seedIso: string | null | undefined) => {
+      const raw = String(seedIso ?? "").trim();
+      if (!raw) return;
+      let tsMs = Date.parse(raw);
+      if (!Number.isFinite(tsMs)) return;
+      for (let i = 0; i < 7; i += 1) {
+        if (tsMs >= clockNowMs - 1000) {
+          out.push({ kind, ts: new Date(tsMs).toISOString() });
+        }
+        tsMs += 24 * 60 * 60 * 1000;
+      }
+    };
+    addSeries("morning", sessionStatus?.next_morning);
+    addSeries("eod", sessionStatus?.next_eod);
+    return out
+      .sort((a, b) => a.ts.localeCompare(b.ts))
+      .slice(0, 10);
+  }, [sessionStatus?.next_morning, sessionStatus?.next_eod, clockNowMs]);
 
   useEffect(() => {
     if (!datiOpsReady && (centerPhase !== "ante" || anteSubTab !== "dati")) {
@@ -5698,6 +5718,22 @@ export default function App() {
                   </div>
                 );
               })}
+            </div>
+            <div style={{marginTop:6, borderTop:"1px solid var(--border)", paddingTop:6}}>
+              <div style={{fontSize:"0.55rem", color:"#777", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4}}>Log scadenze</div>
+              {upcomingDailyDeadlines.length === 0 ? (
+                <div style={{fontSize:"0.58rem", color:"#666"}}>Nessuna scadenza disponibile</div>
+              ) : (
+                <div style={{display:"flex", flexDirection:"column", gap:3}}>
+                  {upcomingDailyDeadlines.map((it, idx) => (
+                    <div key={`${it.kind}-${it.ts}-${idx}`} style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:6, fontSize:"0.58rem", borderBottom:"1px solid #1f2a24", paddingBottom:2}}>
+                      <span style={{color:"#9ac4af", minWidth:52}}>{it.kind === "morning" ? "Morning" : "EOD"}</span>
+                      <span className="sev-meta" style={{flex:1, textAlign:"left"}}>{fmtTsMin(it.ts)}</span>
+                      <span className="sev-ok" style={{fontVariantNumeric:"tabular-nums"}}>{countdownTo(it.ts)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
           <section className="rp-section">
