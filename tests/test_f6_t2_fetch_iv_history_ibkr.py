@@ -4,7 +4,12 @@ import unittest
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from scripts.fetch_iv_history_ibkr import _snapshot_on_connection
+from scripts.fetch_iv_history_ibkr import (
+    _ibkr_connection_params,
+    _estimate_sigma_bands,
+    _select_regular_expiries,
+    _snapshot_on_connection,
+)
 
 
 class _FakeStock:
@@ -112,6 +117,75 @@ class TestF6T2FetchIvHistoryIbkr(unittest.TestCase):
 
         self.assertEqual(out.get("market_data_type"), 3)
         self.assertIn("PRE-MKT", str(out.get("error")))
+
+    def test_select_regular_expiries_prefers_near_20th(self):
+        today = date(2026, 3, 1)
+        expiries = ["20260306", "20260320", "20260417", "20260522", "20260619"]
+        out = _select_regular_expiries(expiries, max_candidates=5, today_ref=today)
+        chosen = [x[0] for x in out]
+        self.assertIn("20260320", chosen)
+        self.assertIn("20260417", chosen)
+        self.assertIn("20260522", chosen)
+        self.assertIn("20260619", chosen)
+        self.assertNotIn("20260306", chosen)
+
+    def test_select_regular_expiries_fallback_when_no_regular(self):
+        today = date(2026, 3, 1)
+        expiries = ["20260310", "20260313"]
+        out = _select_regular_expiries(expiries, max_candidates=5, today_ref=today)
+        chosen = [x[0] for x in out]
+        self.assertEqual(chosen, ["20260310", "20260313"])
+
+    def test_estimate_sigma_bands_returns_1_and_2_sigma(self):
+        bands = _estimate_sigma_bands(100.0, 0.20, 30)
+        self.assertAlmostEqual(float(bands["sigma_1_abs"]), 5.735, places=2)
+        self.assertAlmostEqual(float(bands["sigma_2_abs"]), 11.47, places=2)
+        self.assertAlmostEqual(float(bands["sigma_1_up"]), 105.735, places=2)
+        self.assertAlmostEqual(float(bands["sigma_1_down"]), 94.265, places=2)
+
+    def test_ibkr_connection_params_prefers_manager_connection(self):
+        class _Mgr:
+            def try_connect(self, timeout=1.5):
+                return True
+
+            def connection_info(self):
+                return {
+                    "connected": True,
+                    "host": "127.0.0.1",
+                    "port": 7496,
+                    "client_id": 10,
+                }
+
+        with patch.dict(sys.modules, {"execution.ibkr_connection": types.SimpleNamespace(get_manager=lambda: _Mgr(), IBKR_CLIENT_ID=10)}):
+            with patch.dict("os.environ", {}, clear=False):
+                host, ports, client_id = _ibkr_connection_params(profile="paper")
+
+        self.assertEqual(host, "127.0.0.1")
+        self.assertEqual(ports[0], 7496)
+        self.assertEqual(client_id, 11)
+
+    def test_ibkr_connection_params_uses_profile_client_id_when_manager_off(self):
+        class _Mgr:
+            def try_connect(self, timeout=1.5):
+                return False
+
+            def connection_info(self):
+                return {
+                    "connected": False,
+                    "host": "127.0.0.1",
+                    "port": None,
+                    "client_id": 10,
+                }
+
+        fake_cfg = {"broker": {"port": 7497, "client_id": 7}}
+        with patch.dict(sys.modules, {"execution.ibkr_connection": types.SimpleNamespace(get_manager=lambda: _Mgr(), IBKR_CLIENT_ID=10)}):
+            with patch("execution.config_loader.load_profile_config", return_value=fake_cfg):
+                with patch.dict("os.environ", {}, clear=False):
+                    host, ports, client_id = _ibkr_connection_params(profile="paper")
+
+        self.assertEqual(host, "127.0.0.1")
+        self.assertEqual(ports[0], 7497)
+        self.assertEqual(client_id, 7)
 
 
 if __name__ == "__main__":

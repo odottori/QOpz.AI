@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from api.models import UniverseScanRequest
@@ -48,6 +48,50 @@ def opz_universe_symbol_snapshots(profile: str = "paper") -> Dict[str, Any]:
     from execution.storage import list_symbol_snapshots
     items = list_symbol_snapshots(profile=profile)
     return {"profile": profile, "count": len(items), "items": items}
+
+
+@router.get("/opz/universe/term_structure")
+def opz_universe_term_structure(
+    profile: str = "paper",
+    top_n: int = Query(3, ge=1, le=6),
+) -> Dict[str, Any]:
+    """
+    Term-structure panel for current universe symbols.
+    Returns top-N regular monthly-like expiries by liquidity for each symbol,
+    with ATM IV and 1sigma/2sigma price bands.
+    """
+    from api import opz_api as compat
+    from scripts.fetch_iv_history_ibkr import capture_ibkr_universe_term_structure
+
+    uni = compat.opz_universe_latest(profile=profile)
+    raw_items = uni.get("items") or []
+    symbols: List[str] = []
+    seen: set[str] = set()
+    for row in raw_items:
+        sym = str((row or {}).get("symbol") or "").strip().upper()
+        if not sym or sym in seen:
+            continue
+        seen.add(sym)
+        symbols.append(sym)
+
+    if not symbols:
+        return {
+            "profile": profile,
+            "count": 0,
+            "top_n": int(top_n),
+            "sigma_levels": [1, 2],
+            "items": [],
+            "error": "universe symbols unavailable",
+        }
+
+    items = capture_ibkr_universe_term_structure(symbols, profile=profile, top_n=int(top_n))
+    return {
+        "profile": profile,
+        "count": len(items),
+        "top_n": int(top_n),
+        "sigma_levels": [1, 2],
+        "items": items,
+    }
 
 
 @router.post("/opz/universe/scan")

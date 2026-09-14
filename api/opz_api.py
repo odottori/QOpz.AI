@@ -82,6 +82,14 @@ from execution.paper_metrics import (
     record_equity_snapshot,
     record_trade,
 )
+from execution.signal_validation import (
+    DEFAULT_FORWARD_HORIZONS,
+    DEFAULT_SCORECARD_WINDOW_DAYS,
+    list_signal_observations,
+    list_signal_scorecards,
+    rebuild_signal_scorecards,
+    recompute_forward_outcomes,
+)
 from execution.storage import _connect, _prov, init_execution_schema
 from execution.wheel_storage import (
     init_wheel_schema,
@@ -90,6 +98,7 @@ from execution.wheel_storage import (
     list_wheel_positions,
 )
 from execution.ibkr_settings_profile import extract_ibkr_universe_context
+from execution.ibkr_readiness import run_ibkr_readiness
 from execution.universe import (
     build_universe_compare,
     fetch_latest_universe_batch,
@@ -1817,7 +1826,8 @@ def _control_api_json(
     method: str = "GET",
     payload: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    base = str(os.environ.get("CONTROL_API_BASE", "http://control-plane:8770")).strip().rstrip("/")
+    default_base = "http://127.0.0.1:8770" if os.name == "nt" else "http://control-plane:8770"
+    base = str(os.environ.get("CONTROL_API_BASE", default_base)).strip().rstrip("/")
     token = str(os.environ.get("CONTROL_API_TOKEN", "")).strip()
     headers: dict[str, str] = {}
     if token:
@@ -2283,6 +2293,88 @@ def opz_opportunity_scan_full(req: ScanFullRequest) -> Dict[str, Any]:
     }
 
 
+
+
+def _parse_horizons_csv(horizons_csv: Optional[str]) -> list[int]:
+    raw = (horizons_csv or "").strip()
+    if not raw:
+        return list(DEFAULT_FORWARD_HORIZONS)
+    out: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            value = int(part)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"invalid horizon: {part}") from exc
+        if value <= 0:
+            raise HTTPException(status_code=400, detail=f"invalid horizon: {part}")
+        out.append(value)
+    if not out:
+        raise HTTPException(status_code=400, detail="at least one horizon is required")
+    return sorted(set(out))
+
+
+def opz_signal_observations(
+    profile: str = "paper",
+    symbol: Optional[str] = None,
+    strategy: Optional[str] = None,
+    limit: int = 100,
+    include_outcomes: bool = True,
+) -> Dict[str, Any]:
+    observations = list_signal_observations(
+        profile=_clean_text(profile, "profile"),
+        symbol=symbol,
+        strategy=strategy,
+        limit=limit,
+        include_outcomes=include_outcomes,
+    )
+    return {"ok": True, "profile": profile, "count": len(observations), "observations": observations}
+
+
+def opz_signal_scorecards(
+    profile: str = "paper",
+    asof_date: Optional[str] = None,
+    window_days: int = DEFAULT_SCORECARD_WINDOW_DAYS,
+    horizon_days: Optional[int] = None,
+    strategy: Optional[str] = None,
+    limit: int = 100,
+) -> Dict[str, Any]:
+    rows = list_signal_scorecards(
+        profile=_clean_text(profile, "profile"),
+        asof_date=asof_date,
+        window_days=window_days,
+        horizon_days=horizon_days,
+        strategy=strategy,
+        limit=limit,
+    )
+    return {"ok": True, "profile": profile, "count": len(rows), "scorecards": rows}
+
+
+def opz_signal_recompute(
+    profile: str = "paper",
+    asof_date: Optional[str] = None,
+    window_days: int = DEFAULT_SCORECARD_WINDOW_DAYS,
+    horizons: Optional[str] = None,
+    symbol: Optional[str] = None,
+) -> Dict[str, Any]:
+    horizon_list = _parse_horizons_csv(horizons)
+    outcome_report = recompute_forward_outcomes(
+        profile=_clean_text(profile, "profile"),
+        asof_date=asof_date,
+        horizons=horizon_list,
+        symbol=symbol,
+    )
+    scorecard_report = rebuild_signal_scorecards(
+        profile=profile,
+        asof_date=asof_date,
+        window_days=window_days,
+        horizons=horizon_list,
+    )
+    return {"ok": True, "profile": profile, "outcomes": outcome_report, "scorecards": scorecard_report}
+
+
 def opz_opportunity_ev_report(
     profile: str = "paper",
     window_days: int = 30,
@@ -2414,6 +2506,27 @@ def opz_ibkr_status(try_connect: bool = False) -> IbkrStatusOut:
         "ports_probed": IBKR_PORTS,
         "message": message,
     }
+
+
+
+
+def opz_ibkr_readiness(
+    profile: str = "paper",
+    timeout_sec: float = 2.0,
+    symbol: str = "SPY",
+    include_option_chain: bool = True,
+) -> Dict[str, Any]:
+    """Unified read-only broker readiness probe.
+
+    Returns profile/port semantics plus live read-only probes for connectivity,
+    account summary, positions, and an option chain smoke test.
+    """
+    return run_ibkr_readiness(
+        profile=profile,
+        timeout_sec=timeout_sec,
+        symbol=symbol,
+        include_option_chain=include_option_chain,
+    )
 
 
 def opz_ibkr_disconnect() -> Dict[str, Any]:

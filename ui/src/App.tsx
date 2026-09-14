@@ -466,9 +466,16 @@ type PostSubTab = "chiusura" | "report";
 type UniverseSubTab = "titoli" | "indici" | "opzioni" | "ciclo" | "palinsesto";
 type MarkdownTable = { headers: string[]; rows: string[][] };
 type ReleaseMdView = { before: string; table: MarkdownTable | null; after: string };
-// In production (Docker/nginx) usa URL relativo — nginx fa proxy.
-// In dev locale: VITE_API_BASE=http://localhost:8765 in .env.local
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+// API base resolution:
+// - explicit VITE_API_BASE wins
+// - otherwise derive from Vite BASE_URL (supports shared-path deploy, e.g. /qopz/)
+const API_BASE = (() => {
+  const explicit = (import.meta.env.VITE_API_BASE as string | undefined)?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const baseUrl = ((import.meta.env.BASE_URL as string | undefined) ?? "/").trim();
+  if (!baseUrl || baseUrl === "/") return "";
+  return baseUrl.replace(/\/+$/, "");
+})();
 /** Profilo attivo — unico punto di modifica per dev/paper/live */
 const ACTIVE_PROFILE = (import.meta.env.VITE_PROFILE as string | undefined) ?? "paper";
 /** Timezone unica di visualizzazione UI (default operatore: Roma). */
@@ -1143,7 +1150,34 @@ export default function App() {
     trend_dir?: "up" | "down" | "flat" | string | null;
     trend_note?: string | null;
   };
+  type TermCurvePoint = {
+    expiry: string;
+    expiry_yyyymmdd: string;
+    dte: number|null;
+    atm_strike: number|null;
+    atm_call_iv: number|null;
+    atm_put_iv: number|null;
+    atm_iv: number|null;
+    iv_source: string|null;
+    liquidity_score: number|null;
+    contracts_sampled: number|null;
+    sigma_1_abs: number|null;
+    sigma_1_up: number|null;
+    sigma_1_down: number|null;
+    sigma_2_abs: number|null;
+    sigma_2_up: number|null;
+    sigma_2_down: number|null;
+    error: string|null;
+  };
+  type TermCurveSymbol = {
+    symbol: string;
+    market_data_type: number|null;
+    underlying_price: number|null;
+    chains: TermCurvePoint[];
+    error: string|null;
+  };
   const [symbolSnaps, setSymbolSnaps] = useState<SymbolSnap[]>([]);
+  const [termCurves, setTermCurves] = useState<TermCurveSymbol[]>([]);
   const REFRESH_CONTROLS_ENABLED = false; // flusso operativo auto on-connect + hard reload (Ctrl+F5)
 
   const deriveSnapState = (s: SymbolSnap): { status: "ok" | "partial" | "error"; note: string | null } => {
@@ -1717,7 +1751,7 @@ export default function App() {
     setStoricoLoading(true);
     try {
       const [actData, sumData] = await Promise.all([
-        apiJson<any>(`${API_BASE}/opz/last-actions?limit=500`),
+        apiJson<any>(`${API_BASE}/opz/last_actions?limit=500`),
         apiJson<any>(`${API_BASE}/opz/paper/summary?profile=paper&window_days=365`),
       ]);
       setStoricoTrades(actData.paper_trades ?? []);
@@ -1849,6 +1883,10 @@ export default function App() {
         const snaps = await apiJson<{items: SymbolSnap[]}>(`${API_BASE}/opz/universe/symbol_snapshots?profile=${ACTIVE_PROFILE}`);
         setSymbolSnaps(snaps.items ?? []);
       } catch { /* non critico */ }
+      try {
+        const curves = await apiJson<{items: TermCurveSymbol[]}>(`${API_BASE}/opz/universe/term_structure?profile=${ACTIVE_PROFILE}&top_n=3`);
+        setTermCurves(curves.items ?? []);
+      } catch { /* non critico */ }
       void doFetchUniverseLatest();
     } catch { /* non critico */ }
     finally { setFeedLogLoading(false); }
@@ -1894,6 +1932,10 @@ export default function App() {
         try {
           const snaps2 = await apiJson<{items: SymbolSnap[]}>(`${API_BASE}/opz/universe/symbol_snapshots?profile=${ACTIVE_PROFILE}`);
           setSymbolSnaps(snaps2.items ?? []);
+        } catch { /* non critico */ }
+        try {
+          const curves2 = await apiJson<{items: TermCurveSymbol[]}>(`${API_BASE}/opz/universe/term_structure?profile=${ACTIVE_PROFILE}&top_n=3`);
+          setTermCurves(curves2.items ?? []);
         } catch { /* non critico */ }
         void doFetchUniverseLatest();
       } catch (e) {
@@ -3441,6 +3483,18 @@ export default function App() {
                           a.remove();
                           URL.revokeObjectURL(url);
                         };
+                        const termCurveRows = termCurves.flatMap((sym) =>
+                          (sym.chains ?? []).map((chain) => ({
+                            symbol: sym.symbol,
+                            underlying: sym.underlying_price,
+                            chain,
+                            symError: sym.error,
+                          }))
+                        );
+                        const termSymbolsOk = termCurves.filter((s) => (s.chains ?? []).length > 0).length;
+                        const termSymbolsErr = termCurves.filter((s) => (s.chains ?? []).length === 0 && !!String(s.error ?? "").trim()).length;
+                        const fmtRange = (low: number | null, high: number | null) =>
+                          low != null && high != null ? `${low.toFixed(2)} / ${high.toFixed(2)}` : "—";
                         return (
                           <div key="derivati" style={{background:"var(--p2)", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", minWidth:0}}>
                             <div style={{display:"flex", alignItems:"center", justifyContent:"space-between",
@@ -3470,6 +3524,50 @@ export default function App() {
                                   <div style={{fontSize:"0.85rem", fontWeight:700, color:col}}>{val}</div>
                                 </div>
                               ))}
+                            </div>
+                            <div style={{padding:"4px 12px 8px"}}>
+                              <div style={{fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", color:"#7aaa90", marginBottom:4}}>
+                                Curve a termine (3 scadenze regolari, ranking liquidita) - bande 1sigma/2sigma
+                              </div>
+                              <div style={{fontSize:"0.55rem", color:"#666", marginBottom:6}}>
+                                simboli con curve: {termSymbolsOk} · simboli in errore: {termSymbolsErr} · righe: {termCurveRows.length}
+                              </div>
+                              <div style={{overflowX:"auto", border:"1px solid var(--border)", borderRadius:4}}>
+                                {termCurveRows.length === 0 ? (
+                                  <div style={{padding:"10px", fontSize:"0.56rem", color:"#666"}}>
+                                    Nessuna curva disponibile al momento (verifica connessione IBKR / permessi chain).
+                                  </div>
+                                ) : (
+                                  <table style={{width:"100%", borderCollapse:"collapse", fontSize:"0.56rem"}}>
+                                    <thead>
+                                      <tr style={{borderBottom:"1px solid var(--border)", background:"rgba(255,255,255,0.03)"}}>
+                                        {["Symbol","Scadenza","DTE","Liquidita","IV ATM","Range 1sigma","Range 2sigma","Fonte"].map((h) => (
+                                          <th key={h} style={{padding:"4px 6px", textAlign:(h==="Symbol"||h==="Scadenza"||h==="Fonte")?"left":"right", color:"#b8ddc8", fontWeight:700, whiteSpace:"nowrap"}}>{h}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {termCurveRows.map((row, idx) => {
+                                        const c = row.chain;
+                                        const src = String(c.iv_source ?? "").toLowerCase();
+                                        const srcColor = src === "ibkr" ? "#4ade80" : src === "bs" ? "#fbbf24" : src === "mix" ? "#f59e0b" : "#888";
+                                        return (
+                                          <tr key={`${row.symbol}-${c.expiry}-${idx}`} style={{borderBottom:"1px solid var(--border)", background: idx % 2 === 0 ? "rgba(0,255,106,0.02)" : "rgba(0,255,106,0.04)"}}>
+                                            <td style={{padding:"4px 6px", color:"#e2f0e8", fontWeight:700}}>{row.symbol}</td>
+                                            <td style={{padding:"4px 6px", color:"#e2f0e8"}}>{c.expiry ?? "—"}</td>
+                                            <td style={{padding:"4px 6px", textAlign:"right", color:"#e2f0e8"}}>{c.dte != null ? String(c.dte) : "—"}</td>
+                                            <td style={{padding:"4px 6px", textAlign:"right", color:"#e2f0e8"}}>{c.liquidity_score != null ? c.liquidity_score.toFixed(0) : "—"}</td>
+                                            <td style={{padding:"4px 6px", textAlign:"right", color:"#4ade80"}}>{c.atm_iv != null ? `${(c.atm_iv * 100).toFixed(2)}%` : "—"}</td>
+                                            <td style={{padding:"4px 6px", textAlign:"right", color:"#e2f0e8"}}>{fmtRange(c.sigma_1_down, c.sigma_1_up)}</td>
+                                            <td style={{padding:"4px 6px", textAlign:"right", color:"#e2f0e8"}}>{fmtRange(c.sigma_2_down, c.sigma_2_up)}</td>
+                                            <td style={{padding:"4px 6px", color:srcColor, textTransform:"uppercase"}}>{c.iv_source ?? "—"}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
                             </div>
                             <div style={{padding:"0 12px 4px"}}>
                               <div style={{display:"flex", alignItems:"center", gap:5, cursor:"pointer", padding:"3px 0", borderBottom:"1px solid #1e1e1e", marginBottom: filtersOpen ? 6 : 0}}

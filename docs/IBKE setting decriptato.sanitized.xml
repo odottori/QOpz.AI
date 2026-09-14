@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <Settings soundProfile="1" isSettingsRestore="false">
 	<UISettings varName="ui" version="2" minQuestionDlgWidth="0" fontName="Verdana" bigScalePrices="false" bigScaleSizes="false" contractDisplay="true" delayForFilled="30" delayForCanceled="10" autoMeter="true" autoRemoveFinishedOrder="true" enableOrderSort="false" keyAdded="true" settlingAdded="false" colorText="false" showZeroPosition="true" showMoreOptions="false" showDVPZeroPosition="true" showAwayZeroPosition="true" displayServerTime="true" useLargeTextForServerTime="false" alwaysOnTop="false" flashBulletin="true" lastLoginDisplay="true" audit="true" autoRollover="true" useCondensedComboDesc="false" hideWorkspaceButtons="true" useOldOrderView="false" roundOrderSizes="false" volColumnsAdded="false" optionTraderVolColumnsAdded="true" showPricesOnVolatilityLayout="false" presetsColumnsAdded="false" scaleColumnsAdded="false" manualAwayColumnsAdded="false" clientCommissionColumnAdded="false" columnTips="true" highlightHighLow="false" showLegExecOnly="false" showMouseHotkeyTip="false" showCustomerPanel="false" showCloseIcon="true" consolidateStatus="true" showCustomerPanelInPecentage="true" showCustomerPanelAsValue="true" colorCodePnl="true" uptickBgColor="-16763392" downtickBgColor="-7929856" showModelHoldingsOutsideAllowedRange="false" modelHoldingsOutsideAllowedRangeColor="-26215" colorOptions="true" inTheMoneyColor="-3342388" outOfTheMoneyColor="-13108" showVolTip="true" showOrderStatusTip="true" showTimeStampTip="true" instanRemovalBasketOrders="false" showStatisticsForMainAndAttachedOrdersSeparately="true" ignoreLoadingZeroQuantityOrders="false" includeFxPositions="true" showToolbarOnDetachedPages="false" displayStocksWithOptsInBold="false" allowDetachPages="true" triggerCompressedView="true" displayTableGridLines="false" lastVersionPrompted="0" useSimplifiedActions="false" portfolioPageRemovedByUser="false" portfolioPageRealizedPnlIntro="false" comboExecColumnAdded="true" drillDownColumn="2053" orderDialogStructure="tabbed" positionColumnAutoAdded="true" disabledAnimation="false" rowBrightnessLevel="1" insertPagesSorted="true" usePeggedToPrimaryNotRelative="false" avgPricePrecision="3" blotterAvgPricePrecision="5" extendedQuotePanel="false" displayedQuotePanelHelp="true" autoCreateBlotterTicket="false" autoModifyTicket="false" autoEditOnFocus="true" autoResizeColumns="true" disableGUIAnimation="false" excludePriorDaysPosition="false" roundValues="false" compactContractDisplay="true" roundValuesOnAccountWindow="true" simplifiedAccountView="false" simplifiedViewDefaultColumn="Totale" roundValuesOnAccountWindowAPI="false" pinMarketScanner="false" sortTablesOnHeaderClick="true" showQuickHeader="true" showAdvScannerDescription="true" showOrderReversalTooltip="true" disableExpandInlineEditor="false" historicalVolatalityColumnAddedToQuotePanel="false" showHedgingIconWithSize="true" showSymbolForDerivatives="false" showComboTypeInFrontOfDescription="false" alwaysShowDST="false" suppressOthersAlerts="false" displayBuySellMousePointers="true" autoAlignment="true" removeLeadingZeroBeforeDecimal="false" showOutlineForCellWithHotkeyAction="true" doNotPromptForMdSubscr="false" showAdvisorPartitionMd="false" displayAccountType="false" useTickDots="true" displayTrueTickVolume="false" displayAbbreviatedVolume="true" formatPricesWithCommas="false" statusBarActionButtonsDisplay="true" largeMenuText="false" mosaicAlwaysBlack="true" statusBarMiniIconsDisplay="true" combineWindowsOnFocusChange1="false" windowsGroupMove="true" autoShowHotlist="true" openToolsAtActionSpot="true" shownWriteOptionsSelectionHint="false" adjustWindowAndColumnWidths="true" scaleEnabled="true" showIFAUngrouped="false" contractColumnClickActionVal="200" showPercentage="true" showExtraPrecisionInSuperscript="true" displayedMergeArbInfoPopup="false" displayAccountInTradeNotifications="false" showPerformanceProfileInOrderConfirmation="false" featureManagerVersion="1" pnLMgrVersionForWhichWarningFiled="0" colorsRepairNeeded="false" lastPriceRepairNeeded="false" comboPositionVersionForWhichWarningFiled="0" lastSelectedStrategy="0" lastTimeInstallCodecsMessageShown="0" showCalculationsForPnLTip="false" showCalculationsForPorfolioTimeValueTip="true" autoAddRecogniaPairColumns="true" recogniaDisclaimerShown="false" altavistaDisclaimerShown="true" delayForTransferredTickets="5" descriptionDisclaimerShown="true" mutualfundAPICashQty="false" cashQtyColumnRemovedByUser="false" includeAccountNumberInPositions="false" pctChangeMovedIntroduced="false" pctChangeToggleIntroduced="false" groupWindows="false" jxBrowserPdfToolbar="false" shownStaticDynamicModelSwitchButtonIntroHint="false" showForecastXPanel="false" showOmniVestTile="false" jxBrowserVerboseLogEnabled="false">
 		<browser />
@@ -272,7 +272,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -337,7 +337,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -468,7 +468,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -537,7 +537,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -621,7 +621,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -704,7 +704,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -772,7 +772,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -827,7 +827,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -890,7 +890,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -952,7 +952,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1012,7 +1012,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1063,7 +1063,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1130,7 +1130,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1238,7 +1238,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1298,7 +1298,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1361,7 +1361,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1464,7 +1464,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1520,7 +1520,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1580,7 +1580,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1638,7 +1638,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1728,7 +1728,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1788,7 +1788,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -1883,7 +1883,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2016,7 +2016,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2074,7 +2074,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2196,7 +2196,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2254,7 +2254,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2313,7 +2313,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2371,7 +2371,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2524,7 +2524,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2584,7 +2584,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2644,7 +2644,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2799,7 +2799,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2861,7 +2861,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -2954,7 +2954,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3050,7 +3050,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3122,7 +3122,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3236,7 +3236,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3417,7 +3417,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3503,7 +3503,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3601,7 +3601,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3659,7 +3659,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3722,7 +3722,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3773,7 +3773,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3835,7 +3835,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -3891,7 +3891,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4069,7 +4069,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4123,7 +4123,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4208,7 +4208,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4266,7 +4266,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4319,7 +4319,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4405,7 +4405,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4465,7 +4465,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4540,7 +4540,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4611,7 +4611,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4699,7 +4699,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4787,7 +4787,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4875,7 +4875,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -4965,7 +4965,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -5032,7 +5032,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -5671,7 +5671,7 @@
 						<SpeedPanelAttributeInfo name="Clearing" label="Clearing" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Clearing_Acct" label="Conto compensaz" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Side" label="Parte" checked="true" tabEnabled="true" />
-						<SpeedPanelAttributeInfo name="Quantity" label="Quantità" checked="true" tabEnabled="true" />
+						<SpeedPanelAttributeInfo name="Quantity" label="QuantitÃ " checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="TIF" label="Durata" checked="false" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Lmt-Price" label="Prezzo limite" checked="true" tabEnabled="true" />
 						<SpeedPanelAttributeInfo name="Aux-Price" label="Prezzo aus." checked="true" tabEnabled="true" />
@@ -5919,7 +5919,7 @@
 		<SetOfDestinationSettings varName="destinationSettings" />
 		<ReportingSettings varName="reportingSettings" />
 	</OrderSettings>
-	<ApiSettings varName="api" readOnlyApi="true" allowOnlyLocalhost="true" socketClient="false" autoOpenOrdDonwload="true" port="REDACTED" includeFxPositions="true" prepareDailyPnl="true" includeContinuousUpdateChanges="true" sendMessagesInEnglish="false" sendMessagesTranslated="true" logLevel="2" useNegativeAutoRange="true" overridePrecautionaryConstraints="false" bypassBondWarning="false" bypassRedirectWarning="false" bypassYtwWarning="false" bypassCalledBondWarning="false" bypassSameActionPairTradeWarning="false" bypassFlaggedAccountsWarning="false" bypassPriceBasedVolatilityRiskWarning="false" masterClientID="REDACTED" acceptLargeSize="false" showApiMsg="false" includeMktData="false" createApiMsgLogFile="false" showIBGConsole="false" aPINotAllowedShownAfterDenyAPI="false" slowBufferTimeout="30" syncAccounts="false" proportionalAllocation="false" disableAutoClose="false" disableProfileAutoClose="false" multichartNetDoNotShowTime="0" multichartDoNotShowTime="0" verifiedAppPortRangeStart="REDACTED" verifiedAppPortRangeEnd="REDACTED" timeOfVerifiedAppShutdown="0" portOfVerifiedAppShutdown="REDACTED" exposeEntireTradingSchedule="true" splitInsuredDepositFromCacheBalance="false" sendZeroPositionsForTodaysOpeningOnly="false" encodeMessagesInAscii7="true" useAccountGroupWithAllocationMethods="true" sendMarketDataInLotsForUSStocks="false" sendVolumeInLotsForUSStocks="true" showAdvancedOrderRejectInUiAlways="false" rejectMessagesAboveMaxAllowedMsgRate="false" maintainConnectionUponReceivingIncorrectlyFormattedFields="false" sendIslandForUsStocksTradingOnNasdaq="false" dateTimeAttribFormat="1" sendForexMarketDataInCompatibilityModeInIntegerUnits="false" bypassNoOverfillProtectionPrecaution="false" resubmitOrdersWhenConnectionIsRestored="true" downloadExecutionReports="2" splitHistoricalData="16" automaticallyReportNettingEventContractTrades="true" bypassRouteMarketableToBboWarning="false">
+	<ApiSettings varName="api" readOnlyApi="true" allowOnlyLocalhost="true" socketClient="true" autoOpenOrdDonwload="true" port="7497" includeFxPositions="true" prepareDailyPnl="true" includeContinuousUpdateChanges="true" sendMessagesInEnglish="false" sendMessagesTranslated="true" logLevel="2" useNegativeAutoRange="true" overridePrecautionaryConstraints="false" bypassBondWarning="false" bypassRedirectWarning="false" bypassYtwWarning="false" bypassCalledBondWarning="false" bypassSameActionPairTradeWarning="false" bypassFlaggedAccountsWarning="false" bypassPriceBasedVolatilityRiskWarning="false" masterClientID="REDACTED" acceptLargeSize="false" showApiMsg="false" includeMktData="false" createApiMsgLogFile="false" showIBGConsole="false" aPINotAllowedShownAfterDenyAPI="false" slowBufferTimeout="30" syncAccounts="false" proportionalAllocation="false" disableAutoClose="false" disableProfileAutoClose="false" multichartNetDoNotShowTime="0" multichartDoNotShowTime="0" verifiedAppPortRangeStart="REDACTED" verifiedAppPortRangeEnd="REDACTED" timeOfVerifiedAppShutdown="0" portOfVerifiedAppShutdown="REDACTED" exposeEntireTradingSchedule="true" splitInsuredDepositFromCacheBalance="false" sendZeroPositionsForTodaysOpeningOnly="false" encodeMessagesInAscii7="true" useAccountGroupWithAllocationMethods="true" sendMarketDataInLotsForUSStocks="false" sendVolumeInLotsForUSStocks="true" showAdvancedOrderRejectInUiAlways="false" rejectMessagesAboveMaxAllowedMsgRate="false" maintainConnectionUponReceivingIncorrectlyFormattedFields="false" sendIslandForUsStocksTradingOnNasdaq="false" dateTimeAttribFormat="1" sendForexMarketDataInCompatibilityModeInIntegerUnits="false" bypassNoOverfillProtectionPrecaution="false" resubmitOrdersWhenConnectionIsRestored="true" downloadExecutionReports="2" splitHistoricalData="16" automaticallyReportNettingEventContractTrades="true" bypassRouteMarketableToBboWarning="false">
 		<compExchSeparator />
 	</ApiSettings>
 	<AnalyticsSettings varName="analytics" version="2" hedgeColumn="false" estimateOptMdlPrice="false" whatifOnIbisStartup="true" displayMyCombos="true" useLocalBidAskIV="false" useTaxAdjustedDividend="true" showAbsoluteVolatilityChange="false" risknavDraggableFramesFirstRun="false" report1="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;properties&gt;&lt;comment&gt;Risk Navigator Report Settings - all profiles&lt;/comment&gt;&lt;entry key=&quot;My Portfolio&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;My Portfolio&amp;lt;/comment&amp;gt;&amp;lt;entry key=&quot;Forex@@@Risk by Underlying&quot;&amp;gt;contracts=1&amp;#13;      &#10;_rm.Price=3&amp;#13;      &#10;report.version=2&amp;#13;      &#10;CWB=T;T;T;null;;&amp;#13;      &#10;sorting=&amp;#13;      &#10;_rm.Delta=101&amp;#13;      &#10;_rm.Size=2&amp;#13;      &#10;_rm.Vega=107&amp;#13;      &#10;_rm.Hedge=126&amp;#13;      &#10;_rm.DeltaDollars=51&amp;#13;      &#10;_rm.PnL=35&amp;#13;      &#10;_rm.Theta=111&amp;#13;      &#10;_rm.Gamma=104&amp;#13;      &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;MarginSensitivity@@@Margin Sensitivity&quot;&amp;gt;sorting=&amp;#13;      &#10;MARGINSENS_REPORT_VERSION=2&amp;#13;      &#10;_rm.Size=2&amp;#13;      &#10;_rm.Currency=0&amp;#13;      &#10;_rm.ValueInBase=4&amp;#13;      &#10;report.version=2&amp;#13;      &#10;_rm.MarginSensValueChangeSell=12&amp;#13;      &#10;_rm.MarginSensValueChangeBuy=8&amp;#13;      &#10;_rm.MarginRate=6&amp;#13;      &#10;_rm.MeasureSensSizeChangeDown=11&amp;#13;      &#10;_rm.Conversion=1&amp;#13;      &#10;_rm.MeasureSensMaintUp=9&amp;#13;      &#10;_rm.MeasureSensInitUp=10&amp;#13;      &#10;_rm.ValuePerc=5&amp;#13;      &#10;_rm.MeasureSensSizeChangeUp=7&amp;#13;      &#10;_rm.Value=3&amp;#13;      &#10;_rm.MeasureSensMaintDown=13&amp;#13;      &#10;_rm.MeasureSensInitDown=14&amp;#13;      &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;Plot Data by Underlying&quot;&amp;gt;contracts=1&amp;#13;      &#10;_rm.Price=3&amp;#13;      &#10;_rm.ValueInBase=21&amp;#13;      &#10;report.version=2&amp;#13;      &#10;CWB=T;T;T;0;;&amp;#13;      &#10;sorting=&amp;#13;      &#10;_rm.Value=18&amp;#13;      &#10;_rm.PnLDay=50&amp;#13;      &#10;_rm.Size=2&amp;#13;      &#10;_rm.PlotDataE=128&amp;#13;      &#10;_rm.PlotDataD=127&amp;#13;      &#10;_rm.Hedge=129&amp;#13;      &#10;_rm.PlotDataC=126&amp;#13;      &#10;_rm.PnL=38&amp;#13;      &#10;_rm.PlotDataB=125&amp;#13;      &#10;_rm.PlotDataA=124&amp;#13;      &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;PnL@@@P&amp;amp;amp;L Summary&quot;&amp;gt;_rm.AvgCost=28&amp;#13;      &#10;_rm.Price=3&amp;#13;      &#10;_rm.ValueInBase=14&amp;#13;      &#10;report.version=2&amp;#13;      &#10;sorting=&amp;#13;      &#10;_rm.Value=11&amp;#13;      &#10;_rm.PnLDay=41&amp;#13;      &#10;_rm.Size=2&amp;#13;      &#10;_rm.PnL=29&amp;#13;      &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;Risk by Underlying&quot;&amp;gt;contracts=1&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.Price=3&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;report.version=2&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;CWB=T;T;T;null;;&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;sorting=&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.Delta=105&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.Size=2&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.Vega=111&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.Hedge=129&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.DeltaDollars=54&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.PnL=38&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.Theta=115&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.Gamma=108&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;_rm.Var=72&amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10; &amp;#13;      &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;VAR@@@On Demand VAR Summary&quot;&amp;gt;_rm.VarExchRateChangePerc=3&amp;#13;      &#10;_rm.VarValueChangeAbs=10&amp;#13;      &#10;report.version=2&amp;#13;      &#10;sorting=&amp;#13;      &#10;_rm.VarExchRateScenario=1&amp;#13;      &#10;_rm.VarPriceScenario=5&amp;#13;      &#10;_rm.VarPriceChangePerc=7&amp;#13;      &#10;_rm.VarValueBase=8&amp;#13;      &#10;_rm.VarValueScenario=9&amp;#13;      &#10;&amp;lt;/entry&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;entry key=&quot;My Portfolios - Multi Account User&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;My Portfolios - Multi Account User&amp;lt;/comment&amp;gt;&amp;lt;entry key=&quot;Forex@@@Risk by Underlying&quot;&amp;gt;contracts=1&amp;#13; &#10;     &amp;#13; &#10;_rm.Price=3&amp;#13; &#10;     &amp;#13; &#10;report.version=2&amp;#13; &#10;     &amp;#13; &#10;CWB=T;T;T;null;;&amp;#13; &#10;     &amp;#13; &#10;sorting=&amp;#13; &#10;     &amp;#13; &#10;_rm.Delta=101&amp;#13; &#10;     &amp;#13; &#10;_rm.Size=2&amp;#13; &#10;     &amp;#13; &#10;_rm.Vega=107&amp;#13; &#10;     &amp;#13; &#10;_rm.Hedge=126&amp;#13; &#10;     &amp;#13; &#10;_rm.DeltaDollars=51&amp;#13; &#10;     &amp;#13; &#10;_rm.PnL=35&amp;#13; &#10;     &amp;#13; &#10;_rm.Theta=111&amp;#13; &#10;     &amp;#13; &#10;_rm.Gamma=104&amp;#13; &#10;     &amp;#13; &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;MarginSensitivity@@@Margin Sensitivity&quot;&amp;gt;sorting=&amp;#13; &#10;     &amp;#13; &#10;MARGINSENS_REPORT_VERSION=2&amp;#13; &#10;     &amp;#13; &#10;_rm.Size=2&amp;#13; &#10;     &amp;#13; &#10;_rm.Currency=0&amp;#13; &#10;     &amp;#13; &#10;_rm.ValueInBase=4&amp;#13; &#10;     &amp;#13; &#10;report.version=2&amp;#13; &#10;     &amp;#13; &#10;_rm.MarginSensValueChangeSell=12&amp;#13; &#10;     &amp;#13; &#10;_rm.MarginSensValueChangeBuy=8&amp;#13; &#10;     &amp;#13; &#10;_rm.MarginRate=6&amp;#13; &#10;     &amp;#13; &#10;_rm.MeasureSensSizeChangeDown=11&amp;#13; &#10;     &amp;#13; &#10;_rm.Conversion=1&amp;#13; &#10;     &amp;#13; &#10;_rm.MeasureSensMaintUp=9&amp;#13; &#10;     &amp;#13; &#10;_rm.MeasureSensInitUp=10&amp;#13; &#10;     &amp;#13; &#10;_rm.ValuePerc=5&amp;#13; &#10;     &amp;#13; &#10;_rm.MeasureSensSizeChangeUp=7&amp;#13; &#10;     &amp;#13; &#10;_rm.Value=3&amp;#13; &#10;     &amp;#13; &#10;_rm.MeasureSensMaintDown=13&amp;#13; &#10;     &amp;#13; &#10;_rm.MeasureSensInitDown=14&amp;#13; &#10;     &amp;#13; &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;Plot Data by Underlying&quot;&amp;gt;contracts=1&amp;#13; &#10;_rm.Price=3&amp;#13; &#10;_rm.ValueInBase=21&amp;#13; &#10;report.version=2&amp;#13; &#10;CWB=T;T;T;null;;&amp;#13; &#10;dimension.account=1&amp;#13; &#10;sorting=&amp;#13; &#10;_rm.Value=18&amp;#13; &#10;_rm.PnLDay=50&amp;#13; &#10;_rm.Size=2&amp;#13; &#10;_rm.PlotDataE=128&amp;#13; &#10;_rm.PlotDataD=127&amp;#13; &#10;_rm.Hedge=129&amp;#13; &#10;_rm.PlotDataC=126&amp;#13; &#10;_rm.PnL=38&amp;#13; &#10;_rm.PlotDataB=125&amp;#13; &#10;_rm.PlotDataA=124&amp;#13; &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;PnL@@@P&amp;amp;amp;L Summary&quot;&amp;gt;_rm.AvgCost=28&amp;#13; &#10;     &amp;#13; &#10;_rm.Price=3&amp;#13; &#10;     &amp;#13; &#10;_rm.ValueInBase=14&amp;#13; &#10;     &amp;#13; &#10;report.version=2&amp;#13; &#10;     &amp;#13; &#10;sorting=&amp;#13; &#10;     &amp;#13; &#10;_rm.Value=11&amp;#13; &#10;     &amp;#13; &#10;_rm.PnLDay=41&amp;#13; &#10;     &amp;#13; &#10;_rm.Size=2&amp;#13; &#10;     &amp;#13; &#10;_rm.PnL=29&amp;#13; &#10;     &amp;#13; &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;Risk by Underlying&quot;&amp;gt;contracts=1&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.Price=3&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;report.version=2&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;CWB=T;T;T;null;;&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;sorting=&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.Delta=105&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.Size=2&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.Vega=111&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.Hedge=129&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.DeltaDollars=54&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.PnL=38&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.Theta=115&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.Gamma=108&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;_rm.Var=72&amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10; &amp;#13; &#10;     &amp;#13; &#10;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;VAR@@@On Demand VAR Summary&quot;&amp;gt;_rm.VarExchRateChangePerc=3&amp;#13; &#10;     &amp;#13; &#10;_rm.VarValueChangeAbs=10&amp;#13; &#10;     &amp;#13; &#10;report.version=2&amp;#13; &#10;     &amp;#13; &#10;sorting=&amp;#13; &#10;     &amp;#13; &#10;_rm.VarExchRateScenario=1&amp;#13; &#10;     &amp;#13; &#10;_rm.VarPriceScenario=5&amp;#13; &#10;     &amp;#13; &#10;_rm.VarPriceChangePerc=7&amp;#13; &#10;     &amp;#13; &#10;_rm.VarValueBase=8&amp;#13; &#10;     &amp;#13; &#10;_rm.VarValueScenario=9&amp;#13; &#10;     &amp;#13; &#10;&amp;lt;/entry&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;/properties&gt;" report2="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;properties&gt;&lt;comment&gt;Risk Navigator Local Settings - all profiles&lt;/comment&gt;&lt;entry key=&quot;My Portfolio&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;My Portfolio&amp;lt;/comment&amp;gt;&amp;lt;entry key=&quot;decimal&quot;&amp;gt;#Hedge10yr-NV0@PlotDataA-D0@PlotDataADecr-D0@PlotDataB-D0@PlotDataBDecr-D0@PlotDataC-D0@PlotDataCDecr-D0@PlotDataD-D0@PlotDataDDecr-D0@PlotDataE-D0@PlotDataEDecr-D0@&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;gui.marginsens.config&quot;&amp;gt;&amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;gt;&amp;amp;lt;properties&amp;amp;gt;&amp;amp;lt;comment&amp;amp;gt;&amp;amp;lt;/comment&amp;amp;gt;&amp;amp;lt;entry key=&quot;assetTypeToVaryBy&quot;&amp;amp;gt;&amp;amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;amp;gt;&amp;amp;amp;lt;properties&amp;amp;amp;gt;&amp;amp;amp;lt;comment&amp;amp;amp;gt;&amp;amp;amp;lt;/comment&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;BILL&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;BOND&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;COMMODITY&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;FUND&quot;&amp;amp;amp;gt;100.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;FUT&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;IOPT&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;OPT&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;STK&quot;&amp;amp;amp;gt;100.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;WAR&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;/properties&amp;amp;amp;gt;&amp;amp;lt;/entry&amp;amp;gt;&amp;amp;lt;entry key=&quot;positionIncrement&quot;&amp;amp;gt;1.0&amp;amp;lt;/entry&amp;amp;gt;&amp;amp;lt;entry key=&quot;registry&quot;&amp;amp;gt;&amp;amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;amp;gt;&amp;amp;amp;lt;properties&amp;amp;amp;gt;&amp;amp;amp;lt;comment&amp;amp;amp;gt;&amp;amp;amp;lt;/comment&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;edited&quot;&amp;amp;amp;gt;&amp;amp;amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;properties&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;comment&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;/comment&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;10672@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;11031@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;11240@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;118089500@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;13751@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;13865082@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;14487907@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;1520593@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;2009113@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;241803610@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;268084@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;335049701@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;35111040@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;4165@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;455805463@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;4901@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;49588376@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;5021340@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;560375049@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;6969@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;73354293@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;754442@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;754956@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;80470893@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;8314@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;8511@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;8894@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;9769@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;/properties&amp;amp;amp;amp;gt;&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;locallyEdited&quot;&amp;amp;amp;gt;&amp;amp;amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;properties&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;comment&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;/comment&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;/properties&amp;amp;amp;amp;gt;&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;/properties&amp;amp;amp;gt;&amp;amp;lt;/entry&amp;amp;gt;&amp;amp;lt;entry key=&quot;requestType&quot;&amp;amp;gt;OrderDefaults&amp;amp;lt;/entry&amp;amp;gt;&amp;amp;lt;/properties&amp;amp;gt;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;last.open&quot;&amp;gt;1688410426468&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;osa.panel.state.Equity&quot;&amp;gt;off,big&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;osa.panel.state.Forex&quot;&amp;gt;off,big&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection.Forex&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection.MarginSensitivity&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection.PnL&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection.VAR&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;rn.ver&quot;&amp;gt;5.14.2&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.Equity&quot;&amp;gt;Plot Data by Underlying&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.Forex&quot;&amp;gt;Risk by Underlying&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.MarginSensitivity&quot;&amp;gt;Margin Sensitivity&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.PnL&quot;&amp;gt;P&amp;amp;amp;L Summary&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.VAR&quot;&amp;gt;On Demand VAR Summary&amp;lt;/entry&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;entry key=&quot;My Portfolios - Multi Account User&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;My Portfolios - Multi Account User&amp;lt;/comment&amp;gt;&amp;lt;entry key=&quot;decimal&quot;&amp;gt;#Hedge10yr-NV0@PlotDataA-D0@PlotDataADecr-D0@PlotDataB-D0@PlotDataBDecr-D0@PlotDataC-D0@PlotDataCDecr-D0@PlotDataD-D0@PlotDataDDecr-D0@PlotDataE-D0@PlotDataEDecr-D0@&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;gui.marginsens.config&quot;&amp;gt;&amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;gt;&amp;amp;lt;properties&amp;amp;gt;&amp;amp;lt;comment&amp;amp;gt;&amp;amp;lt;/comment&amp;amp;gt;&amp;amp;lt;entry key=&quot;assetTypeToVaryBy&quot;&amp;amp;gt;&amp;amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;amp;gt;&amp;amp;amp;lt;properties&amp;amp;amp;gt;&amp;amp;amp;lt;comment&amp;amp;amp;gt;&amp;amp;amp;lt;/comment&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;BILL&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;BOND&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;COMMODITY&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;FUND&quot;&amp;amp;amp;gt;100.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;FUT&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;IOPT&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;OPT&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;STK&quot;&amp;amp;amp;gt;100.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;WAR&quot;&amp;amp;amp;gt;1.0&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;/properties&amp;amp;amp;gt;&amp;amp;lt;/entry&amp;amp;gt;&amp;amp;lt;entry key=&quot;positionIncrement&quot;&amp;amp;gt;1.0&amp;amp;lt;/entry&amp;amp;gt;&amp;amp;lt;entry key=&quot;registry&quot;&amp;amp;gt;&amp;amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;amp;gt;&amp;amp;amp;lt;properties&amp;amp;amp;gt;&amp;amp;amp;lt;comment&amp;amp;amp;gt;&amp;amp;amp;lt;/comment&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;edited&quot;&amp;amp;amp;gt;&amp;amp;amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;properties&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;comment&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;/comment&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;10672@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;11031@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;11240@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;118089500@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;13751@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;13865082@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;14487907@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;1520593@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;2009113@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;241803610@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;268084@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;335049701@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;35111040@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;4165@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;455805463@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;4901@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;49588376@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;5021340@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;560375049@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;6969@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;73354293@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;754442@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;754956@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;80470893@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;8314@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;8511@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;8894@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;entry key=&quot;9769@&quot;&amp;amp;amp;amp;gt;100.0&amp;amp;amp;amp;lt;/entry&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;/properties&amp;amp;amp;amp;gt;&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;entry key=&quot;locallyEdited&quot;&amp;amp;amp;gt;&amp;amp;amp;amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;properties&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;comment&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;/comment&amp;amp;amp;amp;gt;&amp;amp;amp;amp;lt;/properties&amp;amp;amp;amp;gt;&amp;amp;amp;lt;/entry&amp;amp;amp;gt;&amp;amp;amp;lt;/properties&amp;amp;amp;gt;&amp;amp;lt;/entry&amp;amp;gt;&amp;amp;lt;entry key=&quot;requestType&quot;&amp;amp;gt;OrderDefaults&amp;amp;lt;/entry&amp;amp;gt;&amp;amp;lt;/properties&amp;amp;gt;&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;last.open&quot;&amp;gt;1738507910520&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;osa.panel.state.Equity&quot;&amp;gt;off,big&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;osa.panel.state.Forex&quot;&amp;gt;off,big&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection.Forex&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection.MarginSensitivity&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection.PnL&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;plotselection.VAR&quot;&amp;gt;{7}&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;rn.ver&quot;&amp;gt;5.18.2&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.Equity&quot;&amp;gt;Plot Data by Underlying&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.Forex&quot;&amp;gt;Risk by Underlying&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.MarginSensitivity&quot;&amp;gt;Margin Sensitivity&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.PnL&quot;&amp;gt;P&amp;amp;amp;L Summary&amp;lt;/entry&amp;gt;&amp;lt;entry key=&quot;selected.report.VAR&quot;&amp;gt;On Demand VAR Summary&amp;lt;/entry&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;/properties&gt;" report3="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;properties&gt;&lt;comment&gt;Risk Navigator Global Settings&lt;/comment&gt;&lt;entry key=&quot;BETA_REGISTRY&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;&amp;lt;/comment&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;entry key=&quot;MULTIPLIER_REGISTRY&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;&amp;lt;/comment&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;entry key=&quot;VolatilityTabInfoMsg&quot;&gt;true&lt;/entry&gt;&lt;entry key=&quot;rn.ver&quot;&gt;5.18.2&lt;/entry&gt;&lt;entry key=&quot;trader.personality&quot;&gt;OPTIONS&lt;/entry&gt;&lt;entry key=&quot;virtualTradeMessageShown&quot;&gt;true&lt;/entry&gt;&lt;/properties&gt;" actualReport="2" clonedPfType="0" optModEdConfig="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;properties&gt;&lt;comment&gt;Option Model Navigator - Configuariton Root&lt;/comment&gt;&lt;entry key=&quot;BasketConfigurations&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;Basket Compositions&amp;lt;/comment&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;entry key=&quot;PacingSettings&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;Pacing Configuaritons&amp;lt;/comment&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;entry key=&quot;PlotModeAccesses&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;Pacing Configuaritons&amp;lt;/comment&amp;gt;&amp;lt;entry key=&quot;679998205&quot;&amp;gt;1740762263893&amp;lt;/entry&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;entry key=&quot;PlotModeSettings&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;Plot Mode Configuaritons&amp;lt;/comment&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;entry key=&quot;SelectedOptionDataSets&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&amp;lt;properties&amp;gt;&amp;lt;comment&amp;gt;Selected OptionDataSets&amp;lt;/comment&amp;gt;&amp;lt;/properties&amp;gt;&lt;/entry&gt;&lt;/properties&gt;" riskFeedPaceStr="Default" volUnits="Annuale" referencePriceType="Bid o Ask">
@@ -20065,7 +20065,7 @@
 			</ExecTableColumnMgr>
 			<ArQuoteElements varName="quoteArray" />
 		</UnifiedCalendarConfig>
-		<AggBookConfig varName="aggBookConfig" pluginKey="Configurazione Strumenti di trading Profondità di mercato" showMenu="false" showToolbar="true" showUnderlying="true" jumpMouseToOrder="false" allowMutlipleUntransmittedOrders="false" destroyInactiveOrders="true" showButtonsPanel="true" foldButtonsPanel="true" foldFcxPanel="true" showCustomerPanel="false" version="4" tradeLogShowLastNDays="1" scaleFontWhenWindowResize="false" adjustWindowAndColumnWidths="true" windowFontSize="0" adjustFontForSameWindow="false" isToolFontSet="false">
+		<AggBookConfig varName="aggBookConfig" pluginKey="Configurazione Strumenti di trading ProfonditÃ  di mercato" showMenu="false" showToolbar="true" showUnderlying="true" jumpMouseToOrder="false" allowMutlipleUntransmittedOrders="false" destroyInactiveOrders="true" showButtonsPanel="true" foldButtonsPanel="true" foldFcxPanel="true" showCustomerPanel="false" version="4" tradeLogShowLastNDays="1" scaleFontWhenWindowResize="false" adjustWindowAndColumnWidths="true" windowFontSize="0" adjustFontForSameWindow="false" isToolFontSet="false">
 			<HotkeyMgr type="feature.aggbook.ui.AggBookHotkeyMgr" varName="hotkeyMgr" version="8" wasMac="false">
 				<ArHotkey varName="arHotkey">
 					<Hotkey>
@@ -20235,7 +20235,7 @@
 			</ExecTableColumnMgr>
 			<ArQuoteElements varName="quoteArray" />
 		</NewsreadConfig>
-		<PersistentOrderTicketConfig varName="persistentOrderTicketConfig" pluginKey="Configurazione Strumenti di trading Order_Entry" showMenu="false" showToolbar="true" showUnderlying="true" jumpMouseToOrder="false" allowMutlipleUntransmittedOrders="false" destroyInactiveOrders="true" showButtonsPanel="true" foldButtonsPanel="true" foldFcxPanel="true" showCustomerPanel="false" version="4" tradeLogShowLastNDays="1" scaleFontWhenWindowResize="false" adjustWindowAndColumnWidths="true" windowFontSize="0" adjustFontForSameWindow="false" isToolFontSet="false" showSubmitButton="true" showSideLED="true" useFollowMe="true" selectedToolText="Profondità di mercato">
+		<PersistentOrderTicketConfig varName="persistentOrderTicketConfig" pluginKey="Configurazione Strumenti di trading Order_Entry" showMenu="false" showToolbar="true" showUnderlying="true" jumpMouseToOrder="false" allowMutlipleUntransmittedOrders="false" destroyInactiveOrders="true" showButtonsPanel="true" foldButtonsPanel="true" foldFcxPanel="true" showCustomerPanel="false" version="4" tradeLogShowLastNDays="1" scaleFontWhenWindowResize="false" adjustWindowAndColumnWidths="true" windowFontSize="0" adjustFontForSameWindow="false" isToolFontSet="false" showSubmitButton="true" showSideLED="true" useFollowMe="true" selectedToolText="ProfonditÃ  di mercato">
 			<HotkeyMgr type="trader.permticket.PersistentOrderTicketHotkeyMgr" varName="hotkeyMgr" version="8" wasMac="false">
 				<ArHotkey varName="arHotkey">
 					<Hotkey>
@@ -20282,7 +20282,7 @@
 			</ArQuoteElements>
 			<interactiveMode>PRICE_LINE</interactiveMode>
 		</PersistentOrderTicketConfig>
-		<ActivityMonitorConfig varName="activityMonitorConfig" pluginKey="Configurazione Strumenti di trading Monitor Attività" showMenu="true" showToolbar="true" showUnderlying="true" jumpMouseToOrder="false" allowMutlipleUntransmittedOrders="false" destroyInactiveOrders="true" showButtonsPanel="true" foldButtonsPanel="true" foldFcxPanel="true" showCustomerPanel="false" version="4" tradeLogShowLastNDays="1" scaleFontWhenWindowResize="false" adjustWindowAndColumnWidths="true" windowFontSize="0" adjustFontForSameWindow="false" isToolFontSet="false" orderSortColId="3466" orderSortAscending="false" orderSortColIdCustom="-1" orderSortAscendingCustom="false" preserveOrderSortCustom="false" completedColor="-8355712" fitColumnsToWindow="false" showSpxDeltaOnPortfolio="false" showThetaAndVegaOnPortfolio="true" showYTDRealizedPnlOnPortfolio="true" showSMA="true" highlightRecentOrder="true" highlightRecentOrderSeconds="5" showDirectedTradesForAllocations="false" collapseAllCombos="false" positionSortColId="99" positionSortAscending="false" positionSortContinuous="false" positionSortAbsolute="false" groupBy="NULL" sortedState="3" performancePositionSortColId="99" performanceGroupBy="UNDERLYING" performanceSortedState="1">
+		<ActivityMonitorConfig varName="activityMonitorConfig" pluginKey="Configurazione Strumenti di trading Monitor AttivitÃ " showMenu="true" showToolbar="true" showUnderlying="true" jumpMouseToOrder="false" allowMutlipleUntransmittedOrders="false" destroyInactiveOrders="true" showButtonsPanel="true" foldButtonsPanel="true" foldFcxPanel="true" showCustomerPanel="false" version="4" tradeLogShowLastNDays="1" scaleFontWhenWindowResize="false" adjustWindowAndColumnWidths="true" windowFontSize="0" adjustFontForSameWindow="false" isToolFontSet="false" orderSortColId="3466" orderSortAscending="false" orderSortColIdCustom="-1" orderSortAscendingCustom="false" preserveOrderSortCustom="false" completedColor="-8355712" fitColumnsToWindow="false" showSpxDeltaOnPortfolio="false" showThetaAndVegaOnPortfolio="true" showYTDRealizedPnlOnPortfolio="true" showSMA="true" highlightRecentOrder="true" highlightRecentOrderSeconds="5" showDirectedTradesForAllocations="false" collapseAllCombos="false" positionSortColId="99" positionSortAscending="false" positionSortContinuous="false" positionSortAbsolute="false" groupBy="NULL" sortedState="3" performancePositionSortColId="99" performanceGroupBy="UNDERLYING" performanceSortedState="1">
 			<HotkeyMgr type="feature.activitymonitor.ActivityMonitorHotkeyMgr" varName="hotkeyMgr" version="8" wasMac="false">
 				<ArHotkey varName="arHotkey">
 					<Hotkey>
@@ -21023,7 +21023,7 @@
 			<putCallMode>PUTS_AND_CALLS</putCallMode>
 			<optionChainGridSettings />
 		</OptionSeriesTraderConfig>
-		<OptionLiquidityToolConfig varName="optionLiquidityToolConfig" pluginKey="Configurazione Strumenti di trading Strumento Liquidità Opzioni" showMenu="true" showToolbar="false" showUnderlying="true" jumpMouseToOrder="false" allowMutlipleUntransmittedOrders="true" destroyInactiveOrders="true" showButtonsPanel="true" foldButtonsPanel="true" foldFcxPanel="true" showCustomerPanel="false" version="4" tradeLogShowLastNDays="1" scaleFontWhenWindowResize="false" adjustWindowAndColumnWidths="true" windowFontSize="0" adjustFontForSameWindow="false" isToolFontSet="false" showStats="true" foldStats="true" showAllOrders="false" showPricesInVolatility="false" showExpirationHeaders="true" orderRef="OptTrader" statsShown="true" forwardSort="true" linkOptionChainsToWindowsGroup="true" autoRefresh="true" showFCXInOptionTrader="true" showNonRegularExpiries="false" optionChainsOpenOption="17" sidecarIdealWidth="0" autoResizeColumns="true" timesToDisableTooltip="0" showFCXInOptionChains="true" denyNews="false">
+		<OptionLiquidityToolConfig varName="optionLiquidityToolConfig" pluginKey="Configurazione Strumenti di trading Strumento LiquiditÃ  Opzioni" showMenu="true" showToolbar="false" showUnderlying="true" jumpMouseToOrder="false" allowMutlipleUntransmittedOrders="true" destroyInactiveOrders="true" showButtonsPanel="true" foldButtonsPanel="true" foldFcxPanel="true" showCustomerPanel="false" version="4" tradeLogShowLastNDays="1" scaleFontWhenWindowResize="false" adjustWindowAndColumnWidths="true" windowFontSize="0" adjustFontForSameWindow="false" isToolFontSet="false" showStats="true" foldStats="true" showAllOrders="false" showPricesInVolatility="false" showExpirationHeaders="true" orderRef="OptTrader" statsShown="true" forwardSort="true" linkOptionChainsToWindowsGroup="true" autoRefresh="true" showFCXInOptionTrader="true" showNonRegularExpiries="false" optionChainsOpenOption="17" sidecarIdealWidth="0" autoResizeColumns="true" timesToDisableTooltip="0" showFCXInOptionChains="true" denyNews="false">
 			<HotkeyMgr type="jhotkey.OptionTraderHotkeyMgr" varName="hotkeyMgr" version="8" wasMac="false">
 				<ArHotkey varName="arHotkey">
 					<Hotkey>
@@ -23595,7 +23595,7 @@
 												<eprStdDevCount>ONE</eprStdDevCount>
 												<flavor>REGULAR</flavor>
 												<TwsGraphSettingsMap varName="graphs">
-													<GraphKey name="XLK@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLK@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLK@SMART" additional="true" template="false" symbol="XLK" localSymbol="XLK" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLK" tradingClass="XLK" listingExchange="ARCA" description="Stock (ARCA)" conid="4215230" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="0" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="40" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -23622,7 +23622,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLK@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLK@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLK@SMART" additional="true" template="false" symbol="XLK" localSymbol="XLK" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLK" tradingClass="XLK" listingExchange="ARCA" description="Stock (ARCA)" conid="4215230" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="0" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="40" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -23701,7 +23701,7 @@
 												<eprStdDevCount>ONE</eprStdDevCount>
 												<flavor>REGULAR</flavor>
 												<TwsGraphSettingsMap varName="graphs">
-													<GraphKey name="XLY@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLY@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLY@SMART" additional="true" template="false" symbol="XLY" localSymbol="XLY" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLY" tradingClass="XLY" listingExchange="ARCA" description="Stock (ARCA)" conid="4215215" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -23755,7 +23755,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLY@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLY@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLY@SMART" additional="true" template="false" symbol="XLY" localSymbol="XLY" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLY" tradingClass="XLY" listingExchange="ARCA" description="Stock (ARCA)" conid="4215215" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -23805,7 +23805,7 @@
 												<eprStdDevCount>ONE</eprStdDevCount>
 												<flavor>REGULAR</flavor>
 												<TwsGraphSettingsMap varName="graphs">
-													<GraphKey name="XLC@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLC@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLC@SMART" additional="true" template="false" symbol="XLC" localSymbol="XLC" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLC" tradingClass="XLC" listingExchange="ARCA" description="Stock (ARCA)" conid="322317077" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -23859,7 +23859,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLC@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLC@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLC@SMART" additional="true" template="false" symbol="XLC" localSymbol="XLC" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLC" tradingClass="XLC" listingExchange="ARCA" description="Stock (ARCA)" conid="322317077" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -23936,7 +23936,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLI@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLI@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLI@SMART" additional="true" template="false" symbol="XLI" localSymbol="XLI" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLI" tradingClass="XLI" listingExchange="ARCA" description="Stock (ARCA)" conid="4215227" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -23963,7 +23963,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLI@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLI@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLI@SMART" additional="true" template="false" symbol="XLI" localSymbol="XLI" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLI" tradingClass="XLI" listingExchange="ARCA" description="Stock (ARCA)" conid="4215227" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24011,7 +24011,7 @@
 												<eprStdDevCount>ONE</eprStdDevCount>
 												<flavor>REGULAR</flavor>
 												<TwsGraphSettingsMap varName="graphs">
-													<GraphKey name="XLB@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLB@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLB@SMART" additional="true" template="false" symbol="XLB" localSymbol="XLB" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLB" tradingClass="XLB" listingExchange="ARCA" description="Stock (ARCA)" conid="4215200" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24038,7 +24038,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLB@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLB@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLB@SMART" additional="true" template="false" symbol="XLB" localSymbol="XLB" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLB" tradingClass="XLB" listingExchange="ARCA" description="Stock (ARCA)" conid="4215200" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24142,7 +24142,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLE@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLE@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLE@SMART" additional="true" template="false" symbol="XLE" localSymbol="XLE" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLE" tradingClass="XLE" listingExchange="ARCA" description="Stock (ARCA)" conid="4215217" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24169,7 +24169,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLE@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLE@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLE@SMART" additional="true" template="false" symbol="XLE" localSymbol="XLE" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLE" tradingClass="XLE" listingExchange="ARCA" description="Stock (ARCA)" conid="4215217" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24246,7 +24246,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLP@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLP@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLP@SMART" additional="true" template="false" symbol="XLP" localSymbol="XLP" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLP" tradingClass="XLP" listingExchange="ARCA" description="Stock (ARCA)" conid="4215210" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24273,7 +24273,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLP@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLP@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLP@SMART" additional="true" template="false" symbol="XLP" localSymbol="XLP" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLP" tradingClass="XLP" listingExchange="ARCA" description="Stock (ARCA)" conid="4215210" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24350,7 +24350,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLV@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLV@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLV@SMART" additional="true" template="false" symbol="XLV" localSymbol="XLV" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLV" tradingClass="XLV" listingExchange="ARCA" description="Stock (ARCA)" conid="4215205" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24377,7 +24377,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLV@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLV@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLV@SMART" additional="true" template="false" symbol="XLV" localSymbol="XLV" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLV" tradingClass="XLV" listingExchange="ARCA" description="Stock (ARCA)" conid="4215205" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24452,7 +24452,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLU@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLU@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLU@SMART" additional="true" template="false" symbol="XLU" localSymbol="XLU" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLU" tradingClass="XLU" listingExchange="ARCA" description="Stock (ARCA)" conid="4215235" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24479,7 +24479,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLU@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLU@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLU@SMART" additional="true" template="false" symbol="XLU" localSymbol="XLU" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLU" tradingClass="XLU" listingExchange="ARCA" description="Stock (ARCA)" conid="4215235" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24554,7 +24554,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLF@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLF@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLF@SMART" additional="true" template="false" symbol="XLF" localSymbol="XLF" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLF" tradingClass="XLF" listingExchange="ARCA" description="Stock (ARCA)" conid="4215220" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24581,7 +24581,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLF@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLF@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLF@SMART" additional="true" template="false" symbol="XLF" localSymbol="XLF" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLF" tradingClass="XLF" listingExchange="ARCA" description="Stock (ARCA)" conid="4215220" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24629,7 +24629,7 @@
 												<eprStdDevCount>ONE</eprStdDevCount>
 												<flavor>REGULAR</flavor>
 												<TwsGraphSettingsMap varName="graphs">
-													<GraphKey name="XLRE@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="XLRE@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="XLRE@SMART" additional="true" template="false" symbol="XLRE" localSymbol="XLRE" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLRE" tradingClass="XLRE" listingExchange="ARCA" description="Stock (ARCA)" conid="209048377" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24656,7 +24656,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="XLRE@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="XLRE@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="XLRE@SMART" additional="true" template="false" symbol="XLRE" localSymbol="XLRE" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="XLRE" tradingClass="XLRE" listingExchange="ARCA" description="Stock (ARCA)" conid="209048377" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24762,7 +24762,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="SPY@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="SPY@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="SPY@SMART" additional="true" template="false" symbol="SPY" localSymbol="SPY" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="SPY" tradingClass="SPY" listingExchange="ARCA" description="Stock (ARCA)" conid="756733" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="40" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -24820,7 +24820,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="SPY@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="SPY@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="SPY@SMART" additional="true" template="false" symbol="SPY" localSymbol="SPY" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="SPY" tradingClass="SPY" listingExchange="ARCA" description="Stock (ARCA)" conid="756733" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="40" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -26691,7 +26691,7 @@
 										<TickerEntry name="Watchlist" conid="13977" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="115441080" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="474515500" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
-										<TickerEntry name="Watchlist" conid="-1" m_type="5" exchange="ANYEXCH" comboTypeId="-1" notes="XLP-  Prime Necessità" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
+										<TickerEntry name="Watchlist" conid="-1" m_type="5" exchange="ANYEXCH" comboTypeId="-1" notes="XLP-  Prime NecessitÃ " scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="8719" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="2585769" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="4065" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
@@ -27082,7 +27082,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="EOSE@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="EOSE@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="EOSE@SMART" additional="true" template="false" symbol="EOSE" localSymbol="EOSE" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="EOSE" tradingClass="SCM" listingExchange="NASDAQ" description="Stock (NASDAQ.SCM)" conid="455592457" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="true" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -27121,7 +27121,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="EOSE@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="EOSE@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="EOSE@SMART" additional="true" template="false" symbol="EOSE" localSymbol="EOSE" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="EOSE" tradingClass="SCM" listingExchange="NASDAQ" description="Stock (NASDAQ.SCM)" conid="455592457" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="true" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -27759,7 +27759,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="EOSE@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="EOSE@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="EOSE@SMART" additional="true" template="false" symbol="EOSE" localSymbol="EOSE" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="EOSE" tradingClass="SCM" listingExchange="NASDAQ" description="Stock (NASDAQ.SCM)" conid="455592457" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="2" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -27869,7 +27869,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="EOSE@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="EOSE@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="EOSE@SMART" additional="true" template="false" symbol="EOSE" localSymbol="EOSE" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="EOSE" tradingClass="SCM" listingExchange="NASDAQ" description="Stock (NASDAQ.SCM)" conid="455592457" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="2" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -28265,7 +28265,7 @@
 										<TickerEntry name="Watchlist" conid="13977" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="115441080" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="474515500" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
-										<TickerEntry name="Watchlist" conid="-1" m_type="5" exchange="ANYEXCH" comboTypeId="-1" notes="XLP-  Prime Necessità" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
+										<TickerEntry name="Watchlist" conid="-1" m_type="5" exchange="ANYEXCH" comboTypeId="-1" notes="XLP-  Prime NecessitÃ " scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="8719" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="2585769" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
 										<TickerEntry name="Watchlist" conid="4065" m_type="0" exchange="SMART" comboTypeId="-1" scaled="false" cash="0.0" profit="0.0" underlyingSpxPrice="0.0" includePartialBonds="false" factor="0.0" expiryType="-1" metaColumn="0" />
@@ -28825,7 +28825,7 @@
 						<String>ClickTrader|0</String>
 						<WindowConfiguration namePrimary="ClickTrader" nameSecondary="0" width="862" height="731" x="383" y="69" restoreWindow="true" maximized="true" onTop="false" minimized="false" groupMinimized="false" restoreIfEmpty="false" groupSnapped="false" doContentScale="false" windowFontSize="16">
 							<ListOfContents varName="contents">
-								<ClickTraderContent version="0" watermarkWhenEmpty="false" tabIndex="-1" restoredFromLayoutLibrary="false" groupBy="NULL" isDeepAllowed="true" armedState="false" displayQuantityMultipliers="false" columns="Status (buy)+Size (buy)+Bid Size+Price+Ask Size+Size (sell)+Status (sell)+P&amp;L+Histogram+:Ask Size-0.10273972602739725,Histogram-0.17281348788198103,Price-0.10379346680716543,P&amp;L-0.10379346680716543,Size (sell)-0.10379346680716543,Status (sell)-0.10273972602739725,Bid Size-0.10273972602739725,Status (buy)-0.10379346680716543,Size (buy)-0.10379346680716543;Stato (acquistare)+Quantità (acquistare)+Qtà bid+Prezzo+Qtà ask+Quantità (vendere)+Stato (vendere)+P&amp;L+Istogramma+:Quantità (acquistare)-0.10853530031612224,Istogramma-0.13487881981032665,Qtà bid-0.10748155953635406,Prezzo-0.10853530031612224,Quantità (vendere)-0.10853530031612224,P&amp;L-0.10853530031612224,Qtà ask-0.10748155953635406,Stato (acquistare)-0.10853530031612224,Stato (vendere)-0.10748155953635406;Stato (acquistare)+Quantità (acquistare)+Qtà bid+Qtà bid.+Qtà ask+Qtà ask.+Stato (vendere)+P&amp;L+Istogramma+:Quantità (acquistare)-0.07142857142857142,Istogramma-0.42857142857142855,Qtà bid.-0.07142857142857142,Qtà bid-0.07142857142857142,P&amp;L-0.07142857142857142,Qtà ask.-0.07142857142857142,Qtà ask-0.07142857142857142,Stato (acquistare)-0.07142857142857142,Stato (vendere)-0.07142857142857142;Status (buy)+Size (buy)+MM Name+Bid Size+Price+Ask Size+MM Name.+Size (sell)+Status (sell)+P&amp;L+Histogram+:Ask Size-0.08324552160168598,Histogram-0.08535300316122234,Price-0.08324552160168598,MM Name-0.07165437302423604,P&amp;L-0.23445732349841938,Size (sell)-0.08429926238145416,Status (sell)-0.08324552160168598,MM Name.-0.02476290832455216,Bid Size-0.08324552160168598,Status (buy)-0.08324552160168598,Size (buy)-0.08324552160168598;Impatto dei costi+Stato (acquistare)+Quantità (acquistare)+Nome MM+Qtà bid+Prezzo+Qtà ask+Nome MM.+Quantità (vendere)+Stato (vendere)+P&amp;L+Impatto dei costi.+Istogramma+:Impatto dei costi.-0.06851464435146444,Quantità (vendere)-0.07740585774058577,Nome MM.-0.07792887029288703,Stato (vendere)-0.10303347280334728,Quantità (acquistare)-0.07426778242677824,Istogramma-0.06851464435146444,Impatto dei costi-0.07740585774058577,Qtà bid-0.07792887029288703,Prezzo-0.07740585774058577,P&amp;L-0.075836820083682,Nome MM-0.07740585774058577,Qtà ask-0.06694560669456066,Stato (acquistare)-0.07740585774058577;Stato (acquistare)+Quantità (acquistare)+Nome MM+Qtà bid+Prezzo+Qtà ask+Nome MM.+Quantità (vendere)+Stato (vendere)+P&amp;L+Istogramma+:Quantità (acquistare)-0.08587987355110643,Istogramma-0.08324552160168598,Qtà bid-0.08587987355110643,Prezzo-0.08587987355110643,Quantità (vendere)-0.08693361433087461,P&amp;L-0.15858798735511065,Nome MM-0.07639620653319283,Qtà ask-0.08587987355110643,Nome MM.-0.07955742887249737,Stato (acquistare)-0.08587987355110643,Stato (vendere)-0.08587987355110643;Stato (acquistare)+Quantità (acquistare)+Nome MM+Qtà bid+Prezzo+Qtà ask+Nome MM.+Quantità (vendere)+Stato (vendere)+P&amp;L+:Quantità (acquistare)-0.07023809523809524,Qtà bid-0.07023809523809524,Prezzo-0.07023809523809524,Quantità (vendere)-0.07023809523809524,P&amp;L-0.3678571428571429,Nome MM-0.07023809523809524,Qtà ask-0.07023809523809524,Nome MM.-0.07023809523809524,Stato (acquistare)-0.07023809523809524,Stato (vendere)-0.07023809523809524;Stato (acquistare)+Quantità (acquistare)+Qtà bid+Qtà bid.+Qtà ask+Quantità (vendere)+Stato (vendere)+P&amp;L+Istogramma+:Quantità (acquistare)-0.07142857142857142,Istogramma-0.42857142857142855,Qtà bid.-0.07142857142857142,Qtà bid-0.07142857142857142,Quantità (vendere)-0.07142857142857142,P&amp;L-0.07142857142857142,Qtà ask-0.07142857142857142,Stato (acquistare)-0.07142857142857142,Stato (vendere)-0.07142857142857142;Stato (acquistare)+Quantità (acquistare)+Qtà bid+Prezzo+Qtà ask+Quantità (vendere)+Stato (vendere)+P&amp;L+:Quantità (acquistare)-0.101159114857745,Qtà bid-0.101159114857745,Prezzo-0.101159114857745,Quantità (vendere)-0.101159114857745,P&amp;L-0.29083245521601686,Qtà ask-0.10168598524762908,Stato (acquistare)-0.101159114857745,Stato (vendere)-0.10168598524762908">
+								<ClickTraderContent version="0" watermarkWhenEmpty="false" tabIndex="-1" restoredFromLayoutLibrary="false" groupBy="NULL" isDeepAllowed="true" armedState="false" displayQuantityMultipliers="false" columns="Status (buy)+Size (buy)+Bid Size+Price+Ask Size+Size (sell)+Status (sell)+P&amp;L+Histogram+:Ask Size-0.10273972602739725,Histogram-0.17281348788198103,Price-0.10379346680716543,P&amp;L-0.10379346680716543,Size (sell)-0.10379346680716543,Status (sell)-0.10273972602739725,Bid Size-0.10273972602739725,Status (buy)-0.10379346680716543,Size (buy)-0.10379346680716543;Stato (acquistare)+QuantitÃ  (acquistare)+QtÃ  bid+Prezzo+QtÃ  ask+QuantitÃ  (vendere)+Stato (vendere)+P&amp;L+Istogramma+:QuantitÃ  (acquistare)-0.10853530031612224,Istogramma-0.13487881981032665,QtÃ  bid-0.10748155953635406,Prezzo-0.10853530031612224,QuantitÃ  (vendere)-0.10853530031612224,P&amp;L-0.10853530031612224,QtÃ  ask-0.10748155953635406,Stato (acquistare)-0.10853530031612224,Stato (vendere)-0.10748155953635406;Stato (acquistare)+QuantitÃ  (acquistare)+QtÃ  bid+QtÃ  bid.+QtÃ  ask+QtÃ  ask.+Stato (vendere)+P&amp;L+Istogramma+:QuantitÃ  (acquistare)-0.07142857142857142,Istogramma-0.42857142857142855,QtÃ  bid.-0.07142857142857142,QtÃ  bid-0.07142857142857142,P&amp;L-0.07142857142857142,QtÃ  ask.-0.07142857142857142,QtÃ  ask-0.07142857142857142,Stato (acquistare)-0.07142857142857142,Stato (vendere)-0.07142857142857142;Status (buy)+Size (buy)+MM Name+Bid Size+Price+Ask Size+MM Name.+Size (sell)+Status (sell)+P&amp;L+Histogram+:Ask Size-0.08324552160168598,Histogram-0.08535300316122234,Price-0.08324552160168598,MM Name-0.07165437302423604,P&amp;L-0.23445732349841938,Size (sell)-0.08429926238145416,Status (sell)-0.08324552160168598,MM Name.-0.02476290832455216,Bid Size-0.08324552160168598,Status (buy)-0.08324552160168598,Size (buy)-0.08324552160168598;Impatto dei costi+Stato (acquistare)+QuantitÃ  (acquistare)+Nome MM+QtÃ  bid+Prezzo+QtÃ  ask+Nome MM.+QuantitÃ  (vendere)+Stato (vendere)+P&amp;L+Impatto dei costi.+Istogramma+:Impatto dei costi.-0.06851464435146444,QuantitÃ  (vendere)-0.07740585774058577,Nome MM.-0.07792887029288703,Stato (vendere)-0.10303347280334728,QuantitÃ  (acquistare)-0.07426778242677824,Istogramma-0.06851464435146444,Impatto dei costi-0.07740585774058577,QtÃ  bid-0.07792887029288703,Prezzo-0.07740585774058577,P&amp;L-0.075836820083682,Nome MM-0.07740585774058577,QtÃ  ask-0.06694560669456066,Stato (acquistare)-0.07740585774058577;Stato (acquistare)+QuantitÃ  (acquistare)+Nome MM+QtÃ  bid+Prezzo+QtÃ  ask+Nome MM.+QuantitÃ  (vendere)+Stato (vendere)+P&amp;L+Istogramma+:QuantitÃ  (acquistare)-0.08587987355110643,Istogramma-0.08324552160168598,QtÃ  bid-0.08587987355110643,Prezzo-0.08587987355110643,QuantitÃ  (vendere)-0.08693361433087461,P&amp;L-0.15858798735511065,Nome MM-0.07639620653319283,QtÃ  ask-0.08587987355110643,Nome MM.-0.07955742887249737,Stato (acquistare)-0.08587987355110643,Stato (vendere)-0.08587987355110643;Stato (acquistare)+QuantitÃ  (acquistare)+Nome MM+QtÃ  bid+Prezzo+QtÃ  ask+Nome MM.+QuantitÃ  (vendere)+Stato (vendere)+P&amp;L+:QuantitÃ  (acquistare)-0.07023809523809524,QtÃ  bid-0.07023809523809524,Prezzo-0.07023809523809524,QuantitÃ  (vendere)-0.07023809523809524,P&amp;L-0.3678571428571429,Nome MM-0.07023809523809524,QtÃ  ask-0.07023809523809524,Nome MM.-0.07023809523809524,Stato (acquistare)-0.07023809523809524,Stato (vendere)-0.07023809523809524;Stato (acquistare)+QuantitÃ  (acquistare)+QtÃ  bid+QtÃ  bid.+QtÃ  ask+QuantitÃ  (vendere)+Stato (vendere)+P&amp;L+Istogramma+:QuantitÃ  (acquistare)-0.07142857142857142,Istogramma-0.42857142857142855,QtÃ  bid.-0.07142857142857142,QtÃ  bid-0.07142857142857142,QuantitÃ  (vendere)-0.07142857142857142,P&amp;L-0.07142857142857142,QtÃ  ask-0.07142857142857142,Stato (acquistare)-0.07142857142857142,Stato (vendere)-0.07142857142857142;Stato (acquistare)+QuantitÃ  (acquistare)+QtÃ  bid+Prezzo+QtÃ  ask+QuantitÃ  (vendere)+Stato (vendere)+P&amp;L+:QuantitÃ  (acquistare)-0.101159114857745,QtÃ  bid-0.101159114857745,Prezzo-0.101159114857745,QuantitÃ  (vendere)-0.101159114857745,P&amp;L-0.29083245521601686,QtÃ  ask-0.10168598524762908,Stato (acquistare)-0.101159114857745,Stato (vendere)-0.10168598524762908">
 									<ExtendedConfigurationMap varName="extendedConfiguration">
 										<String>ClickTraderTable</String>
 										<TableConfiguration>
@@ -28923,7 +28923,7 @@
 												<eprStdDevCount>ONE</eprStdDevCount>
 												<flavor>REGULAR</flavor>
 												<TwsGraphSettingsMap varName="graphs">
-													<GraphKey name="SPY@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="SPY@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="SPY@SMART" additional="true" template="false" symbol="SPY" localSymbol="SPY" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="SPY" tradingClass="SPY" listingExchange="ARCA" description="Stock (ARCA)" conid="756733" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="0" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="40" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -28981,7 +28981,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="SPY@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="SPY@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="SPY@SMART" additional="true" template="false" symbol="SPY" localSymbol="SPY" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="SPY" tradingClass="SPY" listingExchange="ARCA" description="Stock (ARCA)" conid="756733" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="0" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="40" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -29091,7 +29091,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="TLT@SMART Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="TLT@SMART VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="TLT@SMART" additional="true" template="false" symbol="TLT" localSymbol="TLT" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="TLT" tradingClass="NMS" listingExchange="NASDAQ" description="Stock (NASDAQ.NMS)" conid="15547841" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -29118,7 +29118,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="TLT@SMART Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="TLT@SMART VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="TLT@SMART" additional="true" template="false" symbol="TLT" localSymbol="TLT" exchange="SMART" exchangeGroup="USSTK" aggregateGroup="1" underlying="TLT" tradingClass="NMS" listingExchange="NASDAQ" description="Stock (NASDAQ.NMS)" conid="15547841" secType="STK" currency="USD" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="100" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<comboKeyString />
@@ -29297,7 +29297,7 @@
 												<eprStdDevCount>ONE</eprStdDevCount>
 												<flavor>REGULAR</flavor>
 												<TwsGraphSettingsMap varName="graphs">
-													<GraphKey name="MOVE@ICEEU Volatilità implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
+													<GraphKey name="MOVE@ICEEU VolatilitÃ  implicita delle opzioni" sourceId="6" sourceIdUpgraded="6" calculationInput="0" />
 													<TwsGraphSettings graphName="MOVE@ICEEU" additional="true" template="false" symbol="MOVE" localSymbol="MOVE" exchange="ICEEU" aggregateGroup="-1" underlying="MOVE" description="Index" conid="537765669" secType="IND" currency="EUR" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="6" whatToShowUpgraded="6" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="1" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<tradingClass />
@@ -29355,7 +29355,7 @@
 															<TwsIndicatorSettingsList varName="baseSettingsList" />
 														</L>
 													</TwsGraphSettings>
-													<GraphKey name="MOVE@ICEEU Volatilità storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
+													<GraphKey name="MOVE@ICEEU VolatilitÃ  storica" sourceId="5" sourceIdUpgraded="5" calculationInput="0" />
 													<TwsGraphSettings graphName="MOVE@ICEEU" additional="true" template="false" symbol="MOVE" localSymbol="MOVE" exchange="ICEEU" aggregateGroup="-1" underlying="MOVE" description="Index" conid="537765669" secType="IND" currency="EUR" scaled="false" cash="0.0" profit="0.0" factor="1.0" underlyingSpxPrice="0.0" comboTypeId="0" whatToShow="5" whatToShowUpgraded="5" outsideRTH="false" howToShow="0" showCandlesticks="true" barTypeId="1" showVolumes="false" showPriceHistogram="false" showTotalPutCallValue="false" showPutCallRatio="false" showArbitrageMeter="false" positionIndexInChart="0" setIgnoredInterval="false" ignoredIntervalStart="0" ignoredIntervalEnd="0" lotSize="1" scaleFactor="0.0" includePartialBonds="false" createdByIndexComparison="false" useGlobalColors="false" expiryType="0" primary="true" fromAPI="false" valueAxisWidth="0" thumbLeftInset="-1" thumbTopInset="-1" calculatedValue="false" calculationInput="0">
 														<customName />
 														<tradingClass />

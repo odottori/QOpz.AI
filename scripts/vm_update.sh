@@ -27,6 +27,10 @@ APP_DIR="/home/${APP_USER}/qopz"
 VENV_DIR="${APP_DIR}/.venv"
 DOCS_PORT=8080
 FASTAPI_PORT=8765
+APP_SLUG="${APP_SLUG:-qopz}"
+APP_BASE_PATH="${APP_BASE_PATH:-/${APP_SLUG}}"
+APP_BASE_PATH="${APP_BASE_PATH%/}"
+if [ -z "${APP_BASE_PATH}" ]; then APP_BASE_PATH="/${APP_SLUG}"; fi
 CRON_FILE="/etc/cron.d/qopz-sessions"
 SESSION_SCHEDULER_MODE="${SESSION_SCHEDULER_MODE:-internal}"  # internal | external
 
@@ -100,9 +104,9 @@ SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Morning - 14:15 UTC (09:15 EST)
-15 14 * * 1-5 curl -s -X POST -H "Content-Type: application/json" -d '{"type":"morning","profile":"paper"}' http://127.0.0.1:${FASTAPI_PORT}/opz/session/run >/var/log/qopz_cron_morning.log 2>&1
+15 14 * * 1-5 curl -s -X POST -H "Content-Type: application/json" -d '{"type":"morning","profile":"paper"}' http://127.0.0.1:${FASTAPI_PORT}${APP_BASE_PATH}/opz/session/run >/var/log/qopz_cron_morning.log 2>&1
 # EOD - 21:15 UTC (16:15 EST)
-15 21 * * 1-5 curl -s -X POST -H "Content-Type: application/json" -d '{"type":"eod","profile":"paper"}' http://127.0.0.1:${FASTAPI_PORT}/opz/session/run >/var/log/qopz_cron_eod.log 2>&1
+15 21 * * 1-5 curl -s -X POST -H "Content-Type: application/json" -d '{"type":"eod","profile":"paper"}' http://127.0.0.1:${FASTAPI_PORT}${APP_BASE_PATH}/opz/session/run >/var/log/qopz_cron_eod.log 2>&1
 CRON_EOF
   chmod 644 "${CRON_FILE}"
   ok "External cron installed at ${CRON_FILE}"
@@ -120,7 +124,8 @@ echo ""
 echo -e "${GREEN}============================================================${NC}"
 echo -e "${GREEN} UPDATE COMPLETED${NC}"
 echo -e "${GREEN}============================================================${NC}"
-echo -e "${GREEN} FastAPI:${NC} http://127.0.0.1:${FASTAPI_PORT}"
+echo -e "${GREEN} FastAPI base:${NC} http://127.0.0.1:${FASTAPI_PORT}${APP_BASE_PATH}/"
+echo -e "${GREEN} FastAPI health:${NC} http://127.0.0.1:${FASTAPI_PORT}${APP_BASE_PATH}/health"
 echo -e "${GREEN} Docs:${NC}    http://127.0.0.1:${DOCS_PORT}"
 echo -e "${GREEN} Docker:${NC}  $(docker --version 2>/dev/null || echo 'installed')"
 echo -e "${GREEN} Git:${NC}     $(git --version 2>/dev/null || echo 'installed')"

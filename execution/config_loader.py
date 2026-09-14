@@ -20,6 +20,46 @@ logger = logging.getLogger(__name__)
 _IBKR_CLIENT_ID_MIN = 0
 _IBKR_CLIENT_ID_MAX = 32767
 
+_IBKR_PROFILE_PORTS = {
+    "dev": {"tws": 7497, "gateway": 4002},
+    "paper": {"tws": 7497, "gateway": 4002},
+    "live": {"tws": 7496, "gateway": 4001},
+}
+
+
+def expected_broker_port(profile: str, *, broker_kind: str = "tws") -> int:
+    prof = (profile or "paper").strip().lower()
+    if prof not in _IBKR_PROFILE_PORTS:
+        prof = "paper"
+    kind = (broker_kind or "tws").strip().lower()
+    if kind not in {"tws", "gateway"}:
+        raise ValueError(f"Unsupported broker_kind: {broker_kind!r}")
+    return int(_IBKR_PROFILE_PORTS[prof][kind])
+
+
+def describe_broker_port(port: int) -> Dict[str, Any]:
+    p = int(port)
+    if p == 7497:
+        return {"label": "tws_paper", "transport": "tws", "trading_mode": "paper"}
+    if p == 7496:
+        return {"label": "tws_live", "transport": "tws", "trading_mode": "live"}
+    if p == 4002:
+        return {"label": "gateway_paper", "transport": "gateway", "trading_mode": "paper"}
+    if p == 4001:
+        return {"label": "gateway_live", "transport": "gateway", "trading_mode": "live"}
+    if p == 4004:
+        return {"label": "gateway_bridge", "transport": "gateway", "trading_mode": "paper"}
+    return {"label": "custom", "transport": "custom", "trading_mode": "unknown"}
+
+
+def broker_port_matches_profile(profile: str, port: int) -> bool:
+    prof = (profile or "paper").strip().lower()
+    expected_mode = "paper" if prof in {"dev", "paper"} else "live"
+    meta = describe_broker_port(port)
+    if meta["trading_mode"] == "unknown":
+        return False
+    return str(meta["trading_mode"]) == expected_mode
+
 try:
     import tomllib  # py3.11+
 except ModuleNotFoundError:  # pragma: no cover
@@ -33,12 +73,18 @@ def _read_toml(path: Path) -> Dict[str, Any]:
     return data
 
 
-def _normalize_broker(cfg: Dict[str, Any]) -> None:
+def _normalize_broker(cfg: Dict[str, Any], *, profile: str = "paper") -> None:
     broker = cfg.get("broker")
     if broker is None:
-        return
+        broker = {}
+        cfg["broker"] = broker
     if not isinstance(broker, dict):
         raise ValueError("config[broker] must be a table/dict")
+
+    if broker.get("host") is None:
+        broker["host"] = "127.0.0.1"
+    if broker.get("port") is None:
+        broker["port"] = expected_broker_port(profile, broker_kind="tws")
 
     # Accept both spellings.
     camel = broker.get("clientId")
@@ -100,5 +146,5 @@ def load_profile_config(profile: str, repo_root: Optional[Path] = None) -> Dict[
         raise FileNotFoundError(str(path))
 
     cfg = _read_toml(path)
-    _normalize_broker(cfg)
+    _normalize_broker(cfg, profile=profile)
     return cfg

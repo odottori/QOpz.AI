@@ -10,6 +10,17 @@ rem  Crea .venv, installa requirements Python, npm install UI.
 rem ============================================================
 
 set "OPZ_ROOT=%~dp0"
+set "OPZ_BOOT_PY=py"
+
+%OPZ_BOOT_PY% --version >nul 2>&1
+if errorlevel 1 (
+    python --version >nul 2>&1
+    if errorlevel 1 (
+        echo [FAIL] Python launcher non trovato nel PATH. Installa Python 3.11+ con py attivo.
+        exit /b 1
+    )
+    set "OPZ_BOOT_PY=python"
+)
 
 echo.
 echo ============================================================
@@ -17,18 +28,12 @@ echo   QOpz.AI  ^|  SETUP
 echo ============================================================
 echo.
 
-rem --- Python disponibile? ---
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo [FAIL] Python non trovato nel PATH. Installa Python 3.11+.
-    exit /b 1
-)
-for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo [ OK ] %%v
+for /f "tokens=*" %%v in ('%OPZ_BOOT_PY% --version 2^>^&1') do echo [ OK ] %%v
 
 rem --- venv + pip (idempotente) ---
 echo.
 echo [INFO] Configurazione venv e requirements Python...
-python tools\opz_env_setup.py
+%OPZ_BOOT_PY% tools\opz_env_setup.py
 if errorlevel 1 (
     echo [FAIL] Setup Python fallito - vedi errori sopra.
     exit /b 1
@@ -61,7 +66,7 @@ cd /d "%OPZ_ROOT%"
 echo.
 echo ============================================================
 echo   SETUP COMPLETATO
-echo   Prossimo passo:  OPZ_START.bat
+echo   Prossimo passo:  QOPZ_START.bat
 echo ============================================================
 echo.
 exit /b 0

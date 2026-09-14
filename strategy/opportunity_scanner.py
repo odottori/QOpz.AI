@@ -864,6 +864,7 @@ class OpportunityCandidate:
     data_quality: str                      # real_time | cache | stale | synthetic
     source: str                            # ibkr_paper | ibkr_live | csv_delayed
     underlying_price: float
+    capital_feasibility: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -1184,6 +1185,17 @@ def _build_candidate(
     z30 = analytics.iv_zscore_30
     iv_interp = analytics.iv_interp_30 if z30 is not None else analytics.iv_interp_60
 
+    from strategy.capital_feasibility import build_capital_feasibility
+    capital_feasibility = build_capital_feasibility(
+        strategy=strategy,
+        account_size=account_size,
+        underlying_price=underlying,
+        dte=chain_result.dte,
+        strikes=sorted(strikes),
+        credit_or_debit=round(credit_or_debit, 2),
+        max_loss=round(max_loss, 2),
+    ).to_dict()
+
     return OpportunityCandidate(
         symbol=chain_result.symbol,
         strategy=strategy,
@@ -1216,6 +1228,7 @@ def _build_candidate(
         data_quality=chain_result.data_quality,
         source=chain_result.source,
         underlying_price=underlying,
+        capital_feasibility=capital_feasibility,
     )
 
 

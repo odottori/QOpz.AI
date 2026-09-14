@@ -30,6 +30,10 @@ FASTAPI_INTERNAL=18765  # uvicorn binds 127.0.0.1 only
 DOCS_PORT=8080
 MKDOCS_SITE_DIR="${APP_DIR}/docs_site"
 TOKEN_FILE="/etc/qopz-api.env"
+APP_SLUG="${APP_SLUG:-qopz}"
+APP_BASE_PATH="${APP_BASE_PATH:-/${APP_SLUG}}"
+APP_BASE_PATH="${APP_BASE_PATH%/}"
+if [ -z "${APP_BASE_PATH}" ]; then APP_BASE_PATH="/${APP_SLUG}"; fi
 
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
@@ -97,14 +101,28 @@ server {
 
     client_max_body_size 1m;
 
-    location / {
+    location = ${APP_BASE_PATH} {
+        return 301 ${APP_BASE_PATH}/;
+    }
+
+    location = ${APP_BASE_PATH}/ {
+        return 302 ${APP_BASE_PATH}/health;
+    }
+
+    location ${APP_BASE_PATH}/ {
         limit_req zone=qopz_api burst=10 nodelay;
-        proxy_pass         http://127.0.0.1:${FASTAPI_INTERNAL};
+        proxy_pass         http://127.0.0.1:${FASTAPI_INTERNAL}/;
         proxy_set_header   Host \$host;
         proxy_set_header   X-Real-IP \$remote_addr;
         proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Prefix ${APP_BASE_PATH};
         proxy_read_timeout 30s;
         proxy_send_timeout 30s;
+    }
+
+    # Legacy direct health check compatibility
+    location = /health {
+        return 301 ${APP_BASE_PATH}/health;
     }
 }
 NGINX_EOF
@@ -113,7 +131,7 @@ NGINX_EOF
 rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/qopz /etc/nginx/sites-enabled/qopz
 nginx -t && systemctl enable nginx && systemctl restart nginx
-ok "nginx configurato: :${FASTAPI_PORT} → 127.0.0.1:${FASTAPI_INTERNAL} (rate 30r/min)"
+ok "nginx configured: :${FASTAPI_PORT}${APP_BASE_PATH}/ -> 127.0.0.1:${FASTAPI_INTERNAL} (rate 30r/min)"
 
 # ── 4. Virtual environment ───────────────────────────────────────────────────
 log "4/9 · Creazione virtual environment..."
@@ -248,7 +266,9 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║               SETUP COMPLETATO  ✓                       ║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════════════╣${NC}"
 echo -e "${GREEN}║${NC}  IP Pubblico   : ${CYAN}${PUBLIC_IP}${NC}"
-echo -e "${GREEN}║${NC}  FastAPI       : ${CYAN}http://${PUBLIC_IP}:${FASTAPI_PORT}${NC}"
+echo -e "${GREEN}║${NC}  FastAPI base  : ${CYAN}http://${PUBLIC_IP}:${FASTAPI_PORT}${APP_BASE_PATH}/${NC}"
+echo -e "${GREEN}║${NC}  Health        : ${CYAN}http://${PUBLIC_IP}:${FASTAPI_PORT}${APP_BASE_PATH}/health${NC}"
+echo -e "${GREEN}║${NC}  App path      : ${APP_BASE_PATH}"
 echo -e "${GREEN}║${NC}  Docs          : ${CYAN}http://${PUBLIC_IP}:${DOCS_PORT}${NC}"
 echo -e "${GREEN}║${NC}  App dir       : ${APP_DIR}"
 echo -e "${GREEN}║${NC}  Venv          : ${VENV_DIR}"

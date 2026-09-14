@@ -1,33 +1,25 @@
 @echo off
 setlocal
-cd /d %~dp0
+set "ROOT=%~dp0"
 
-set "OPZ_AGENT_OWNER=operator"
-if "%OPZ_FORCE_KILL_PORTS%"=="" set "OPZ_FORCE_KILL_PORTS=0"
+call "%ROOT%STOP.bat"
 
-echo.
-echo ============================================================
-echo   QOpz.AI ^| tracked startup
-echo ============================================================
-echo.
-
-call scripts\opz_start_api_if_needed.bat
-set "RC_API=%errorlevel%"
-if not "%RC_API%"=="0" (
-  echo [FAIL] API startup failed rc=%RC_API%
-  exit /b %RC_API%
+echo [CHECK] Verifico porte libere...
+netstat -ano | findstr ":8765" | findstr "LISTENING" >nul
+if %errorlevel% == 0 (
+    echo [ERRORE] Porta 8765 ancora occupata
+    exit /b 1
 )
 
-call scripts\opz_start_ui_if_needed.bat
-set "RC_UI=%errorlevel%"
-if not "%RC_UI%"=="0" (
-  echo [FAIL] UI startup failed rc=%RC_UI%
-  exit /b %RC_UI%
+netstat -ano | findstr ":8173" | findstr "LISTENING" >nul
+if %errorlevel% == 0 (
+    echo [ERRORE] Porta 8173 ancora occupata
+    exit /b 1
 )
 
-echo.
-echo [OK] Startup complete.
-echo      API health: http://localhost:8765/health
-echo      UI:         http://localhost:8173
-echo.
+echo [START] Lancio QOpz...
+start "QOpz-API" cmd /c "cd /d "%ROOT%" && title QOpz-API && "%ROOT%\.venv\Scripts\python.exe" -m uvicorn api.opz_api:app --host 127.0.0.1 --port 8765 --no-use-colors"
+start "QOpz-UI" cmd /c "cd /d "%ROOT%ui" && title QOpz-UI && npm run dev -- --host 127.0.0.1 --port 8173"
+
+echo [FINE] Sessione lanciata.
 exit /b 0

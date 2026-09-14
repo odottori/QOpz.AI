@@ -284,6 +284,7 @@ def init_execution_schema() -> None:
                 data_quality  VARCHAR,
                 source        VARCHAR,
                 underlying_price  DOUBLE,
+                capital_feasibility_json VARCHAR,
                 source_system VARCHAR,
                 source_mode   VARCHAR,
                 source_quality VARCHAR,
@@ -292,6 +293,11 @@ def init_execution_schema() -> None:
             )
             """
         )
+
+        try:
+            con.execute("ALTER TABLE opportunity_candidates ADD COLUMN IF NOT EXISTS capital_feasibility_json VARCHAR")
+        except Exception as _exc:
+            logger.debug("ALTER TABLE skip: %s", _exc)
 
         con.execute(
             """
@@ -748,10 +754,10 @@ def save_opportunity_scan(
                     credit_or_debit, sizing_suggested, kelly_fraction,
                     events_flag, human_review_required,
                     stress_base, stress_shock,
-                    data_quality, source, underlying_price,
+                    data_quality, source, underlying_price, capital_feasibility_json,
                     source_system, source_mode, source_quality, asof_ts, received_ts
                 ) VALUES (
-                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
                 )
                 """,
                 (
@@ -772,6 +778,7 @@ def save_opportunity_scan(
                     d.get("events_flag"), d.get("human_review_required"),
                     d.get("stress_base"), d.get("stress_shock"),
                     d.get("data_quality"), d.get("source"), d.get("underlying_price"),
+                    _json.dumps(d.get("capital_feasibility") or {}),
                     *prov,
                 ),
             )

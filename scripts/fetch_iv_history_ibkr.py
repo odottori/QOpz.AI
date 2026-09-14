@@ -22,7 +22,7 @@ import math
 import os
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +132,41 @@ def _ibkr_connection_params(profile: str = "dev") -> tuple[str, list[int], int]:
     env_ports = [int(p.strip()) for p in env_ports_raw.replace(";", ",").split(",")
                  if p.strip().isdigit()]
     ports = env_ports or [4004, 4002, 7497, 7496, 4001]
-    client_id = int(os.environ.get("IBKR_CLIENT_ID") or "8")
+    default_client_id = "10"
+    try:
+        from execution.ibkr_connection import IBKR_CLIENT_ID as _DEFAULT_CLIENT_ID
+        default_client_id = str(int(_DEFAULT_CLIENT_ID))
+    except Exception:
+        pass
+    env_client_id_raw = os.environ.get("IBKR_CLIENT_ID")
+    client_id = int(env_client_id_raw or default_client_id)
+
+    manager_connected = False
+    try:
+        from execution.ibkr_connection import get_manager
+
+        mgr = get_manager()
+        # Controllo sempre stato/connessione prima di snapshot chain.
+        mgr.try_connect(timeout=1.5)
+        info = mgr.connection_info()
+        if bool(info.get("connected")):
+            manager_connected = True
+            m_host = str(info.get("host") or "").strip()
+            m_port = info.get("port")
+            m_client_id = info.get("client_id")
+            if m_host:
+                host = m_host
+            if m_port:
+                p = int(m_port)
+                ports = [p] + [x for x in ports if x != p]
+            if m_client_id is not None:
+                if env_client_id_raw:
+                    client_id = int(env_client_id_raw)
+                else:
+                    client_id = int(m_client_id) + 1
+    except Exception:
+        pass
+
     try:
         from execution.config_loader import load_profile_config
         cfg = load_profile_config(profile)
@@ -141,9 +175,110 @@ def _ibkr_connection_params(profile: str = "dev") -> tuple[str, list[int], int]:
             cfg_port = b.get("port")
             if cfg_port:
                 ports = [int(cfg_port)] + [p for p in ports if p != int(cfg_port)]
+        if not os.environ.get("IBKR_CLIENT_ID"):
+            cfg_client_id = b.get("client_id")
+            if cfg_client_id is not None and not manager_connected:
+                client_id = int(cfg_client_id)
     except Exception:
         pass
     return host, ports, client_id
+
+
+def _parse_expiry_yyyymmdd(exp_str: str) -> Optional[date]:
+    s = str(exp_str or "").strip()
+    if len(s) != 8 or not s.isdigit():
+        return None
+    try:
+        return date(int(s[:4]), int(s[4:6]), int(s[6:8]))
+    except Exception:
+        return None
+
+
+def _select_regular_expiries(
+    expirations: Iterable[str],
+    *,
+    min_dte: int = 7,
+    max_dte: int = 240,
+    center_day: int = 20,
+    day_tolerance: int = 5,
+    max_candidates: int = 8,
+    today_ref: Optional[date] = None,
+) -> list[tuple[str, date, int]]:
+    """
+    Select candidate expiries with preference for monthly-like regular dates.
+
+    Regular monthly-like is approximated as day-of-month in
+    [center_day-day_tolerance, center_day+day_tolerance].
+    """
+    today = today_ref or date.today()
+    parsed: list[tuple[str, date, int]] = []
+    for raw in expirations:
+        exp_dt = _parse_expiry_yyyymmdd(str(raw))
+        if exp_dt is None:
+            continue
+        dte = (exp_dt - today).days
+        if dte < min_dte or dte > max_dte:
+            continue
+        parsed.append((exp_dt.strftime("%Y%m%d"), exp_dt, dte))
+    parsed.sort(key=lambda x: x[1])
+    if not parsed:
+        return []
+
+    lo = center_day - day_tolerance
+    hi = center_day + day_tolerance
+    regular = [x for x in parsed if lo <= x[1].day <= hi]
+    pool = regular if regular else parsed
+    return pool[: max(1, int(max_candidates))]
+
+
+def _estimate_sigma_bands(
+    underlying: float,
+    atm_iv: Optional[float],
+    dte: Optional[int],
+) -> dict[str, Optional[float]]:
+    if underlying <= 0.0 or atm_iv is None or atm_iv <= 0.0 or dte is None or dte <= 0:
+        return {
+            "sigma_1_abs": None,
+            "sigma_1_up": None,
+            "sigma_1_down": None,
+            "sigma_2_abs": None,
+            "sigma_2_up": None,
+            "sigma_2_down": None,
+        }
+    t = float(dte) / 365.0
+    if t <= 0.0:
+        return {
+            "sigma_1_abs": None,
+            "sigma_1_up": None,
+            "sigma_1_down": None,
+            "sigma_2_abs": None,
+            "sigma_2_up": None,
+            "sigma_2_down": None,
+        }
+    sigma_1 = underlying * atm_iv * math.sqrt(t)
+    sigma_2 = sigma_1 * 2.0
+    return {
+        "sigma_1_abs": round(sigma_1, 4),
+        "sigma_1_up": round(underlying + sigma_1, 4),
+        "sigma_1_down": round(max(0.0, underlying - sigma_1), 4),
+        "sigma_2_abs": round(sigma_2, 4),
+        "sigma_2_up": round(underlying + sigma_2, 4),
+        "sigma_2_down": round(max(0.0, underlying - sigma_2), 4),
+    }
+
+
+def _ticker_iv(tkr: Any) -> Optional[float]:
+    direct = _safe_float(getattr(tkr, "impliedVolatility", None))
+    if direct and direct > 0:
+        return direct
+    for g_name in ("modelGreeks", "lastGreeks"):
+        g = getattr(tkr, g_name, None)
+        if g is None:
+            continue
+        val = _safe_float(getattr(g, "impliedVol", None))
+        if val and val > 0:
+            return val
+    return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -411,6 +546,342 @@ def capture_ibkr_universe_snapshot(symbols: list[str], profile: str = "dev") -> 
     except Exception as exc:
         err = f"{type(exc).__name__}: {exc}"
         return [_empty_result(s, err) for s in symbols]
+    finally:
+        try:
+            if ib.isConnected():
+                ib.disconnect()
+        except Exception:
+            pass
+
+
+def _term_structure_point_on_expiry(
+    ib: Any,
+    *,
+    symbol: str,
+    exchange: str,
+    expiry_yyyymmdd: str,
+    expiry_dt: date,
+    dte: int,
+    underlying: float,
+    strikes: list[float],
+    max_strikes: int = 18,
+) -> dict[str, Any]:
+    from ib_insync import Option
+
+    if not strikes:
+        return {
+            "expiry": expiry_dt.isoformat(),
+            "expiry_yyyymmdd": expiry_yyyymmdd,
+            "dte": dte,
+            "atm_strike": None,
+            "atm_call_iv": None,
+            "atm_put_iv": None,
+            "atm_iv": None,
+            "iv_source": "none",
+            "liquidity_score": 0.0,
+            "contracts_sampled": 0,
+            "error": "no strikes",
+            **_estimate_sigma_bands(underlying, None, dte),
+        }
+
+    strike_vals = sorted({float(s) for s in strikes if s is not None and float(s) > 0.0})
+    if underlying > 0.0:
+        sampled_strikes = sorted(strike_vals, key=lambda s: abs(s - underlying))[: max(4, max_strikes)]
+        sampled_strikes = sorted(sampled_strikes)
+    else:
+        sampled_strikes = strike_vals[: max(4, max_strikes)]
+    if not sampled_strikes:
+        return {
+            "expiry": expiry_dt.isoformat(),
+            "expiry_yyyymmdd": expiry_yyyymmdd,
+            "dte": dte,
+            "atm_strike": None,
+            "atm_call_iv": None,
+            "atm_put_iv": None,
+            "atm_iv": None,
+            "iv_source": "none",
+            "liquidity_score": 0.0,
+            "contracts_sampled": 0,
+            "error": "no sampled strikes",
+            **_estimate_sigma_bands(underlying, None, dte),
+        }
+
+    opts = []
+    for s in sampled_strikes:
+        opts.append(Option(symbol.upper(), expiry_yyyymmdd, s, "C", exchange, currency="USD"))
+        opts.append(Option(symbol.upper(), expiry_yyyymmdd, s, "P", exchange, currency="USD"))
+
+    try:
+        qualified = ib.qualifyContracts(*opts)
+    except Exception as exc:
+        return {
+            "expiry": expiry_dt.isoformat(),
+            "expiry_yyyymmdd": expiry_yyyymmdd,
+            "dte": dte,
+            "atm_strike": None,
+            "atm_call_iv": None,
+            "atm_put_iv": None,
+            "atm_iv": None,
+            "iv_source": "none",
+            "liquidity_score": 0.0,
+            "contracts_sampled": 0,
+            "error": f"qualify error: {exc}",
+            **_estimate_sigma_bands(underlying, None, dte),
+        }
+    if not qualified:
+        return {
+            "expiry": expiry_dt.isoformat(),
+            "expiry_yyyymmdd": expiry_yyyymmdd,
+            "dte": dte,
+            "atm_strike": None,
+            "atm_call_iv": None,
+            "atm_put_iv": None,
+            "atm_iv": None,
+            "iv_source": "none",
+            "liquidity_score": 0.0,
+            "contracts_sampled": 0,
+            "error": "no qualified contracts",
+            **_estimate_sigma_bands(underlying, None, dte),
+        }
+
+    req_pairs: list[tuple[Any, Any]] = []
+    for opt in qualified:
+        tkr = ib.reqMktData(opt, "100,101,106", snapshot=False, regulatorySnapshot=False)
+        req_pairs.append((opt, tkr))
+    ib.sleep(2.0)
+    for opt, _ in req_pairs:
+        try:
+            ib.cancelMktData(opt)
+        except Exception:
+            pass
+
+    liquidity = 0.0
+    ticker_by_leg: dict[tuple[float, str], Any] = {}
+    for opt, tkr in req_pairs:
+        k = round(float(getattr(opt, "strike", 0.0)), 4)
+        right = str(getattr(opt, "right", "")).upper()
+        ticker_by_leg[(k, right)] = tkr
+        oi = _safe_float(getattr(tkr, "openInterest", None)) or 0.0
+        vol = _safe_float(getattr(tkr, "volume", None)) or 0.0
+        bid = _safe_float(getattr(tkr, "bid", None)) or 0.0
+        ask = _safe_float(getattr(tkr, "ask", None)) or 0.0
+        mid = (bid + ask) / 2.0 if bid > 0.0 and ask > 0.0 and ask >= bid else 0.0
+        spread_penalty = 1.0
+        if mid > 0.0:
+            spread_ratio = max(0.0, (ask - bid) / mid)
+            spread_penalty = max(0.25, min(1.0, 1.0 - spread_ratio))
+        liquidity += (oi + vol) * spread_penalty
+
+    if underlying > 0.0:
+        atm_strike = min(sampled_strikes, key=lambda s: abs(s - underlying))
+    else:
+        atm_strike = sampled_strikes[len(sampled_strikes) // 2]
+
+    atm_key = round(float(atm_strike), 4)
+    call_t = ticker_by_leg.get((atm_key, "C"))
+    put_t = ticker_by_leg.get((atm_key, "P"))
+
+    call_iv = _ticker_iv(call_t) if call_t is not None else None
+    put_iv = _ticker_iv(put_t) if put_t is not None else None
+    call_from_bs = False
+    put_from_bs = False
+    t_years = float(dte) / 365.0 if dte > 0 else 0.0
+
+    if (call_iv is None or call_iv <= 0.0) and call_t is not None and t_years > 0.0 and underlying > 0.0:
+        bid = _safe_float(getattr(call_t, "bid", None))
+        ask = _safe_float(getattr(call_t, "ask", None))
+        if bid and ask and bid > 0.0 and ask > 0.0:
+            mid = (bid + ask) / 2.0
+            call_iv = _implied_vol_from_price(underlying, atm_strike, t_years, mid, "C")
+            call_from_bs = bool(call_iv and call_iv > 0.0)
+    if (put_iv is None or put_iv <= 0.0) and put_t is not None and t_years > 0.0 and underlying > 0.0:
+        bid = _safe_float(getattr(put_t, "bid", None))
+        ask = _safe_float(getattr(put_t, "ask", None))
+        if bid and ask and bid > 0.0 and ask > 0.0:
+            mid = (bid + ask) / 2.0
+            put_iv = _implied_vol_from_price(underlying, atm_strike, t_years, mid, "P")
+            put_from_bs = bool(put_iv and put_iv > 0.0)
+
+    call_iv_out = round(call_iv, 6) if call_iv and call_iv > 0.0 else None
+    put_iv_out = round(put_iv, 6) if put_iv and put_iv > 0.0 else None
+    iv_vals = [v for v in (call_iv, put_iv) if v and v > 0.0]
+    atm_iv = round(sum(iv_vals) / len(iv_vals), 6) if iv_vals else None
+    if atm_iv is None:
+        iv_source = "none"
+    elif call_from_bs and put_from_bs:
+        iv_source = "bs"
+    elif call_from_bs or put_from_bs:
+        iv_source = "mix"
+    else:
+        iv_source = "ibkr"
+
+    return {
+        "expiry": expiry_dt.isoformat(),
+        "expiry_yyyymmdd": expiry_yyyymmdd,
+        "dte": dte,
+        "atm_strike": round(float(atm_strike), 4),
+        "atm_call_iv": call_iv_out,
+        "atm_put_iv": put_iv_out,
+        "atm_iv": atm_iv,
+        "iv_source": iv_source,
+        "liquidity_score": round(float(liquidity), 2),
+        "contracts_sampled": int(len(sampled_strikes) * 2),
+        "error": None if atm_iv is not None else "ATM IV unavailable",
+        **_estimate_sigma_bands(underlying, atm_iv, dte),
+    }
+
+
+def _term_structure_on_connection(
+    ib: Any,
+    symbol: str,
+    *,
+    top_n: int = 3,
+) -> dict[str, Any]:
+    from ib_insync import Stock
+
+    out: dict[str, Any] = {
+        "symbol": symbol.upper(),
+        "market_data_type": None,
+        "underlying_price": None,
+        "chains": [],
+        "error": None,
+    }
+    try:
+        stock = Stock(symbol.upper(), "SMART", "USD")
+        qualified = ib.qualifyContracts(stock)
+        if not qualified:
+            out["error"] = "qualify underlying failed"
+            return out
+        stock = qualified[0]
+
+        preferred_type = getattr(ib, "_qopz_market_data_type", None)
+        tried_types: list[int] = []
+        ordered_types = [preferred_type, 1, 3, 4]
+        underlying: Optional[float] = None
+        for mdt in ordered_types:
+            if not isinstance(mdt, int) or mdt in tried_types:
+                continue
+            tried_types.append(mdt)
+            try:
+                ib.reqMarketDataType(mdt)
+            except Exception:
+                pass
+            tkr = ib.reqMktData(stock, "", snapshot=True, regulatorySnapshot=False)
+            ib.sleep(2.0)
+            try:
+                ib.cancelMktData(stock)
+            except Exception:
+                pass
+            px = (
+                _safe_float(getattr(tkr, "last", None))
+                or _safe_float(getattr(tkr, "close", None))
+                or _safe_float(getattr(tkr, "bid", None))
+                or _safe_float(getattr(tkr, "ask", None))
+            )
+            if px and px > 0.0:
+                underlying = float(px)
+                out["market_data_type"] = mdt
+                try:
+                    setattr(ib, "_qopz_market_data_type", mdt)
+                except Exception:
+                    pass
+                break
+        if underlying is None or underlying <= 0.0:
+            out["error"] = "underlying unavailable"
+            return out
+        out["underlying_price"] = round(float(underlying), 4)
+
+        chains = ib.reqSecDefOptParams(stock.symbol, "", stock.secType, stock.conId)
+        if not chains:
+            out["error"] = "no option chain params"
+            return out
+        chain = next((c for c in chains if getattr(c, "exchange", "") == "SMART"), chains[0])
+        expirations = list(getattr(chain, "expirations", []) or [])
+        strikes = [float(s) for s in (getattr(chain, "strikes", []) or []) if s is not None]
+        exp_candidates = _select_regular_expiries(expirations, max_candidates=10)
+        if not exp_candidates:
+            out["error"] = "no regular expiries in range"
+            return out
+
+        points: list[dict[str, Any]] = []
+        chain_exchange = str(getattr(chain, "exchange", "SMART") or "SMART")
+        for exp_str, exp_dt, dte in exp_candidates:
+            point = _term_structure_point_on_expiry(
+                ib,
+                symbol=symbol,
+                exchange=chain_exchange,
+                expiry_yyyymmdd=exp_str,
+                expiry_dt=exp_dt,
+                dte=dte,
+                underlying=float(underlying),
+                strikes=strikes,
+                max_strikes=18,
+            )
+            points.append(point)
+        if not points:
+            out["error"] = "no term points"
+            return out
+
+        points.sort(key=lambda p: (-float(p.get("liquidity_score") or 0.0), int(p.get("dte") or 9999)))
+        out["chains"] = points[: max(1, int(top_n))]
+        if not out["chains"]:
+            out["error"] = "no selected chains"
+        return out
+    except Exception as exc:
+        out["error"] = f"{type(exc).__name__}: {exc}"
+        return out
+
+
+def capture_ibkr_universe_term_structure(
+    symbols: list[str],
+    profile: str = "dev",
+    *,
+    top_n: int = 3,
+) -> list[dict[str, Any]]:
+    """
+    Capture term-structure snapshots for each symbol:
+    select top-N regular monthly-like expiries by liquidity and compute 1sigma/2sigma bands.
+    """
+    if not symbols:
+        return []
+    try:
+        from ib_insync import IB
+    except ImportError as exc:
+        err = f"ib_insync non installato: {exc}"
+        return [{"symbol": str(s).upper(), "market_data_type": None, "underlying_price": None, "chains": [], "error": err} for s in symbols]
+
+    host, ports, client_id = _ibkr_connection_params(profile)
+    ib = IB()
+    connected_port: Optional[int] = None
+    try:
+        for port in ports:
+            try:
+                ok = ib.connect(host, port, clientId=client_id, timeout=8.0, readonly=True)
+                if ok and ib.isConnected():
+                    connected_port = port
+                    break
+            except Exception:
+                try:
+                    ib.disconnect()
+                except Exception:
+                    pass
+                ib = IB()
+        if connected_port is None:
+            err = f"IBG non raggiungibile su {host} porte {ports}"
+            return [{"symbol": str(s).upper(), "market_data_type": None, "underlying_price": None, "chains": [], "error": err} for s in symbols]
+
+        try:
+            ib.reqMarketDataType(1)
+        except Exception:
+            pass
+
+        out: list[dict[str, Any]] = []
+        for s in symbols:
+            out.append(_term_structure_on_connection(ib, str(s), top_n=top_n))
+        return out
+    except Exception as exc:
+        err = f"{type(exc).__name__}: {exc}"
+        return [{"symbol": str(s).upper(), "market_data_type": None, "underlying_price": None, "chains": [], "error": err} for s in symbols]
     finally:
         try:
             if ib.isConnected():

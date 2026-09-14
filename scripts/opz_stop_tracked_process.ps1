@@ -1,5 +1,5 @@
-﻿param(
-  [int]$Pid = 0,
+param(
+  [Alias('Pid')][int]$TargetPid = 0,
   [string]$Role = "",
   [string]$Owner = ""
 )
@@ -18,6 +18,9 @@ if([string]::IsNullOrWhiteSpace($Owner)){
   $Owner = "assistant"
 }
 
+$repoPython = Join-Path $repo ".venv\Scripts\python.exe"
+$registryPython = if(Test-Path $repoPython){ $repoPython } else { "py" }
+
 try {
   $data = Get-Content $regPath -Raw | ConvertFrom-Json
 } catch {
@@ -27,8 +30,8 @@ try {
 
 $entries = @($data.entries)
 $entries = @($entries | Where-Object { [string]$_.owner -eq $Owner })
-if($Pid -gt 0){
-  $entries = @($entries | Where-Object { [int]$_.pid -eq $Pid })
+if($TargetPid -gt 0){
+  $entries = @($entries | Where-Object { [int]$_.pid -eq $TargetPid })
 }
 if(-not [string]::IsNullOrWhiteSpace($Role)){
   $entries = @($entries | Where-Object { [string]$_.role -eq $Role })
@@ -40,7 +43,7 @@ foreach($e in $entries){
   if($id -le 0){ continue }
   try {
     Stop-Process -Id $id -Force -ErrorAction Stop
-    & py "$repo\scripts\opz_process_registry.py" unregister --owner $Owner --pid $id | Out-Null
+    & $registryPython "$repo\scripts\opz_process_registry.py" unregister --owner $Owner --pid $id | Out-Null
     $stopped += 1
     Write-Output "TRACKED_STOP owner=$Owner pid=$id role=$($e.role)"
   } catch {

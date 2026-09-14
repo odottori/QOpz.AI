@@ -25,10 +25,10 @@ seed = 42
 mode = "live"      # DATA_MODE watermark: live mode — Kelly ENABLED if N>=50
 
 [broker]
-# port 7497 = TWS live (default); port 7496 = paper
+# port 7496 = TWS live; port 4001 = Gateway live; 7497/4002 are paper endpoints
 # IMPORTANT: double-check port before connecting with live credentials
 host      = "127.0.0.1"
-port      = 7497        # LIVE port — real money, real execution
+port      = 7496        # LIVE port — real money, real execution
 client_id = 7           # must be unique per connected client
 
 [ops]

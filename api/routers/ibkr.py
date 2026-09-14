@@ -25,3 +25,17 @@ def opz_ibkr_disconnect():
     from api import opz_api as compat
 
     return compat.opz_ibkr_disconnect()
+
+
+@router.get("/opz/ibkr/readiness")
+def opz_ibkr_readiness(profile: str = "paper", timeout_sec: float = 2.0, symbol: str = "SPY", include_option_chain: bool = True):
+    from api import opz_api as compat
+
+    return compat.opz_ibkr_readiness(profile, timeout_sec, symbol, include_option_chain)
+
+
+@router.get("/opz/ibkr/preflight")
+def opz_ibkr_preflight_alias(profile: str = "paper", timeout_sec: float = 2.0, symbol: str = "SPY", include_option_chain: bool = True):
+    from api import opz_api as compat
+
+    return compat.opz_ibkr_readiness(profile, timeout_sec, symbol, include_option_chain)

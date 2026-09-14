@@ -1,9 +1,12 @@
-﻿param(
+param(
   [Parameter(Mandatory=$true)][string]$FilePath,
   [string[]]$ArgumentList = @(),
+  [string]$ArgumentsLine = "",
   [string]$Role = "generic",
   [string]$WorkingDirectory = "",
-  [string]$Owner = ""
+  [string]$Owner = "",
+  [string]$StdoutPath = "",
+  [string]$StderrPath = ""
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
@@ -15,11 +18,42 @@ if([string]::IsNullOrWhiteSpace($Owner)){
   $Owner = "assistant"
 }
 
+$repoPython = Join-Path $repo ".venv\Scripts\python.exe"
+$registryPython = if(Test-Path $repoPython){ $repoPython } else { "py" }
+
+$effectiveArgumentLine = ""
+if(-not [string]::IsNullOrWhiteSpace($ArgumentsLine)){
+  $effectiveArgumentLine = $ArgumentsLine.Trim()
+} elseif($ArgumentList -and $ArgumentList.Count -gt 0){
+  if($ArgumentList.Count -eq 1 -and $ArgumentList[0] -match ','){
+    $tokens = $ArgumentList[0].Split(',') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    $effectiveArgumentLine = ($tokens -join ' ').Trim()
+  } else {
+    $effectiveArgumentLine = ($ArgumentList -join ' ').Trim()
+  }
+}
+
 $psi = @{
   FilePath = $FilePath
-  ArgumentList = $ArgumentList
   WorkingDirectory = $WorkingDirectory
   PassThru = $true
+}
+if(-not [string]::IsNullOrWhiteSpace($effectiveArgumentLine)){
+  $psi.ArgumentList = $effectiveArgumentLine
+}
+if(-not [string]::IsNullOrWhiteSpace($StdoutPath)){
+  $stdoutDir = Split-Path -Parent $StdoutPath
+  if(-not [string]::IsNullOrWhiteSpace($stdoutDir)){
+    New-Item -ItemType Directory -Force -Path $stdoutDir | Out-Null
+  }
+  $psi.RedirectStandardOutput = $StdoutPath
+}
+if(-not [string]::IsNullOrWhiteSpace($StderrPath)){
+  $stderrDir = Split-Path -Parent $StderrPath
+  if(-not [string]::IsNullOrWhiteSpace($stderrDir)){
+    New-Item -ItemType Directory -Force -Path $stderrDir | Out-Null
+  }
+  $psi.RedirectStandardError = $StderrPath
 }
 $p = Start-Process @psi
 if(-not $p){
@@ -27,8 +61,11 @@ if(-not $p){
   exit 1
 }
 
-$cmd = "$FilePath " + ($ArgumentList -join " ")
-& py "$repo\scripts\opz_process_registry.py" register --owner $Owner --pid $p.Id --role $Role --command $cmd --cwd $WorkingDirectory --note "started via opz_start_tracked_process.ps1"
+$cmd = $FilePath
+if(-not [string]::IsNullOrWhiteSpace($effectiveArgumentLine)){
+  $cmd = "$FilePath $effectiveArgumentLine"
+}
+& $registryPython "$repo\scripts\opz_process_registry.py" register --owner $Owner --pid $p.Id --role $Role --command $cmd --cwd $WorkingDirectory --note "started via opz_start_tracked_process.ps1"
 if($LASTEXITCODE -ne 0){
   Write-Warning "process started but registry update failed pid=$($p.Id)"
 }
