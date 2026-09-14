@@ -443,6 +443,102 @@ def init_execution_schema() -> None:
             """
         )
 
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_observations (
+                observation_id VARCHAR PRIMARY KEY,
+                candidate_id   VARCHAR,
+                batch_id       VARCHAR,
+                profile        VARCHAR,
+                observed_at    TIMESTAMP,
+                observed_date  VARCHAR,
+                regime         VARCHAR,
+                data_mode      VARCHAR,
+                symbol         VARCHAR,
+                strategy       VARCHAR,
+                signal_direction VARCHAR,
+                score          DOUBLE,
+                expiry         VARCHAR,
+                dte            INTEGER,
+                strikes_json   VARCHAR,
+                underlying_price DOUBLE,
+                expected_move_pct DOUBLE,
+                signal_vs_em_ratio DOUBLE,
+                max_loss       DOUBLE,
+                max_loss_pct   DOUBLE,
+                data_quality   VARCHAR,
+                source         VARCHAR,
+                observation_context_json VARCHAR,
+                source_system  VARCHAR,
+                source_mode    VARCHAR,
+                source_quality VARCHAR,
+                asof_ts        VARCHAR,
+                received_ts    VARCHAR
+            )
+            """
+        )
+
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_forward_outcomes (
+                outcome_id      VARCHAR PRIMARY KEY,
+                observation_id  VARCHAR,
+                profile         VARCHAR,
+                symbol          VARCHAR,
+                strategy        VARCHAR,
+                signal_direction VARCHAR,
+                horizon_days    INTEGER,
+                observation_date VARCHAR,
+                target_date     VARCHAR,
+                entry_price     DOUBLE,
+                outcome_date    VARCHAR,
+                outcome_price   DOUBLE,
+                spot_return_pct DOUBLE,
+                realized_move_abs_pct DOUBLE,
+                expected_move_pct DOUBLE,
+                within_expected_move BOOLEAN,
+                success         BOOLEAN,
+                outcome_label   VARCHAR,
+                status          VARCHAR,
+                score_at_observation DOUBLE,
+                computed_at     TIMESTAMP,
+                source_system   VARCHAR,
+                source_mode     VARCHAR,
+                source_quality  VARCHAR,
+                asof_ts         VARCHAR,
+                received_ts     VARCHAR
+            )
+            """
+        )
+
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_scorecards (
+                scorecard_id    VARCHAR PRIMARY KEY,
+                profile         VARCHAR,
+                asof_date       VARCHAR,
+                window_days     INTEGER,
+                horizon_days    INTEGER,
+                strategy        VARCHAR,
+                observations_count INTEGER,
+                outcomes_ready_count INTEGER,
+                pending_count   INTEGER,
+                hit_rate_pct    DOUBLE,
+                containment_rate_pct DOUBLE,
+                avg_forward_return_pct DOUBLE,
+                median_forward_return_pct DOUBLE,
+                avg_score       DOUBLE,
+                summary_json    VARCHAR,
+                computed_at     TIMESTAMP,
+                source_system   VARCHAR,
+                source_mode     VARCHAR,
+                source_quality  VARCHAR,
+                asof_ts         VARCHAR,
+                received_ts     VARCHAR
+            )
+            """
+        )
+
         try:
             con.close()
         except Exception:
@@ -795,6 +891,26 @@ def save_opportunity_scan(
                     """,
                     (str(uuid.uuid4()), batch_id, profile, sym, scan_ts_str, *prov),
                 )
+
+            # Signal validation foundation: mirror each candidate into
+            # signal_observations so recompute_forward_outcomes / scorecards
+            # (F6) can track forward performance. Local import avoids a
+            # circular dependency (signal_validation imports from this module).
+            try:
+                from .signal_validation import _insert_signal_observation
+
+                _insert_signal_observation(
+                    con,
+                    profile=profile,
+                    batch_id=batch_id,
+                    candidate_id=cid,
+                    scan_ts=scan_ts_str,
+                    regime=getattr(scan_result, "regime", None),
+                    data_mode=getattr(scan_result, "data_mode", None),
+                    candidate=c,
+                )
+            except Exception:
+                logger.exception("save_opportunity_scan: signal_observations insert failed for %s", d.get("symbol"))
 
         if hasattr(con, "commit"):
             con.commit()

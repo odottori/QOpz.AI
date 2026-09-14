@@ -171,7 +171,7 @@ def _ibkr_connection_params(profile: str = "dev") -> tuple[str, list[int], int]:
         from execution.config_loader import load_profile_config
         cfg = load_profile_config(profile)
         b = cfg.get("broker") or {}
-        if not env_ports:
+        if not env_ports and not manager_connected:
             cfg_port = b.get("port")
             if cfg_port:
                 ports = [int(cfg_port)] + [p for p in ports if p != int(cfg_port)]
