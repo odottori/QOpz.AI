@@ -12,7 +12,7 @@ Hai bisogno di:
 
 Sulla VM, anteporre `/qopz` agli endpoint mostrati sotto (per esempio `/qopz/opz/session/status`). L'health positivo certifica solo la disponibilita tecnica, non dati o broker pronti.
 
-Se l'API è online vedrai **API LIVE** verde in alto a destra. Se vedi **API DOWN**, l'API non risponde — non procedere.
+Se l'API è online vedrai **API ONLINE** verde in alto a destra. Questo indica solo la disponibilita dell'API QOpz, non la connessione al broker: verificarla nella voce IBKR. Se vedi **API DOWN**, l'API non risponde — non procedere.
 
 ---
 

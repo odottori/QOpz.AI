@@ -1475,38 +1475,6 @@ export default function App() {
       const ctxQuery = universeSettingsPath.trim()
         ? `?settings_path=${encodeURIComponent(universeSettingsPath.trim())}`
         : "";
-      // Promise.allSettled: un endpoint lento/down non blocca gli altri
-      const settled = await Promise.allSettled([
-        apiJson<unknown>(`${API_BASE}/opz/state`),
-        apiJson<ReleaseStatusResponse>(`${API_BASE}/opz/release_status`),
-        apiJson<PaperSummaryResponse>(`${API_BASE}/opz/paper/summary?profile=${ACTIVE_PROFILE}&window_days=60`),
-        apiJson<LastActionsResponse>(`${API_BASE}/opz/last_actions?limit=8`),
-        apiJson<UniverseLatestResponse>(`${API_BASE}/opz/universe/latest?profile=${ACTIVE_PROFILE}`),
-        apiJson<UniverseIbkrContext>(`${API_BASE}/opz/universe/ibkr_context${ctxQuery}`),
-        apiJson<NarratorTutorialResponse>(`${API_BASE}/opz/narrator/tutorial`),
-      ]);
-      const ok = <T,>(r: PromiseSettledResult<T>): T | null =>
-        r.status === "fulfilled" ? r.value : null;
-      const [s, rs, ps, la, ul, ic, nt] = settled.map(ok) as [
-        unknown, ReleaseStatusResponse | null, PaperSummaryResponse | null,
-        LastActionsResponse | null, UniverseLatestResponse | null,
-        UniverseIbkrContext | null, NarratorTutorialResponse | null,
-      ];
-      const up = await apiJson<UniverseProvenanceResponse>(
-        `${API_BASE}/opz/universe/provenance${provenanceQuery({
-          batchId: ul?.batch_id ?? null,
-          settingsPath: ul?.ibkr_settings_path || universeSettingsPath,
-          regime: ul?.regime ?? universeRegime,
-        })}`
-      ).catch(() => null);
-      if (s !== null) setStateJson(s);
-      if (rs !== null) setReleaseMd(rs.content || "");
-      if (ps !== null) setPaperSummary(ps);
-      if (la !== null) setLastActions(la);
-      if (ul !== null) setUniverseLatest(ul);
-      if (ic !== null) setIbkrContext(ic);
-      if (nt !== null) setNarratorTutorial(nt);
-      setUniverseProvenance(up);
       void doFetchEquityHistory();
       void doFetchSysStatus();
       void doFetchRegimeCurrent();
@@ -1519,6 +1487,31 @@ export default function App() {
       void doFetchBriefingList();
       void doFetchControlStatus();
       void doFetchLifecycle();
+      const initialRead: RequestInit = { signal: AbortSignal.timeout(15_000) };
+      // Publish each result independently; an optional GET cannot hold the UI hostage.
+      const settled = await Promise.allSettled([
+        apiJson<unknown>(`${API_BASE}/opz/state`, initialRead).then(value => { setStateJson(value); return value; }),
+        apiJson<ReleaseStatusResponse>(`${API_BASE}/opz/release_status`, initialRead).then(value => { setReleaseMd(value.content || ""); return value; }),
+        apiJson<PaperSummaryResponse>(`${API_BASE}/opz/paper/summary?profile=${ACTIVE_PROFILE}&window_days=60`, initialRead).then(value => { setPaperSummary(value); return value; }),
+        apiJson<LastActionsResponse>(`${API_BASE}/opz/last_actions?limit=8`, initialRead).then(value => { setLastActions(value); return value; }),
+        apiJson<UniverseLatestResponse>(`${API_BASE}/opz/universe/latest?profile=${ACTIVE_PROFILE}`, initialRead).then(value => { setUniverseLatest(value); return value; }),
+        apiJson<UniverseIbkrContext>(`${API_BASE}/opz/universe/ibkr_context${ctxQuery}`, initialRead).then(value => { setIbkrContext(value); return value; }),
+        apiJson<NarratorTutorialResponse>(`${API_BASE}/opz/narrator/tutorial`, initialRead).then(value => { setNarratorTutorial(value); return value; }),
+      ]);
+      const ok = <T,>(r: PromiseSettledResult<T>): T | null =>
+        r.status === "fulfilled" ? r.value : null;
+      const [, , , , ul, ic] = settled.map(ok) as [
+        unknown, ReleaseStatusResponse | null, PaperSummaryResponse | null,
+        LastActionsResponse | null, UniverseLatestResponse | null,
+        UniverseIbkrContext | null, NarratorTutorialResponse | null,
+      ];
+      void apiJson<UniverseProvenanceResponse>(
+        `${API_BASE}/opz/universe/provenance${provenanceQuery({
+          batchId: ul?.batch_id ?? null,
+          settingsPath: ul?.ibkr_settings_path || universeSettingsPath,
+          regime: ul?.regime ?? universeRegime,
+        })}`, { signal: AbortSignal.timeout(15_000) }
+      ).then(setUniverseProvenance).catch(() => setUniverseProvenance(null));
       if (!universeScannerName && ic?.scanners && ic.scanners.length > 0) {
         setUniverseScannerName(ic.scanners[0].scanner_name);
       }
@@ -2613,17 +2606,10 @@ export default function App() {
   // On mount: stato IBKR passivo + fetch iniziale di tutti i dati
   useEffect(() => {
     void doCheckIbkr(false);
-    void doFetchSysStatus();
-    void doFetchRegimeCurrent();
-    void doFetchRegimeContext();
+    void refreshAll();
     void doFetchRegimeContextBase();
-    void doFetchUniverseLatest();
-    void doFetchEquityHistory();
-    void doFetchExitCandidates();
-    void doFetchActivityStream();
     void doFetchSessionStatus();
     void doFetchSessionLogs();
-    void doFetchControlStatus();
     // Opening a dashboard must neither run ingestion nor erase diagnostic evidence.
     void doFetchFeedLog();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2927,8 +2913,8 @@ export default function App() {
             </Tooltip>
           )}
           <span className="clock">{clockText}</span>
-          <Tooltip text={apiOnline ? TOOLTIPS.ibkr_connected : TOOLTIPS.ibkr_disconnected}>
-            <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API LIVE" : "API DOWN"}</span>
+          <Tooltip text={apiOnline ? "API QOpz disponibile. Non certifica la connessione IBKR." : "API QOpz non raggiungibile."}>
+            <span className={`live-pill ${apiOnline ? "online" : "offline"}`}>{apiOnline ? "API ONLINE" : "API DOWN"}</span>
           </Tooltip>
           {REFRESH_CONTROLS_ENABLED ? (
             <button className="btn btn-primary" onClick={refreshAll} disabled={busy}>{busy ? "REFRESHING" : "REFRESH"}</button>
@@ -6167,7 +6153,9 @@ export default function App() {
             <textarea
               ref={narratorBoxRef}
               className="narrator-textbox"
-              value={tutorialText || `File non trovato: ${narratorTutorial?.path ?? "docs/TUTORIAL_APPLICAZIONE.md"}`}
+              value={tutorialText || (narratorTutorial === null
+                ? "Tutorial non ancora caricato. Premi REFRESH per riprovare."
+                : narratorTutorial.exists ? "Tutorial vuoto." : `File non trovato: ${narratorTutorial.path}`)}
               readOnly
             />
           </section>

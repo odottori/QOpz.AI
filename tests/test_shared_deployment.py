@@ -33,9 +33,27 @@ class TestSharedDeployment(unittest.TestCase):
         text = (ROOT / 'ui/src/App.tsx').read_text(encoding='utf-8')
         mount = text.split('// On mount:', 1)[1].split('// Heartbeat', 1)[0]
         self.assertIn('void doFetchFeedLog();', mount)
+        self.assertIn('void refreshAll();', mount)
         self.assertNotIn('true, false', mount)
         refresh = text.split('if (triggerRefresh) {', 1)[1].split('async function doFetchControlStatus', 1)[0]
         self.assertNotIn('/opz/system/log/clear', refresh)
+        bootstrap = text.split('async function refreshAll()', 1)[1].split('async function doPreview', 1)[0]
+        self.assertIn('AbortSignal.timeout(15_000)', bootstrap)
+        self.assertLess(bootstrap.index('void doFetchSysStatus();'), bootstrap.index('await Promise.allSettled'))
+        self.assertIn('setNarratorTutorial(value); return value;', bootstrap)
+
+    def test_narrator_reads_existing_canonical_guide(self):
+        from api.opz_api import opz_narrator_tutorial
+        result = opz_narrator_tutorial()
+        self.assertTrue(result['exists'])
+        self.assertEqual(Path(result['path']), ROOT / 'docs/guide/guida_completa.md')
+        self.assertIn('# QOpz.AI', result['content'])
+
+    def test_api_badge_does_not_claim_broker_connection(self):
+        text = (ROOT / 'ui/src/App.tsx').read_text(encoding='utf-8')
+        self.assertIn('"API ONLINE"', text)
+        self.assertIn('Non certifica la connessione IBKR.', text)
+        self.assertNotIn('apiOnline ? TOOLTIPS.ibkr_connected', text)
 
     def test_shared_prefix_and_loopback_gateway(self):
         docker = (ROOT / 'Dockerfile.nginx').read_text(encoding='utf-8')

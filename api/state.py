@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = ROOT / ".qoaistate.json"
 LOG_DIR = ROOT / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-TUTORIAL_TEXT2SPEECH_PATH = ROOT / "docs" / "TUTORIAL_APPLICAZIONE.md"
+TUTORIAL_TEXT2SPEECH_PATH = ROOT / "docs" / "guide" / "guida_completa.md"
 ALLOWED_SETTINGS_ROOT = ROOT / "docs"
 ALLOWED_TUTORIAL_ROOT = ROOT / "docs"
 ALLOWED_OCR_ROOTS = [ROOT / "data", ROOT / "docs"]
