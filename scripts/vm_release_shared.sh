@@ -107,7 +107,7 @@ for svc in api control-plane nginx; do
   [[ "$ready" == 1 ]]
 done
 python3 "$ROOT/scripts/install_shared_proxy.py" --backup "$BACKUP"
-curl --fail --silent http://127.0.0.1/qopz/health -H 'Host: 178.104.94.34' | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"] == "ok"'
+python3 "$ROOT/scripts/opz_http_ready.py" http://127.0.0.1/qopz/health --host 178.104.94.34 --timeout 30
 python3 "$ROOT/scripts/opz_release_state.py" publish "$BASE" "$BACKUP" "$ROOT" "$ENV"
 trap - ERR
 echo "RELEASE OK commit=$REV backup=$BACKUP"

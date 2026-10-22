@@ -81,6 +81,9 @@ Il ponte TCP autorizzato collega solo la porta 4004 tra `qopz-net` e
 `app_default`; non pubblica porte host, non sposta l'API nella rete del
 Gateway e non riavvia il Gateway. Il Gateway verificato e in modalita paper.
 La validazione non invia ordini; il ponte rimane disponibile dopo il test.
+Nel profilo condiviso `CONTROL_MANAGE_IBWR=0` disabilita esplicitamente
+start/stop e mostra `EXTERNAL`, anche se esiste un vecchio Gateway QOpz
+spento: non puo essere riavviato per creare un login concorrente.
 Il controllo Docker accetta solo container con entrambi
 i label di progetto e servizio corretti; non ripiega su servizi omonimi.
 Il token del control-plane e privato e obbligatorio, mai il valore comune
@@ -106,6 +109,9 @@ Procedura del rilascio (dopo i gate e gli audit preliminari sul candidato; i due
    errore la procedura tenta il rollback dei servizi e del proxy; il
    backup DB resta disponibile per un ripristino esplicito, non viene
    sovrascritto automaticamente su un processo vivo.
+   Il reload e asincrono: il checkpoint HTTP attende al massimo 30 secondi,
+   registra gli esiti e accetta soltanto una risposta 200 JSON con stato
+   `ok`, mai una pagina HTML della SPA. Un mancato ready avvia il rollback.
 5. Controllare il commit in `/opt/qopz/current-release.json`, le prove
    HTTP/browser e i container degli altri progetti prima di chiudere il
    rilascio. Il file runtime con le credenziali ha permessi 600 e non va

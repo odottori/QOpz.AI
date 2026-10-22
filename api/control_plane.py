@@ -22,6 +22,7 @@ _TOKEN = str(os.environ.get("CONTROL_API_TOKEN", "")).strip()
 _SOCK_PATH = str(os.environ.get("DOCKER_SOCK_PATH", "/var/run/docker.sock")).strip() or "/var/run/docker.sock"
 _PROJECT = str(os.environ.get("CONTROL_COMPOSE_PROJECT", "qopz")).strip() or "qopz"
 _IBWR_SERVICE = str(os.environ.get("CONTROL_IBWR_SERVICE", "ibg")).strip() or "ibg"
+_MANAGE_IBWR = str(os.environ.get("CONTROL_MANAGE_IBWR", "1")).strip().lower() in {"1", "true", "yes", "on"}
 _BACKEND = str(os.environ.get("CONTROL_BACKEND", "docker")).strip().lower() or "docker"
 _EVENTS_PATH = Path(
     str(os.environ.get("CONTROL_EVENTS_PATH", "/app/data/control/ibwr_events.jsonl")).strip()
@@ -413,6 +414,13 @@ def _ibwr_action_docker(action: str, source: str) -> dict[str, Any]:
 
 
 def _ibwr_action(action: str, source: str) -> dict[str, Any]:
+    if not _MANAGE_IBWR:
+        if action != "status":
+            raise HTTPException(status_code=409, detail="Gateway shared and externally managed; start/stop disabled")
+        return {"ok": True, "requested_action": "status", "applied_action": "status",
+                "service_name": _IBWR_SERVICE, "service_state": "EXTERNAL", "managed": False,
+                "reason": "EXTERNALLY_MANAGED", "backend": "external", "container_id": None,
+                "ts_utc": _now_utc(), "source": source}
     if _BACKEND == "local_process":
         return _ibwr_action_local(action, source)
     return _ibwr_action_docker(action, source)
@@ -437,8 +445,11 @@ def _services_status() -> dict[str, dict[str, Any]]:
                 "open_ports": open_ports,
             }
         }
-    names = ["api", "nginx", "tg-bot", _IBWR_SERVICE]
+    names = ["api", "nginx", "tg-bot"] + ([_IBWR_SERVICE] if _MANAGE_IBWR else [])
     out: dict[str, dict[str, Any]] = {}
+    if not _MANAGE_IBWR:
+        out[_IBWR_SERVICE] = {"present": None, "state": "EXTERNAL", "running": None,
+                              "managed": False, "container_id": None, "backend": "external"}
     with _docker_client() as client:
         containers = _list_containers(client, all_containers=True)
         for name in names:

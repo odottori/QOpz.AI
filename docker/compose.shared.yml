@@ -7,6 +7,8 @@ services:
       - IBKR_PORTS=4004
   control-plane:
     image: qopz-api:${OPZ_RELEASE:?Set OPZ_RELEASE to the deployed commit}
+    environment:
+      - CONTROL_MANAGE_IBWR=0
   nginx:
     image: qopz-nginx:${OPZ_RELEASE:?Set OPZ_RELEASE to the deployed commit}
   broker-proxy:
