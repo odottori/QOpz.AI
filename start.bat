@@ -1,4 +1,3 @@
 @echo off
-setlocal
-set "ROOT=%~dp0"
-Qopz_START.BAT
+call "%~dp0QOPZ_START.bat"
+exit /b %errorlevel%

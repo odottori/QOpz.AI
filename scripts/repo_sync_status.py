@@ -35,8 +35,8 @@ def _parse_ahead_behind(value: str) -> tuple[int, int]:
     parts = value.strip().split()
     if len(parts) != 2:
         raise ValueError(f"invalid ahead/behind payload: {value!r}")
-    behind = int(parts[0])
-    ahead = int(parts[1])
+    ahead = int(parts[0])
+    behind = int(parts[1])
     return ahead, behind
 
 

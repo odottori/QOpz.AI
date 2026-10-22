@@ -43,12 +43,9 @@ document.addEventListener("DOMContentLoaded", function () {
   document.body.appendChild(printAllBtn);
 
   printAllBtn.addEventListener("click", function () {
-    // Detect base path from current location
-    const base = document.querySelector("base") ? document.querySelector("base").href : window.location.origin + "/";
-    // Build URL to guida_completa page (works for both mkdocs serve and static build)
-    const loc = window.location.pathname;
-    const root = loc.replace(/\/[^/]*\/?$/, "/");
-    window.open(root + "guida_completa/", "_blank");
+    const link = document.querySelector("a.md-logo");
+    const root = link ? link.href : new URL("./", window.location.href).href;
+    window.open(new URL("guida_completa/", root).href, "_blank", "noopener");
   });
 
 });

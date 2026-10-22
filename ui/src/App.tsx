@@ -1178,7 +1178,10 @@ export default function App() {
   };
   const [symbolSnaps, setSymbolSnaps] = useState<SymbolSnap[]>([]);
   const [termCurves, setTermCurves] = useState<TermCurveSymbol[]>([]);
-  const REFRESH_CONTROLS_ENABLED = false; // flusso operativo auto on-connect + hard reload (Ctrl+F5)
+  const [termCurvesCapturedAt, setTermCurvesCapturedAt] = useState<string | null>(null);
+  const [termCurvesStale, setTermCurvesStale] = useState(true);
+  const [termCurvesLoading, setTermCurvesLoading] = useState(false);
+  const REFRESH_CONTROLS_ENABLED = true; // updates are explicit; opening the UI is read-only
 
   const deriveSnapState = (s: SymbolSnap): { status: "ok" | "partial" | "error"; note: string | null } => {
     const errRaw = String(s.error_msg ?? "").trim();
@@ -1884,8 +1887,10 @@ export default function App() {
         setSymbolSnaps(snaps.items ?? []);
       } catch { /* non critico */ }
       try {
-        const curves = await apiJson<{items: TermCurveSymbol[]}>(`${API_BASE}/opz/universe/term_structure?profile=${ACTIVE_PROFILE}&top_n=3`);
+        const curves = await apiJson<{items: TermCurveSymbol[]; captured_at?: string; stale?: boolean}>(`${API_BASE}/opz/universe/term_structure?profile=${ACTIVE_PROFILE}&top_n=3`);
         setTermCurves(curves.items ?? []);
+        setTermCurvesCapturedAt(curves.captured_at ?? null);
+        setTermCurvesStale(curves.stale ?? true);
       } catch { /* non critico */ }
       void doFetchUniverseLatest();
     } catch { /* non critico */ }
@@ -1895,10 +1900,6 @@ export default function App() {
       const CD_SECS = 90;
       if (datiCdRef.current) clearInterval(datiCdRef.current);
       setDatiCdSecs(CD_SECS);
-      setSysLog([]);
-      try {
-        await apiJson<SysLogClearResponse>(`${API_BASE}/opz/system/log/clear`, { method: "POST" });
-      } catch { /* non critico */ }
       datiCdRef.current = setInterval(() => {
         setDatiCdSecs(prev => {
           if (prev === null || prev <= 1) {
@@ -1934,8 +1935,10 @@ export default function App() {
           setSymbolSnaps(snaps2.items ?? []);
         } catch { /* non critico */ }
         try {
-          const curves2 = await apiJson<{items: TermCurveSymbol[]}>(`${API_BASE}/opz/universe/term_structure?profile=${ACTIVE_PROFILE}&top_n=3`);
+          const curves2 = await apiJson<{items: TermCurveSymbol[]; captured_at?: string; stale?: boolean}>(`${API_BASE}/opz/universe/term_structure?profile=${ACTIVE_PROFILE}&top_n=3`);
           setTermCurves(curves2.items ?? []);
+          setTermCurvesCapturedAt(curves2.captured_at ?? null);
+          setTermCurvesStale(curves2.stale ?? true);
         } catch { /* non critico */ }
         void doFetchUniverseLatest();
       } catch (e) {
@@ -1945,6 +1948,23 @@ export default function App() {
         if (datiCdRef.current) { clearInterval(datiCdRef.current); datiCdRef.current = null; }
         setDatiCdSecs(null);
       }
+    }
+  }
+
+  async function doRefreshTermCurves() {
+    setTermCurvesLoading(true);
+    try {
+      const curves = await apiJson<{items: TermCurveSymbol[]; captured_at?: string; stale?: boolean}>(
+        `${API_BASE}/opz/universe/term_structure/refresh?profile=${ACTIVE_PROFILE}&top_n=3`,
+        { method: "POST", signal: AbortSignal.timeout(120000) },
+      );
+      setTermCurves(curves.items ?? []);
+      setTermCurvesCapturedAt(curves.captured_at ?? null);
+      setTermCurvesStale(curves.stale ?? true);
+    } catch (e) {
+      setError(`Aggiornamento curve fallito: ${String(e)}`);
+    } finally {
+      setTermCurvesLoading(false);
     }
   }
 
@@ -2604,8 +2624,8 @@ export default function App() {
     void doFetchSessionStatus();
     void doFetchSessionLogs();
     void doFetchControlStatus();
-    // refresh dati all'apertura UI, ma senza forzare run sessione fuori scheduler
-    void doFetchFeedLog(undefined, undefined, true, false);
+    // Opening a dashboard must neither run ingestion nor erase diagnostic evidence.
+    void doFetchFeedLog();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Heartbeat ogni 5 minuti — solo status leggeri e letture passive
@@ -3528,9 +3548,14 @@ export default function App() {
                             <div style={{padding:"4px 12px 8px"}}>
                               <div style={{fontSize:"0.56rem", textTransform:"uppercase", letterSpacing:"0.06em", color:"#7aaa90", marginBottom:4}}>
                                 Curve a termine (3 scadenze regolari, ranking liquidita) - bande 1sigma/2sigma
+                                <button className="btn btn-ghost" disabled={!apiOnline || termCurvesLoading}
+                                  onClick={() => void doRefreshTermCurves()}>
+                                  {termCurvesLoading ? "Aggiornamento curve..." : "Aggiorna curve IBKR"}
+                                </button>
                               </div>
                               <div style={{fontSize:"0.55rem", color:"#666", marginBottom:6}}>
                                 simboli con curve: {termSymbolsOk} · simboli in errore: {termSymbolsErr} · righe: {termCurveRows.length}
+                                {" · cache: "}{termCurvesCapturedAt ?? "non disponibile"}{termCurvesStale ? " (da aggiornare)" : ""}
                               </div>
                               <div style={{overflowX:"auto", border:"1px solid var(--border)", borderRadius:4}}>
                                 {termCurveRows.length === 0 ? (

@@ -6,9 +6,11 @@
 ## Prima di iniziare
 
 Hai bisogno di:
-- Console aperta su `http://localhost:8173` (o indirizzo VM)
-- API in esecuzione (`docker compose up -d` sulla VM, o `QOPZ_START.bat` in locale)
-- IBKR TWS o IBG attivo se vuoi dati reali (porta 7496 paper, 7497 live)
+- Console locale su `http://127.0.0.1:8173/`, oppure VM su `https://qopzai.duckdns.org/qopz/`
+- Avvio locale con `QOPZ_START.bat`; sulla VM seguire il [runbook di avvio e deploy](avvio_deploy.md), senza riavviare tutto lo stack condiviso.
+- IBKR TWS o IBG attivo se vuoi dati reali (default TWS: 7497 paper, 7496 live; IB Gateway: 4002 paper, 4001 live; eventuali bridge Docker sono configurati separatamente)
+
+Sulla VM, anteporre `/qopz` agli endpoint mostrati sotto (per esempio `/qopz/opz/session/status`). L'health positivo certifica solo la disponibilita tecnica, non dati o broker pronti.
 
 Se l'API è online vedrai **API LIVE** verde in alto a destra. Se vedi **API DOWN**, l'API non risponde — non procedere.
 

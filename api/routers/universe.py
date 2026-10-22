@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+import threading
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ class ScanItemStatusRequest(BaseModel):
 
 
 router = APIRouter()
+_TERM_REFRESH_LOCK = threading.Lock()
 
 
 @router.get("/opz/universe/latest")
@@ -61,7 +63,7 @@ def opz_universe_term_structure(
     with ATM IV and 1sigma/2sigma price bands.
     """
     from api import opz_api as compat
-    from scripts.fetch_iv_history_ibkr import capture_ibkr_universe_term_structure
+    from api.term_structure_cache import read_cache
 
     uni = compat.opz_universe_latest(profile=profile)
     raw_items = uni.get("items") or []
@@ -84,14 +86,36 @@ def opz_universe_term_structure(
             "error": "universe symbols unavailable",
         }
 
-    items = capture_ibkr_universe_term_structure(symbols, profile=profile, top_n=int(top_n))
-    return {
-        "profile": profile,
-        "count": len(items),
-        "top_n": int(top_n),
-        "sigma_levels": [1, 2],
-        "items": items,
-    }
+    try:
+        return read_cache(profile, symbols, int(top_n))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post('/opz/universe/term_structure/refresh')
+def refresh_universe_term_structure(profile: str = 'paper', top_n: int = Query(3, ge=1, le=6)) -> Dict[str, Any]:
+    from api import opz_api as compat
+    from api.term_structure_cache import _path, read_cache, save_cache
+    from scripts.fetch_iv_history_ibkr import capture_ibkr_universe_term_structure
+
+    try:
+        _path(profile)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not _TERM_REFRESH_LOCK.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail='Curve refresh already running')
+    try:
+        rows = compat.opz_universe_latest(profile=profile).get('items') or []
+        symbols = list(dict.fromkeys(str(row.get('symbol') or '').strip().upper() for row in rows if row.get('symbol')))
+        if not symbols:
+            raise HTTPException(status_code=409, detail='Universe unavailable; run the explicit data refresh first')
+        items = capture_ibkr_universe_term_structure(symbols[:50], profile=profile, top_n=int(top_n))
+        if not any(item.get('chains') for item in items):
+            raise HTTPException(status_code=503, detail='Broker curves unavailable; previous cache preserved')
+        save_cache(profile, items)
+        return read_cache(profile, symbols, int(top_n))
+    finally:
+        _TERM_REFRESH_LOCK.release()
 
 
 @router.post("/opz/universe/scan")

@@ -24,6 +24,7 @@ theme:
 
 nav:
   - Prefazione: index.md
+  - Avvio e VM condivisa: avvio_deploy.md
   - 'Cap. 0 — Il Perché': 00_perche.md
   - 'Cap. 1 — I Dati': 02_dati.md
   - 'Cap. 2 — I Filtri': 03_filtri.md

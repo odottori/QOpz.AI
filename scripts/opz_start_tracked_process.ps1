@@ -37,6 +37,7 @@ $psi = @{
   FilePath = $FilePath
   WorkingDirectory = $WorkingDirectory
   PassThru = $true
+  WindowStyle = 'Hidden'
 }
 if(-not [string]::IsNullOrWhiteSpace($effectiveArgumentLine)){
   $psi.ArgumentList = $effectiveArgumentLine
@@ -60,6 +61,9 @@ if(-not $p){
   Write-Error "failed to start process"
   exit 1
 }
+$identityPath = Join-Path $repo "logs\tracked\identity-$($p.Id).json"
+New-Item -ItemType Directory -Force (Split-Path -Parent $identityPath) | Out-Null
+@{ startTicks = $p.StartTime.ToUniversalTime().Ticks.ToString(); executable = $p.Path } | ConvertTo-Json | Set-Content -Encoding UTF8 $identityPath
 
 $cmd = $FilePath
 if(-not [string]::IsNullOrWhiteSpace($effectiveArgumentLine)){

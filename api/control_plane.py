@@ -97,12 +97,7 @@ def _find_compose_service(containers: list[dict[str, Any]], service: str) -> Opt
         labels = item.get("Labels") if isinstance(item.get("Labels"), dict) else {}
         svc = str(labels.get("com.docker.compose.service") or "").strip().lower()
         proj = str(labels.get("com.docker.compose.project") or "").strip().lower()
-        if svc == want and (not _PROJECT or not proj or proj == _PROJECT.lower()):
-            return item
-    for item in containers:
-        labels = item.get("Labels") if isinstance(item.get("Labels"), dict) else {}
-        svc = str(labels.get("com.docker.compose.service") or "").strip().lower()
-        if svc == want:
+        if svc == want and proj == _PROJECT.lower():
             return item
     return None
 

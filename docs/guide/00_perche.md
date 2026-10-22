@@ -46,13 +46,13 @@ Esistono decine di strategie di trading. Scalping, momentum, mean reversion, car
 **Tre ragioni concrete:**
 
 **1. Si adatta a chi ha un'altra vita.**
-Non richiede di stare incollato agli schermi tutto il giorno. Le opzioni si muovono lentamente rispetto alle azioni. Un'opportunità aperta oggi sarà ancora lì domani. Il sistema monitora per te — e ti avvisa solo quando c'è qualcosa che merita la tua attenzione.
+Non richiede di stare incollato agli schermi tutto il giorno. Prezzi, liquidita e opportunita possono cambiare rapidamente: una proposta va verificata nuovamente al momento della decisione. Il sistema monitora per te — e ti avvisa solo quando c'è qualcosa che merita la tua attenzione.
 
-**2. Il rischio è sempre definito.**
-Prima di aprire qualsiasi posizione, sai già il massimo che puoi perdere. Non è una stima. Non è una speranza. È un numero scritto nel contratto. Questo cambia completamente il modo in cui dormi la notte.
+**2. Il rischio va quantificato prima di operare.**
+Per gli spread a rischio definito il modello calcola la perdita teorica della struttura. La verifica operativa deve considerare anche esecuzione, costi, assegnazione e gestione delle gambe: non tutte le strategie del sistema hanno lo stesso profilo di rischio.
 
-**3. La probabilità lavora strutturalmente per te.**
-Un credit spread ben costruito ha una probabilità di successo che parte dal 60–70% per design — non per fortuna. Non significa che vinci sempre. Significa che, su un numero sufficiente di operazioni, la matematica tende dalla tua parte.
+**3. Probabilita e valore atteso vanno verificati.**
+La probabilita stimata dipende da struttura, prezzi, modello e dati. Una frequenza elevata di operazioni vincenti non garantisce un valore atteso positivo: contano anche le perdite, i costi e la robustezza delle stime. Non e prevista una probabilita di successo garantita.
 
 ---
 

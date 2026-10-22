@@ -39,7 +39,7 @@ La strategia Wheel funziona in cicli. Non è pensata per chi vuole esposizione d
 
 Il ciclo inizia con una **Cash-Secured Put**: vendi una put su IWM, incassi un premio, e ti impegni ad acquistare 100 azioni se la put viene esercitata. Hai abbastanza liquidità in conto per farlo. Se la put scade senza essere esercitata, tieni il premio e ricomincia. Se viene esercitata, ricevi le 100 azioni al prezzo di strike.
 
-A quel punto sei nella fase di **assegnazione**: hai le azioni. Il tuo costo effettivo è lo strike meno il premio già incassato — non hai perso nulla, hai semplicemente cambiato forma al tuo capitale. E adesso vendi una **Covered Call**: un'opzione call sulle azioni che hai, con strike uguale o superiore al tuo costo di acquisto. Incassi un altro premio. Se la call scade, vendi un'altra. Se viene esercitata, le azioni vengono "chiamate via" al prezzo di strike — incassi la differenza di prezzo più tutti i premi accumulati durante il ciclo.
+A quel punto sei nella fase di **assegnazione**: hai le azioni. Il tuo costo effettivo è lo strike meno il premio già incassato — il valore di mercato delle azioni puo essere inferiore al costo e la posizione puo gia registrare una perdita. L'assegnazione cambia l'esposizione e richiede capitale disponibile; i premi non eliminano il rischio. E adesso vendi una **Covered Call**: un'opzione call sulle azioni che hai, con strike uguale o superiore al tuo costo di acquisto. Incassi un altro premio. Se la call scade, vendi un'altra. Se viene esercitata, le azioni vengono "chiamate via" al prezzo di strike — incassi la differenza di prezzo più tutti i premi accumulati durante il ciclo.
 
 Il ciclo ricomincia.
 

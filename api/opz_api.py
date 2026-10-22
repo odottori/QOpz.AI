@@ -422,7 +422,8 @@ async def _app_lifespan(_app: FastAPI):
         init_execution_schema()
         init_wheel_schema()
     except Exception as exc:
-        logger.warning("STARTUP_STORAGE_WARN %s", exc)
+        logger.exception("STARTUP_STORAGE_FAILED %s", exc)
+        raise
 
     # Avvia scheduler se abilitato in config
     cfg = _load_sessions_config()
@@ -462,7 +463,8 @@ async def _app_lifespan(_app: FastAPI):
         logger.info("SESSION_SCHEDULER stopped")
 
 
-app = FastAPI(title="OPZ Operator API", version="0.1.0", lifespan=_app_lifespan)
+app = FastAPI(title="OPZ Operator API", version="0.1.0", lifespan=_app_lifespan,
+              root_path=os.environ.get("OPZ_ROOT_PATH", "").rstrip("/"))
 
 app.add_middleware(
     CORSMiddleware,

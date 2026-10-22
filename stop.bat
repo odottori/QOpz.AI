@@ -1,4 +1,4 @@
 @echo off
-setlocal
-set "ROOT=%~dp0"
-Qopz_STOP.bat
+setlocal EnableExtensions
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\opz_local.ps1" -Action stop -Role all
+exit /b %errorlevel%

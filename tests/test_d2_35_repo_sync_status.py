@@ -7,8 +7,8 @@ from scripts import repo_sync_status
 class TestD2_35_RepoSyncStatus(unittest.TestCase):
     def test_parse_ahead_behind(self):
         ahead, behind = repo_sync_status._parse_ahead_behind("2 5")
-        self.assertEqual(ahead, 5)
-        self.assertEqual(behind, 2)
+        self.assertEqual(ahead, 2)
+        self.assertEqual(behind, 5)
 
     def test_collect_sync_status_with_upstream(self):
         outputs = {
@@ -27,8 +27,8 @@ class TestD2_35_RepoSyncStatus(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["branch"], "work")
         self.assertEqual(payload["upstream"], "origin/work")
-        self.assertEqual(payload["ahead"], 3)
-        self.assertEqual(payload["behind"], 1)
+        self.assertEqual(payload["ahead"], 1)
+        self.assertEqual(payload["behind"], 3)
         self.assertTrue(payload["needs_realign"])
         self.assertTrue(payload["push_ready"])
         self.assertEqual(payload["push_hint"], "git push")

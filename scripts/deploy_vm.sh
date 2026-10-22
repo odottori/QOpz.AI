@@ -6,6 +6,10 @@
 #   NGINX_PASSWORD: password for basic auth (generated if omitted)
 # =============================================================================
 set -euo pipefail
+if [[ "${OPZ_ALLOW_LEGACY_BOOTSTRAP:-0}" != 1 ]]; then
+  echo 'Legacy whole-host script disabled. Use docs/guide/avvio_deploy.md for the shared VM.' >&2
+  exit 64
+fi
 
 TWS_HOST="${1:-127.0.0.1}"
 REPO_URL="https://github.com/odottori/QOpz.AI.git"

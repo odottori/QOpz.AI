@@ -30,14 +30,14 @@ class TestLaunchReadinessScripts(unittest.TestCase):
 
     def test_api_launcher_uses_argumentsline_not_powershell_array_literals(self):
         text = self._read_text("scripts/opz_start_api_if_needed.bat")
-        self.assertIn('set "OPZ_API_ARGUMENTS=-m uvicorn api.opz_api:app --host 127.0.0.1 --port %PORT%"', text)
-        self.assertIn('-ArgumentsLine "%OPZ_API_ARGUMENTS%"', text)
+        self.assertIn('-Action start -Role api', text)
+        self.assertIn('opz_local.ps1', text)
         self.assertNotIn('-ArgumentList "-m","uvicorn"', text)
 
     def test_ui_launcher_uses_argumentsline_not_powershell_array_literals(self):
         text = self._read_text("scripts/opz_start_ui_if_needed.bat")
-        self.assertIn('set "OPZ_UI_ARGUMENTS=run dev -- --host 127.0.0.1 --port %PORT%"', text)
-        self.assertIn('-ArgumentsLine "%OPZ_UI_ARGUMENTS%"', text)
+        self.assertIn('-Action start -Role ui', text)
+        self.assertIn('opz_local.ps1', text)
         self.assertNotIn('-ArgumentList "run","dev"', text)
 
 

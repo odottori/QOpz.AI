@@ -1,0 +1,27 @@
+services:
+  api:
+    image: qopz-api:${OPZ_RELEASE:?Set OPZ_RELEASE to the deployed commit}
+    environment:
+      - IBKR_HOST=broker-proxy
+      - IBKR_PORT=4004
+      - IBKR_PORTS=4004
+  control-plane:
+    image: qopz-api:${OPZ_RELEASE:?Set OPZ_RELEASE to the deployed commit}
+  nginx:
+    image: qopz-nginx:${OPZ_RELEASE:?Set OPZ_RELEASE to the deployed commit}
+  broker-proxy:
+    image: qopz-broker-proxy:${OPZ_RELEASE:?Set OPZ_RELEASE to the deployed commit}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.broker-proxy
+    networks:
+      - qopz-net
+      - shared-ibg
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+networks:
+  shared-ibg:
+    external: true
+    name: app_default

@@ -1,5 +1,3 @@
 @echo off
-setlocal
-cd /d %~dp0\..
-call scripts\opz_run_api_tab.cmd
+call "%~dp0opz_start_api_if_needed.bat"
 exit /b %errorlevel%

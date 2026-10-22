@@ -7,6 +7,8 @@
 
 ---
 
+> Avvio, pubblicazione su VM condivisa e criteri di verifica correnti: [runbook operativo](STARTUP_DEPLOY_RUNBOOK.md). Il planner completo non certifica esecuzione live o redditivita.
+
 ## 0. Visione del Sistema
 
 QOpz.AI è un sistema quantitativo per il trading di opzioni su azioni e ETF progettato per operatori retail che vogliono lavorare con rigore istituzionale su capitali contenuti (€1k–€20k+).

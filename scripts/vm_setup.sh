@@ -10,6 +10,10 @@
 # =============================================================================
 
 set -euo pipefail
+if [[ "${OPZ_ALLOW_LEGACY_BOOTSTRAP:-0}" != 1 ]]; then
+  echo 'Legacy whole-host script disabled. Use docs/guide/avvio_deploy.md for the shared VM.' >&2
+  exit 64
+fi
 
 # ── Colori ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'

@@ -1,41 +1,23 @@
-from pathlib import Path
+import subprocess
+import sys
 import unittest
-
-import pytest
-
+from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
-
 class TestWindowsTerminalLauncher(unittest.TestCase):
-    @pytest.mark.xfail(
-        strict=False,
-        reason="contradicts test_f3_t4_launcher_reset.py's expectation (opz_launcher_reset.py "
-        "IN the batch files) — two superseding launcher-design iterations left uncommitted "
-        "side by side; needs a product decision on which to keep, tracked as a follow-up",
-    )
-    def test_root_batches_point_to_new_script(self):
-        start = (ROOT / 'QOPZ_START.bat').read_text(encoding='utf-8')
-        stop = (ROOT / 'QOPZ_STOP.bat').read_text(encoding='utf-8')
-        self.assertIn('opz_wt_launcher.ps1', start)
-        self.assertIn('opz_wt_launcher.ps1', stop)
-        self.assertNotIn('opz_launcher_reset.py', start)
-        self.assertNotIn('opz_launcher_reset.py', stop)
-
-    def test_ps1_is_bom_free_and_uses_new_tab_and_split(self):
-        ps1 = ROOT / 'scripts' / 'opz_wt_launcher.ps1'
-        data = ps1.read_bytes()
+    def test_ps1_is_bom_free(self):
+        data = (ROOT / 'scripts/opz_local.ps1').read_bytes()
         self.assertFalse(data.startswith(b'\xef\xbb\xbf'))
-        text = data.decode('utf-8')
-        self.assertIn("'new-tab'", text)
-        self.assertIn("'split-pane'", text)
-        self.assertIn("'-w', $WindowName", text)
-        self.assertIn('Start-Process -FilePath $wtExe', text)
+        self.assertTrue(data.startswith(b'param('))
 
-    def test_no_old_helper_cmds_in_active_path(self):
-        start = (ROOT / 'QOPZ_START.bat').read_text(encoding='utf-8')
-        self.assertNotIn('opz_run_api_tab.cmd', start)
-        self.assertNotIn('opz_run_ui_tab.cmd', start)
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows PowerShell syntax')
+    def test_powershell_parser_accepts_controller(self):
+        command = "$e=$null; [void][Management.Automation.Language.Parser]::ParseFile('scripts/opz_local.ps1',[ref]$null,[ref]$e); if($e){$e; exit 1}"
+        p = subprocess.run(['powershell.exe', '-NoProfile', '-Command', command], cwd=ROOT, capture_output=True, text=True, timeout=20)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_batch_entrypoints_propagate_failure(self):
+        for rel in ['QOPZ_START.bat', 'QOPZ_STOP.bat', 'scripts/opz_start_local.bat', 'scripts/opz_start_tabs.bat']:
+            text = (ROOT / rel).read_text(encoding='utf-8')
+            self.assertIn('exit /b %errorlevel%', text)
+            self.assertNotIn('start "', text)

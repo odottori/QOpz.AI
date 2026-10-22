@@ -42,7 +42,15 @@ foreach($e in $entries){
   $id = [int]$e.pid
   if($id -le 0){ continue }
   try {
-    Stop-Process -Id $id -Force -ErrorAction Stop
+    $identityPath = Join-Path $repo "logs\tracked\identity-$id.json"
+    if(-not (Test-Path $identityPath)){ throw 'legacy entry without process identity; refusing stop' }
+    $identity = Get-Content $identityPath -Raw | ConvertFrom-Json
+    $proc = Get-Process -Id $id -ErrorAction Stop
+    if($proc.StartTime.ToUniversalTime().Ticks.ToString() -ne [string]$identity.startTicks -or $proc.Path -ne [string]$identity.executable){
+      throw 'process identity mismatch; refusing stop'
+    }
+    & taskkill.exe /PID $id /T /F | Out-Null
+    if($LASTEXITCODE -ne 0){ throw 'taskkill failed' }
     & $registryPython "$repo\scripts\opz_process_registry.py" unregister --owner $Owner --pid $id | Out-Null
     $stopped += 1
     Write-Output "TRACKED_STOP owner=$Owner pid=$id role=$($e.role)"

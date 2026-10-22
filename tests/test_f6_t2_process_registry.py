@@ -1,4 +1,5 @@
-﻿import json
+import json
+import os
 import shutil
 import unittest
 from pathlib import Path
@@ -7,6 +8,10 @@ import scripts.opz_process_registry as reg
 
 
 class TestF6T2ProcessRegistry(unittest.TestCase):
+    def test_liveness_probe_recognizes_self(self):
+        self.assertTrue(reg._proc_alive(os.getpid()))
+        self.assertFalse(reg._proc_alive(-1))
+
     def test_register_list_untrack_cleanup(self):
         root = Path(".tmp_test_registry")
         if root.exists():

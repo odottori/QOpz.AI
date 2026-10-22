@@ -1,0 +1,4 @@
+FROM alpine:3.22
+RUN apk add --no-cache socat
+USER 65534:65534
+CMD ["socat", "TCP-LISTEN:4004,fork,reuseaddr", "TCP:ibg:4004"]

@@ -32,25 +32,13 @@ La differenza è solo di **modalità operativa**:
 
 Quindi il comportamento passato non è sbagliato: è solo un workflow diverso.
 
-## Runbook VM (memoria operativa persistente)
+## Runbook VM
 
-Questi valori sono da considerare baseline fino a nuova evidenza:
+La procedura corrente e [Avvio e pubblicazione QOpz](STARTUP_DEPLOY_RUNBOOK.md).
+SSH usa l'alias `edge-vm` e la chiave gia presente in configurazione;
+non disabilitare la verifica della chiave host.
 
-- Host VM: `178.104.94.34`
-- Utente SSH operativo: `root`
-- Chiave SSH locale: `$HOME/.ssh/qopz_vm_key`
-- Repo path in VM: `/opt/qopz`
-- Branch deploy: `main`
-
-Comandi standard:
-
-- Ping SSH:
-  - `ssh -i $HOME/.ssh/qopz_vm_key -o StrictHostKeyChecking=no root@178.104.94.34 "echo ping"`
-- Sync Git -> VM (fast-forward):
-  - `ssh -i $HOME/.ssh/qopz_vm_key -o StrictHostKeyChecking=no root@178.104.94.34 "cd /opt/qopz && git pull --ff-only origin main"`
-- Health API:
-  - `curl -sS --max-time 20 http://178.104.94.34/health`
-
-Nota operativa:
-- Prima del sync, eseguire sempre `git push origin main`.
-- Se `git pull --ff-only` fallisce, fermarsi e risolvere divergenza branch (no reset distruttivi).
+Il checkout storico `/opt/qopz` contiene configurazioni locali da preservare.
+Un `git pull` da solo non aggiorna le immagini/container. Il rilascio va
+verificato separatamente dal push Git, usando `/qopz/` per UI e API.
+I log e i due audit devono attestare il commit realmente in esecuzione.

@@ -9,6 +9,11 @@ function normalizeBasePath(raw: string | undefined): string {
 }
 
 const basePath = normalizeBasePath(process.env.VITE_BASE_PATH);
+const apiProxy = {
+  "/opz": "http://127.0.0.1:8765",
+  "/health": "http://127.0.0.1:8765",
+  "/guide": "http://127.0.0.1:8765",
+};
 
 export default defineConfig({
   base: basePath,
@@ -17,11 +22,9 @@ export default defineConfig({
     port: 8173,
     strictPort: true,
     // Dev proxy: /opz/* and /health to local FastAPI.
-    proxy: {
-      "/opz": "http://localhost:8765",
-      "/health": "http://localhost:8765",
-    },
+    proxy: apiProxy,
   },
+  preview: { port: 8173, strictPort: true, proxy: apiProxy },
   build: {
     outDir: "dist",
     emptyOutDir: true,
